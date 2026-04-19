@@ -9,7 +9,8 @@ Claude skills for working with SentinelOne. Each subfolder is a standalone skill
 
 ## Installing
 
-Drop a skill folder into your Claude skills directory (for Claude Code / Cowork, typically `~/.claude/skills/`). Claude will pick it up on next session.
+1. Drop a skill folder into your Claude skills directory (for Claude Code / Cowork, typically `~/.claude/skills/`). Claude will pick it up on next session.
+2. Clone and zip the folder, upload the skill to Claude Cowork. Note: the sentinelone-mgmt-console-api needs a valid config.json - ensure you use it responsibly with an RO token, plan and validate actions before executing any changes. 
 
 ## Configuration
 
