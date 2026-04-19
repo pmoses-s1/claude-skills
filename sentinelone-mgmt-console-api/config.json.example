@@ -1,0 +1,9 @@
+{
+  "_comment": "Copy this file to config.json and fill in your SentinelOne Management Console details. config.json is gitignored — never commit real tokens.",
+  "base_url": "https://<your-tenant>.sentinelone.net",
+  "api_token": "<PASTE_YOUR_API_TOKEN_HERE>",
+  "verify_tls": true,
+  "timeout_seconds": 30,
+  "default_account_ids": [],
+  "default_site_ids": []
+}
