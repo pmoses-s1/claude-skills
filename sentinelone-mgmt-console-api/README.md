@@ -1,6 +1,6 @@
 # sentinelone-mgmt-console-api (Claude skill)
 
-A Claude skill wrapping the SentinelOne Management Console API (Swagger 2.1, 781 operations, 113 tags) plus a natural-language wrapper over the console's undocumented Purple AI GraphQL endpoint.
+A Claude skill wrapping the SentinelOne Management Console API (Swagger 2.1, 781 operations, 113 tags) plus the two GraphQL surfaces the console exposes: **Unified Alert Management** (documented, for modern multi-source alert triage and bulk actions) and **Purple AI** (undocumented, for natural-language SDL queries).
 
 ## Install
 
@@ -41,13 +41,20 @@ python scripts/s1_client.py
 
 Should print the first 5 accounts.
 
+Unified Alert Management:
+
+```bash
+python scripts/call_unified_alerts.py list --filter detectionProduct=EDR --first 10
+python scripts/call_unified_alerts.py facets status severity detectionProduct
+```
+
 Purple AI natural-language query (requires tenant entitlement for Purple AI):
 
 ```bash
 python scripts/call_purple.py "show powershell.exe outbound connections in the last 24h, top 10"
 ```
 
-Purple AI answers questions about SDL telemetry (process/network/file events, indicators, ingested logs). It does *not* answer questions about console entities (alerts, threats, agents) — those go through the REST endpoints.
+Purple AI answers questions about SDL telemetry (process/network/file events, indicators, ingested logs). It does *not* answer questions about console entities (alerts, threats, agents) — those go through the REST endpoints or Unified Alert Management.
 
 ## Layout
 
@@ -58,5 +65,7 @@ Purple AI answers questions about SDL telemetry (process/network/file events, in
 - `scripts/search_endpoints.py` — keyword search over the endpoint index
 - `scripts/purple_ai.py` — Purple AI GraphQL wrapper (`purple_query()`, `PurpleAIError`)
 - `scripts/call_purple.py` — Purple AI CLI wrapper
-- `references/` — endpoint index + per-tag reference docs
+- `scripts/unified_alerts.py` — Unified Alert Management GraphQL wrapper (queries, mutations, triage helpers)
+- `scripts/call_unified_alerts.py` — UAM CLI wrapper
+- `references/` — endpoint index + per-tag reference docs; `UNIFIED_ALERTS.md` covers the GraphQL UAM surface
 - `spec/` — the original Swagger JSON
