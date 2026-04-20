@@ -101,10 +101,13 @@ c.add_events(
 )
 
 # ---- Configuration files ----
+# Parsers live under /logParsers/<name> — the SDL API also accepts /parsers/<name>
+# but the Log Parsers UI only reads /logParsers/, so PUTs at /parsers/ are invisible
+# in the console. Use /logParsers/<name> by default.
 files = c.list_files()                        # {"status":"success","paths":["/foo", ...]}
-parser = c.get_file("/parsers/MyParser")      # {"status":"success","content":"...","version":7,...}
-c.put_file("/parsers/MyParser", content="// new parser body")
-c.put_file("/parsers/Stale", delete=True)
+parser = c.get_file("/logParsers/MyParser")   # {"status":"success","content":"...","version":7,...}
+c.put_file("/logParsers/MyParser", content="// new parser body")
+c.put_file("/logParsers/Stale", delete=True)
 ```
 
 ## Authentication
@@ -148,7 +151,7 @@ There is no undo. Configuration files are versioned but accidental deletes still
 - **Hunt with PowerQuery.** `c.power_query("event.type='process creation' src.process.name='powershell.exe' tgt.process.cmdline contains 'IEX' | columns timestamp, agent.uuid, src.process.cmdline", start_time="24h")`. For PQ syntax beyond what's here, defer to the `sentinelone-powerquery` skill.
 - **Webhook → SDL.** Stateless ingest from a Lambda/CF Worker: `c.upload_logs(json.dumps(event), parser="my-webhook-parser", nonce=event_id)`. Reuse the same nonce on retries to dedupe.
 - **Bulk structured ingest.** Generate one session ID at process start, batch events to ~5 MB, call `add_events(session=sess, events=batch)` in a loop. Honour the backoff pattern.
-- **Promote a parser/dashboard.** `get_file("/parsers/Foo")` from staging → `put_file("/parsers/Foo", content=..., expected_version=N)` on production. The `expected_version` guard catches concurrent edits.
+- **Promote a parser/dashboard.** `get_file("/logParsers/Foo")` from staging → `put_file("/logParsers/Foo", content=..., expected_version=N)` on production. The `expected_version` guard catches concurrent edits. (Parser path is `/logParsers/` — `/parsers/` is API-accepted but not UI-visible.)
 - **Audit configuration drift.** `list_files()` then `get_file()` for each path; diff against a checked-in copy.
 - **Quick stats panel.** `facet_query(field="srcIp", filter="status >= 500", start_time="1h")` returns the top offenders fast.
 

@@ -200,8 +200,9 @@ Response: `{"status": "success", "values": [n, n, ...], "cpuUsage": 12}`.
 ## Configuration files
 
 Config files back every SDL customisation: parsers, dashboards, alerts,
-lookups, datatables. Paths look like `/parsers/Foo`, `/dashboards/Bar`,
-`/alerts`, etc.
+lookups, datatables. Paths look like `/logParsers/Foo`, `/dashboards/Bar`,
+`/alerts`, etc. Parsers specifically must use `/logParsers/<name>` —
+the API also accepts `/parsers/<name>` but the Log Parsers UI reads only `/logParsers/`.
 
 ### `listFiles` — `c.list_files()` — CLI `list-files`
 

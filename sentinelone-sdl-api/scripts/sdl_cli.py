@@ -9,7 +9,7 @@ Examples
     python scripts/sdl_cli.py list-files
 
     # Read one
-    python scripts/sdl_cli.py get-file /parsers/uploadLogs
+    python scripts/sdl_cli.py get-file /logParsers/uploadLogs
 
     # Power query
     python scripts/sdl_cli.py power-query "dataset='accesslog' | group count() by status" --start 1h
@@ -36,10 +36,11 @@ Examples
     python scripts/sdl_cli.py add-events --message "something happened" --attr app=hq --attr latencyMs=42
 
     # Put file (create/update)
-    python scripts/sdl_cli.py put-file /parsers/MyParser --content-file ./parser.txt
+    # Parsers: use /logParsers/<name> — /parsers/ is API-accepted but invisible in the UI.
+    python scripts/sdl_cli.py put-file /logParsers/MyParser --content-file ./parser.txt
 
     # Delete file
-    python scripts/sdl_cli.py put-file /parsers/Stale --delete
+    python scripts/sdl_cli.py put-file /logParsers/Stale --delete
 
 Every output is pretty-printed JSON on stdout. Errors exit non-zero with
 the parsed error body.

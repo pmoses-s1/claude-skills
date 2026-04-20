@@ -30,7 +30,8 @@ Usage:
     # config files
     c.list_files()
     c.get_file("/alerts")
-    c.put_file("/parsers/MyParser", content="// parser body")
+    # Parsers: use /logParsers/<name> — /parsers/ is API-accepted but invisible in the UI.
+    c.put_file("/logParsers/MyParser", content="// parser body")
 
 The client retries 429 and 5xx with exponential backoff and honours
 Retry-After. All responses are returned as parsed JSON dicts. Errors

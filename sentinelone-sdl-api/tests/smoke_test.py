@@ -144,8 +144,8 @@ def main():
     pick_path = None
     if isinstance(list_res, dict):
         paths = list_res.get("paths") or []
-        # prefer a /parsers path for getFile; else the first one
-        parsers = [p for p in paths if p.startswith("/parsers/")]
+        # prefer a /logParsers path for getFile; else the first one
+        parsers = [p for p in paths if p.startswith("/logParsers/")]
         pick_path = (parsers or paths or [None])[0]
 
     if pick_path:
