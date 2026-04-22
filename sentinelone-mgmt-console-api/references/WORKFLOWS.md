@@ -62,47 +62,76 @@ Destructive: network quarantine has no undo beyond the corresponding `connect` a
 
 ---
 
-## 4. Deep Visibility hunt — process / file / network
+## 4. Deep Visibility / PowerQuery hunt via LRQ
+
+The Deep Visibility endpoints (`/dv/init-query`, `/dv/query-status`, `/dv/events`, `/dv/events/pq`, `/dv/events/pq-ping`) are deprecated and sunset on 2027-02-15. Use the **Long Running Query (LRQ) API** for every programmatic query, whether S1QL log search or PowerQuery.
 
 ```python
-body = {
-    "query": 'EventType="Process Creation" AND TgtProcName="powershell.exe"',
-    "fromDate": since, "toDate": now,
-    "accountIds": [account_id],
-}
-q = c.post("/web/api/v2.1/dv/init-query", json_body=body)
-qid = q["data"]["queryId"]
+import time, requests
+from urllib.parse import urljoin
 
+# Auth: the same S1Client.api_token works; swap the ApiToken prefix for Bearer
+jwt = c.api_token
+base = c.base_url.rstrip("/")  # tenant's own console host, not xdr.us1.*
+
+body = {
+    "queryType": "PQ",          # or "LOG" for S1QL log search
+    "tenant": True,             # query every account the token can reach
+    "startTime": since, "endTime": now,
+    "queryPriority": "HIGH",
+    "pq": {
+        "query": (
+            "dataSource.name='SentinelOne' dataSource.category='security' "
+            "event.type='Process Creation' src.process.name='powershell.exe' "
+            "| group ct=count() by endpoint.name, src.process.cmdline "
+            "| sort -ct | limit 100"
+        ),
+        "resultType": "TABLE",
+    },
+}
+
+# Launch
+r = requests.post(urljoin(base, "/sdl/v2/api/queries"),
+                  headers={"Authorization": f"Bearer {jwt}"}, json=body,
+                  timeout=30)
+r.raise_for_status()
+qid = r.json()["id"]
+fwd = r.headers["X-Dataset-Query-Forward-Tag"]  # must echo on every GET/DELETE
+
+# Poll (expires 30s after launch or 30s after last poll, so keep polling)
+steps_seen = 0
 while True:
-    st = c.get(f"/web/api/v2.1/dv/query-status", params={"queryId": qid})
-    if st["data"]["responseState"] == "FINISHED":
+    p = requests.get(urljoin(base, f"/sdl/v2/api/queries/{qid}"),
+                     params={"lastStepSeen": steps_seen},
+                     headers={"Authorization": f"Bearer {jwt}",
+                              "X-Dataset-Query-Forward-Tag": fwd},
+                     timeout=30)
+    p.raise_for_status()
+    js = p.json()
+    steps_seen = js.get("stepsCompleted", steps_seen)
+    if js.get("stepsTotal") and steps_seen >= js["stepsTotal"]:
         break
-    time.sleep(2)
+    time.sleep(1)
 
-events = list(c.iter_items("/web/api/v2.1/dv/events",
-                           params={"queryId": qid, "limit": 1000}))
+columns = js["data"]["columns"]             # list of column names
+rows    = js["data"]["values"]              # 2-D array of rows
+
+# Always clean up (releases concurrent-query budget)
+requests.delete(urljoin(base, f"/sdl/v2/api/queries/{qid}"),
+                headers={"Authorization": f"Bearer {jwt}",
+                         "X-Dataset-Query-Forward-Tag": fwd},
+                timeout=30)
 ```
 
-Prefer **PowerQuery** (`POST /web/api/v2.1/dv/events/pq`) for anything beyond a trivial filter — it's what the modern console uses, and the PQ language has joins/grouping/columns/time-series. See the `sentinelone-powerquery` skill for query authoring.
+Key points:
+- `queryType: "PQ"` runs a PowerQuery; `queryType: "LOG"` runs S1QL log search. Both replace the old `/dv/*` endpoints.
+- The `X-Dataset-Query-Forward-Tag` response header from the launch must be echoed on every subsequent GET/DELETE. GET/DELETE without it is rejected.
+- Per-user rate cap is 3 rps. For multi-slice parallel runs over long windows (7d+), see the `sentinelone-powerquery` skill's `references/lrq-api.md` for slicing, two-JWT round-robin, and merge patterns.
+- For interactive hunts over short windows, the Purple MCP `powerquery` tool is simpler; fall back to this LRQ pattern when the MCP times out or the window is longer than a few days.
 
 ---
 
-## 5. PowerQuery from the Mgmt API
-
-```python
-body = {
-    "query": "Event.Type='Process Creation' | group count() by src.process.name | sort -count() | limit 20",
-    "fromDate": since, "toDate": now,
-}
-r = c.post("/web/api/v2.1/dv/events/pq", json_body=body)
-# r["data"]["columns"] + r["data"]["data"]
-```
-
-For long-running PQ use `Long Running Query` tag: `POST /dv/events/pq-ping` to poll.
-
----
-
-## 6. RemoteOps script execution (destructive — confirm)
+## 5. RemoteOps script execution (destructive - confirm)
 
 ```python
 # discover scripts
@@ -123,7 +152,7 @@ c.get(f"/web/api/v2.1/remote-scripts/tasks",
 
 ---
 
-## 7. Audit trail — who did what, when
+## 6. Audit trail - who did what, when
 
 ```python
 since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
@@ -138,7 +167,7 @@ Types are listed at `GET /web/api/v2.1/activities/types`. `1001` = threat create
 
 ---
 
-## 8. Tenant structure — accounts → sites → groups → agents
+## 7. Tenant structure - accounts -> sites -> groups -> agents
 
 ```python
 accounts = c.get("/web/api/v2.1/accounts", params={"limit": 100})
@@ -150,7 +179,7 @@ Many mutating endpoints require `accountIds` / `siteIds` / `groupIds`; always li
 
 ---
 
-## 9. Exclusions & blocklist inspection
+## 8. Exclusions & blocklist inspection
 
 ```python
 hashes = list(c.iter_items("/web/api/v2.1/restrictions",
@@ -163,7 +192,7 @@ Exclusions v2.1 (`/exclusions-v2`) is the newer API — prefer it on modern tena
 
 ---
 
-## 10. Report a tenant's capability snapshot (perfect for pre-sales demos)
+## 9. Report a tenant's capability snapshot (perfect for pre-sales demos)
 
 Run the read-only smoke test sweep and capture which endpoints are reachable on this tenant:
 
@@ -185,7 +214,7 @@ Useful when demoing to a prospect: "here are the 164 Mgmt API endpoints your tok
 ## Anti-patterns to avoid
 
 - **Looping per-ID calls** when a `…/actions/...` filter-based endpoint exists. S1 is built for bulk filter ops; looping will hit rate limits fast.
-- **Manual `skip`/`limit` math** — the cursor cap kicks in at 1000 items. Use `client.paginate()` / `iter_items()` which cursor-pages automatically.
-- **Calling `dv/events` without `queryId`** — you need to init-query and wait for FINISHED first.
-- **Trusting `totalItems`** on restricted-scope accounts — it reflects what the token can see, not the tenant total.
+- **Manual `skip`/`limit` math**: the cursor cap kicks in at 1000 items. Use `client.paginate()` / `iter_items()` which cursor-pages automatically.
+- **Using the legacy `/dv/init-query` + `/dv/query-status` + `/dv/events` flow**: deprecated and sunset 2027-02-15. Use LRQ with `queryType="LOG"` instead (see Section 4).
+- **Trusting `totalItems`** on restricted-scope accounts: it reflects what the token can see, not the tenant total.
 - **Re-reading `spec/swagger_2_1.json`** (14 MB) into context. Use the per-tag reference file or `search_endpoints.py`.

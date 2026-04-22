@@ -149,8 +149,8 @@ Symbols: L=list (GET collection), G=get-one (GET /{id}), C=count (GET/POST /coun
 | uninstall an agent | Agent Actions — POST /web/api/v2.1/agents/actions/uninstall |
 | move agent to group | Agent Actions — POST /web/api/v2.1/agents/actions/move-to-group |
 | run a RemoteOps script | RemoteOps Scripts — POST /web/api/v2.1/remote-scripts/execute |
-| hunt across Deep Visibility | Deep Visibility — POST /web/api/v2.1/dv/init-query → GET /dv/query-status/{id} → GET /dv/events |
-| run a PowerQuery | Settings/Long Running Query — POST /web/api/v2.1/dv/events/pq |
+| hunt across Deep Visibility | Long Running Query - POST /sdl/v2/api/queries (queryType="LOG" for S1QL or "PQ" for PowerQuery), then GET /sdl/v2/api/queries/{id} to poll. The legacy /dv/init-query + /dv/query-status + /dv/events flow is deprecated (sunset 2027-02-15). |
+| run a PowerQuery | Long Running Query - POST /sdl/v2/api/queries (queryType="PQ"), then GET /sdl/v2/api/queries/{id} to poll. The legacy /dv/events/pq + /dv/events/pq-ping flow is deprecated (sunset 2027-02-15). |
 | see tenant structure | Accounts/Sites/Groups — GET /web/api/v2.1/{accounts,sites,groups} |
 | see what the token can do | RBAC — GET /web/api/v2.1/rbac/role  and  GET /web/api/v2.1/users |
 | audit who did what | Activities — GET /web/api/v2.1/activities |

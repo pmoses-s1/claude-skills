@@ -23,7 +23,7 @@ Read the reference file for the tag(s) relevant to the user's task. Each file li
 | Config Overrides | 5 | `references/tags/Config_Overrides.md` |
 | Custom Detection Rule | 6 | `references/tags/Custom_Detection_Rule.md` |
 | Datalake Unified Actions | 4 | `references/tags/Datalake_Unified_Actions.md` |
-| Deep Visibility | 9 | `references/tags/Deep_Visibility.md` |
+| Deep Visibility | 9 | `references/tags/Deep_Visibility.md` (query endpoints deprecated, use Long Running Query) |
 | Default Reports | 9 | `references/tags/Default_Reports.md` |
 | Device Control | 12 | `references/tags/Device_Control.md` |
 | Dynamic tag rules | 5 | `references/tags/Dynamic_tag_rules.md` |
