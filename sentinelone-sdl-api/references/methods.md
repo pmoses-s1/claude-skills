@@ -68,6 +68,8 @@ All five methods consume the CPU leaky bucket described in `auth_and_limits.md`.
 
 ### `query` — `c.query(filter="", ...)` / `c.iter_query(...)` — CLI `query`
 
+**DEPRECATED.** The V1 `/api/query` endpoint sunsets on 2027-02-15. For log search in new code use the LRQ API with `queryType: "LOG"` - async, cursor-paged to unlimited rows, survives long windows. See the `sentinelone-powerquery` skill's `references/lrq-api.md`. This method is fine for legacy one-offs until the sunset date.
+
 Event search. Filter syntax matches the UI search bar.
 
 Params:
@@ -101,6 +103,8 @@ Use `c.iter_query(...)` to iterate across pages automatically.
 ---
 
 ### `powerQuery` — `c.power_query(query, ...)` — CLI `power-query`
+
+**DEPRECATED.** The V1 `/api/powerQuery` endpoint at `xdr.us1.sentinelone.net` sunsets on 2027-02-15. New code should route PowerQueries through the **Long Running Query API** at `POST /sdl/v2/api/queries` on the tenant's own console host. LRQ is async, has higher row/rate limits, parallelizes cleanly across time slices, and is the only path that stays supported after the sunset date. Canonical runner, body schema, auth, and gotchas live in the `sentinelone-powerquery` skill at `references/lrq-api.md`. This method is kept here only for legacy one-offs and to round out the 10-method SDL surface.
 
 Full pipeline query language (S1QL-style). `query` is limited to 10K chars; escape `"` with `\"`.
 

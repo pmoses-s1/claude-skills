@@ -15,7 +15,7 @@ When the user asks you to write or investigate with a PowerQuery:
 
 1. **Clarify the intent** if it's ambiguous (time range, data view, what the output should look like). A good PQ is scoped — not everything needs to be hunted over 30 days.
 2. **Draft the query** following the grammar below. Favor `filter | group | sort | limit | columns` as the default shape — it's what most real investigations need.
-3. **Run it against the tenant** using the Purple MCP `powerquery` tool to confirm it parses and produces plausible results. This is the single fastest way to catch syntax mistakes and wrong field names. If the user's request is clear and low-risk (read-only query), just run it; don't ask permission.
+3. **Run it against the tenant.** Default to the **Long Running Query (LRQ) API** at `POST /sdl/v2/api/queries` on the tenant's console URL. LRQ is the fastest, highest-limit, most reliable path for any programmatic use and supersedes both `/api/powerQuery` and the Deep Visibility `/dv/events/pq` endpoint (both deprecated; sunset Feb 15 2027). It is async, supports cursor paging to essentially unlimited rows, has a 100 req/sec per-account cap, and lets you parallelize across time slices. Reach for the Purple MCP `powerquery` tool only for a single quick exploratory check when no API client is already wired up. See "Running queries (LRQ API by default)" below and `references/lrq-api.md` for the canonical runner, body schema, auth, rate limits, and the gotchas that make it fail silently with 0 rows. If the user's request is clear and low-risk (read-only query), just run it; don't ask permission.
 4. **Iterate**: if the query errors or returns obviously wrong results, read the error, fix, rerun. If the query returns nothing, that is a legitimate result — don't blindly loosen it; check the time range and filter logic first.
 5. **Explain the result briefly** and cite any fields you're relying on. If you used a non-obvious pattern (subquery, `savelookup`, `transpose`, `compare`), explain *why* you chose it.
 
@@ -83,18 +83,59 @@ These are where queries go wrong. Internalize them before writing.
 13. **Percentiles: use `p50`/`p95`/`p99`, not `percentile(x, N)`.** The latter isn't a real function and returns 500.
 14. **Null-filter at the wrong stage: `filter x = null` before `x` is computed returns 500.** Use `filter !(x = *)` for is-null until after a `let`/`join`/`lookup` has produced `x`.
 
-## Running queries via Purple MCP
+## Running queries (LRQ API by default)
 
-The `mcp__purple-mcp__powerquery` tool runs your query against the tenant. It needs ISO-8601 `start_datetime` and `end_datetime` with a timezone (e.g., `2026-04-19T06:00:00Z`). Use `mcp__purple-mcp__get_timestamp_range(hours=24)` to get a relative-time range.
+The primary execution path is the Long Running Query API. It is async (launch + poll + cancel), handles queries that would time out on any other endpoint, scales cleanly to 30-day aggregates, and is the only path that stays supported after Feb 15 2027 when both `/api/powerQuery` and `/web/api/v2.1/dv/events/pq` retire.
 
-Default to the last 24 hours. Longer ranges are fine but slower and more likely to hit the 5-minute query timeout. If a query is heavy, tighten the range before adding `nolimit`.
+**Three calls, in order:**
 
-When the user describes a hunt in natural language and you're unsure of the right fields or shape, `mcp__purple-mcp__purple_ai` can produce a PowerQuery — useful as a starting point. When it returns one, run it as-is (don't rewrite it blindly), then iterate on the result.
+```
+POST   https://<console>.sentinelone.net/sdl/v2/api/queries          -> launch, returns {id, ...}
+GET    https://<console>.sentinelone.net/sdl/v2/api/queries/{id}?lastStepSeen=N   -> poll every 1-2s
+DELETE https://<console>.sentinelone.net/sdl/v2/api/queries/{id}     -> cancel when done
+```
+
+**Required body fields for a PowerQuery:**
+
+```json
+{
+  "queryType": "PQ",
+  "tenant": true,
+  "startTime": "2026-04-21T00:00:00Z",
+  "endTime":   "2026-04-22T00:00:00Z",
+  "queryPriority": "HIGH",
+  "pq": { "query": "<your PQ>", "resultType": "TABLE" }
+}
+```
+
+**Five things that will bite you if you skip them** (full list in `references/lrq-api.md`):
+
+1. **Auth: `Authorization: Bearer <jwt>`**, not `ApiToken`. Same JWT from the mgmt console, different prefix. Wrong prefix returns HTTP 500 "Header must start with Bearer".
+2. **`queryType` is required.** Omit and you get 400 "Query type must be specified".
+3. **`tenant: true` is required** unless you pass `accountIds`. Without either, the query runs against a near-empty default scope and returns `matchCount=0`.
+4. **Echo `X-Dataset-Query-Forward-Tag`** from the POST response header on every poll and the cancel. GET/DELETE without it is rejected.
+5. **EDR filter for SentinelOne telemetry:** prepend `dataSource.name='SentinelOne' dataSource.category='security'` (or `i.scheme="edr"`) to your query. Without it you get Scalyr / infra logs mixed with everything, and on some tenants you get only infra.
+
+**Rate limits:** 100 req/sec per account, **3 req/sec per user** (the tight one). A user token capped at 3 rps means a token-bucket limiter at ~2.5 rps with a pool of 3 parallel slices is the sweet spot. To push further, use two distinct service user JWTs and round-robin slices across them - each user identity has its own 3 rps budget.
+
+**Query expires 30s after launch or 30s after the last poll.** Poll every 1-2s; don't let the deadline slip.
+
+**Sizing & parallelism.** Two bottlenecks stack: per-user rate cap first, then slowest-slice server runtime. Measured on `usea1-purple` for a 30d count-by-event.type over 574M events:
+
+- **1 token, 2.5 rps:** 30d serial 166s | 30x1d pool=3 87s | 6x5d pool=3 **66s** (best 1-token)
+- **2 tokens, ~5 rps combined, round-robin:** 30x1d pool=6 35s | 15x2d pool=6 **29s** | 10x3d pool=6 **29s** (best 2-token)
+
+Once two tokens are in play the per-user rate cap stops being the bottleneck and the slowest slice's backend runtime (p95 ~9-17s) becomes the floor. Push further by adding a third service-user JWT (pool=9, ~7.5 rps budget, expected 18-22s), swapping `| group` for `| top K` on huge ranges, or narrowing the initial filter. Defaults table and the full benchmark live in `references/lrq-api.md`.
+
+**Canonical runner.** A working Python implementation (rate limiter, two-token round-robin, aggregate merge across slices) is kept at `/sessions/great-serene-euler/pq_30d_max_lrq_v2.py` and documented in `references/lrq-api.md`. Read that file before writing a new runner from scratch.
+
+**Quick one-shot exploration** (no API client wired up): the Purple MCP `mcp__purple-mcp__powerquery` tool still works for a one-off query. It wraps the same engine but with lower limits, tighter timeouts, and no parallelism. Pair it with `mcp__purple-mcp__get_timestamp_range(hours=24)` for ISO-8601 ranges, and `mcp__purple-mcp__purple_ai` when you need a starting-point query draft from natural language. Prefer LRQ for anything programmatic, multi-slice, over long windows, or producing results the user will use downstream.
 
 ## Reference files — read as needed
 
 Don't read these upfront. Read the one you need.
 
+- `references/lrq-api.md` - the canonical Long Running Query API runner: auth, body schema, forward-tag routing, rate-limit strategy, 30-second query expiration, slicing/parallelism patterns, two-JWT round-robin to exceed the per-user rate cap. Read before writing any programmatic PQ runner, or when a query silently returns `matchCount=0`.
 - `references/syntax-and-operators.md` — full operator reference, identifier rules, shortcut fields, regex dialect, date/time formats, short-circuit `||`.
 - `references/commands-reference.md` — deep dive on every command (join variants, subqueries, lookup / dataset / savelookup, transpose, compare, top, nolimit). Read before writing anything non-trivial with join, transpose, or compare.
 - `references/functions-reference.md` — all built-in functions: string, numeric, JSON, network, URL, aggregate, array (method chaining), geolocation, timestamp, time, string-formatting. Read when you need a function and can't remember the name.

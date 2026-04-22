@@ -7,7 +7,25 @@ description: Use whenever the user wants to read or write data through the Senti
 
 Wraps the Singularity Data Lake API (10 methods across log ingestion, query, and configuration files) with a pre-built Python client, a CLI runner, and a per-method reference.
 
-The SDL API is distinct from the Management Console API. It speaks JSON over `Bearer` tokens (not `ApiToken`) and is the only path for ingesting custom telemetry, running PowerQueries, and editing parsers/dashboards/alerts/lookups directly.
+The SDL API is distinct from the Management Console API. It speaks JSON over `Bearer` tokens (not `ApiToken`) and is the canonical path for ingesting custom telemetry and editing parsers/dashboards/alerts/lookups directly.
+
+## IMPORTANT: query methods are deprecated, use LRQ
+
+The query methods on this skill (`query`, `powerQuery`, `facetQuery`, `timeseriesQuery`, `numericQuery`) wrap the V1 SDL endpoints (`/api/query`, `/api/powerQuery`, etc.) at the centralized host `xdr.us1.sentinelone.net`. Those endpoints are **deprecated and sunset on 2027-02-15** (also applies to the Deep Visibility `/web/api/v2.1/dv/events/pq` endpoint). The replacement is the **Long Running Query (LRQ) API** at `POST /sdl/v2/api/queries` on the tenant's own console host.
+
+**Default to LRQ for every new query.** It is async, handles queries that would otherwise time out, supports cursor paging to effectively unlimited rows, raises the per-account rate cap to 100 rps, and is the only path that stays supported after 2027-02-15. Measured on `usea1-purple` for a 30-day count-by-event.type over 574M events: 166s serial baseline drops to 28.5s with a two-service-user-JWT round-robin at pool=6.
+
+When to use LRQ vs this skill:
+
+| Task | Path |
+|------|------|
+| PowerQuery (any range, especially multi-day or high-volume) | **LRQ** via `sentinelone-powerquery` skill (`references/lrq-api.md`) |
+| Log search (`query`/`iter_query`) for long windows or large result sets | **LRQ** (queryType="LOG") |
+| Quick one-off stats (`facet_query`, `timeseries_query`, `numeric_query`) under 24h | Either - V1 still works until 2027-02-15 |
+| `upload_logs` / `add_events` (ingestion) | **This skill** - LRQ is query-only |
+| `get_file` / `put_file` / `list_files` (parsers, dashboards, lookups, datatables) | **This skill** - LRQ doesn't cover config files |
+
+The canonical LRQ runner, body schema, auth, forward-tag routing, rate-limit strategy, and measured benchmark live in the `sentinelone-powerquery` skill at `references/lrq-api.md`. Read that before writing a programmatic query runner.
 
 ## Setup — configure credentials first
 
@@ -43,8 +61,8 @@ Before running anything, confirm `base_url` is set and at least one key for the 
 
 When the user asks for something involving the SDL API:
 
-1. **Pick the method.** Check `references/methods.md` for the right call (search/ingest/file). If the user describes a query in natural language, prefer `power_query()` — it composes filter/group/sort/join/parse pipes in one shot.
-2. **Use the client.** `from sdl_client import SDLClient` then call the named method (`upload_logs`, `add_events`, `query`, `power_query`, `facet_query`, `timeseries_query`, `numeric_query`, `list_files`, `get_file`, `put_file`). The client picks the correct key, handles JSON encoding, retries 429/5xx/`error/server/backoff`, and returns parsed JSON.
+1. **Pick the method.** Check `references/methods.md` for the right call (search/ingest/file). For **queries**, default to the LRQ API via the `sentinelone-powerquery` skill - see the deprecation table above. For **ingestion** (`upload_logs`, `add_events`) and **configuration files** (`get_file`, `put_file`, `list_files`), this skill is still the right tool. For quick one-off stats under 24h (`facet_query`, `timeseries_query`, `numeric_query`), either path works until 2027-02-15.
+2. **Use the client.** `from sdl_client import SDLClient` then call the named method (`upload_logs`, `add_events`, `query`, `power_query`, `facet_query`, `timeseries_query`, `numeric_query`, `list_files`, `get_file`, `put_file`). The client picks the correct key, handles JSON encoding, retries 429/5xx/`error/server/backoff`, and returns parsed JSON. Note: `query` and `power_query` go to the V1 deprecated endpoints - for production query work, route through LRQ instead.
 3. **For ad-hoc shots, use the CLI.** `python scripts/sdl_cli.py <method> [args]`. The CLI mirrors the client.
 4. **Summarize for the user.** Don't dump raw JSON unless asked. For query results, prefer a concise table or CSV; for ingestion, confirm `bytesCharged` and the session ID; for config files, show path + version + (truncated) content.
 
@@ -148,7 +166,7 @@ There is no undo. Configuration files are versioned but accidental deletes still
 
 ## Common high-value workflows
 
-- **Hunt with PowerQuery.** `c.power_query("event.type='process creation' src.process.name='powershell.exe' tgt.process.cmdline contains 'IEX' | columns timestamp, agent.uuid, src.process.cmdline", start_time="24h")`. For PQ syntax beyond what's here, defer to the `sentinelone-powerquery` skill.
+- **Hunt with PowerQuery.** Route through the LRQ API, not `c.power_query()`. Use the `sentinelone-powerquery` skill - it covers the PQ syntax and the LRQ runner pattern (auth, body, forward-tag, rate limits, slicing). Only fall back to `c.power_query()` on this skill for a quick ad-hoc one-off; even then, the V1 `/api/powerQuery` endpoint is deprecated and will retire 2027-02-15.
 - **Webhook → SDL.** Stateless ingest from a Lambda/CF Worker: `c.upload_logs(json.dumps(event), parser="my-webhook-parser", nonce=event_id)`. Reuse the same nonce on retries to dedupe.
 - **Bulk structured ingest.** Generate one session ID at process start, batch events to ~5 MB, call `add_events(session=sess, events=batch)` in a loop. Honour the backoff pattern.
 - **Promote a parser/dashboard.** `get_file("/logParsers/Foo")` from staging → `put_file("/logParsers/Foo", content=..., expected_version=N)` on production. The `expected_version` guard catches concurrent edits. (Parser path is `/logParsers/` — `/parsers/` is API-accepted but not UI-visible.)
