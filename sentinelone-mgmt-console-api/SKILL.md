@@ -70,10 +70,15 @@ It enumerates every GET plus a curated allow-list of read-only query POSTs, reco
 - `spec/swagger_2_1.json` — the original full Swagger spec (14 MB). Use only when the per-tag reference is insufficient — e.g. to resolve a deeply nested request-body schema by `$ref`. Never read this whole file into context.
 - `tests/test_ioc_lifecycle.py` — reversible CREATE → LIST → DELETE → VERIFY round-trip for Threat Intelligence IOCs. Uses a unique run-tag per invocation, scopes to a single account, and cleans up before exit. Covers the one "create content" path against the S1 detection surface.
 - `tests/test_alerts_dual_api.py` — dual-API round-trip for alerts: GraphQL list/detail/addNote/notes/deleteNote plus a parallel REST `/cloud-detection/alerts` read. Demonstrates that UAM GraphQL is the PRIMARY alert surface and REST is SECONDARY, with the note mutation cleaned up before exit (handles the `mgmt_note_id` propagation delay).
+- `scripts/pq.py` — foolproof PowerQuery runner over the LRQ API. Wraps launch/poll/cancel, auth flip to `Bearer`, `X-Dataset-Query-Forward-Tag` capture, exponential backoff on 5xx/429/connection errors, and a best-effort cancel. One call: `run_pq(client, "<query>", hours=24)` returns `{row_count, columns, rows, matchCount, ...}`. Also exposes `list_data_sources(client, hours=24)` for the first-response "does this data source actually exist on this tenant?" check. Use this any time a user says "query logs", "run a PQ", "search for events" via the mgmt console API.
 - `scripts/uam_alert_interface.py` — UAM (Unified Alert Management) Alert Interface client for pushing OCSF indicators + alerts INTO UAM via `POST /v1/indicators` and `POST /v1/alerts` on `ingest.us1.sentinelone.net`. Handles the gzip-compressed concatenated-JSON body, `Bearer` auth (the endpoint rejects `ApiToken`), and the `S1-Scope` header. Exposes `UAMAlertInterfaceClient`, plus `build_file_indicator()`, `build_process_indicator()`, `build_network_indicator()`, and `build_alert_referencing()` payload helpers. URL is configurable via `uam_alert_interface_url` in `config.json` (defaults to `https://ingest.us1.sentinelone.net`; legacy key `ingestion_gateway_url` is still honored as a fallback).
 - `tests/test_uam_alert_interface_single.py` — minimum-viable reversible write-side round-trip: POST one OCSF FileSystem-Activity indicator + one SecurityAlert referencing it, poll UAM GraphQL until the alert surfaces, verify the indicator is stitched in, then close the alert via bulk-ops (status=RESOLVED, analystVerdict=TRUE_POSITIVE_BENIGN). Covers the single-indicator happy path into UAM.
 - `tests/test_uam_alert_interface_batch.py` — comprehensive reversible round-trip: batched POST of 3 indicators (OCSF classes 1001 FileSystem Activity, 1007 Process Activity, 4001 Network Activity) each carrying 3+ observables, referenced by a single SecurityAlert via `finding_info.related_events[]`. Verifies all 3 metadata.uids and their observable names surface in `alert.rawIndicators`, then closes the alert. Covers batching, multi-observable, and multi-indicator linkage.
 - `scripts/ingestion_gateway.py` + `tests/test_ingestion_gateway_alert_with_indicator.py` — deprecated back-compat shims. The helper re-exports from `uam_alert_interface`; the test prints a pointer to the renamed file and exits non-zero.
+- `build_ps_report_data.py`: collector for the CTO report pipeline. Runs dimension probes + per-principal mix + timeline for a named data source via `scripts/pq.py` and writes `reports/<slug>_<window>/data.json`. Outputs to a per-source subfolder so multiple sources and windows coexist cleanly.
+- `render_charts.py`: pure-function renderer. `data.json` in, PNG charts out under `reports/<slug>_<window>/charts/`. No tenant calls.
+- `build_docx.py` / `build_pptx.py`: source-agnostic renderers that read `data.json` and emit `<Slug>_CTO_Report_<window>.docx` and `<Slug>_CTO_Deck_<window>.pptx`. Every section is gated on `dims` so dimension-sparse sources render cleanly. See "CTO report generation pipeline" below for the full contract and renderer gotchas.
+- `reports/<slug>_<window>/`: per-run artefact directory. Holds `data.json`, `charts/`, and the rendered `.docx` / `.pptx`. Treat this as the portable unit: move or archive the whole folder.
 
 ## Using the client in Python
 
@@ -182,47 +187,128 @@ Key fields in the normalized dict:
 - Entitlement and permission failures come back as HTTP 200 with `status.error` populated. The wrapper raises `PurpleAIError` on these so they don't masquerade as empty results — surface the `error_type` to the user verbatim (it's the best hint we have for "re-issue the token with Purple AI permission" vs "the tenant isn't licensed for Purple").
 - `teamToken` and `accountId` in the request body are UI-session artifacts; empty strings are accepted for API-token auth.
 
-## Long Running Query (LRQ) - canonical PowerQuery / log-search path
+## Querying logs via the mgmt console API — the foolproof procedure
 
-For any programmatic PowerQuery or log search against this tenant, use the **Long Running Query API** at `POST /sdl/v2/api/queries` on the tenant's own console host. It supersedes `/api/powerQuery` (SDL v1) and the Deep Visibility `/dv/events/pq` endpoint (mgmt REST). Both older paths are deprecated and sunset on 2027-02-15. LRQ is async, parallelizes cleanly, has higher limits, and is the only path that stays supported after sunset. Full reference and canonical Python runner live in the `sentinelone-powerquery` skill at `references/lrq-api.md`.
+Every time somebody rolls their own `requests.post(...)` for a PowerQuery, one of the same six things goes wrong: wrong auth prefix, wrong endpoint path, missing `tenant: true`, missing `X-Dataset-Query-Forward-Tag`, no retry on transient 5xx, or 0 rows and the wrong debugging reflex. The fix is: do not hand-roll the call. Use `scripts/pq.py`.
 
-**Crucially, the S1Client's JWT doubles as the LRQ Bearer token** - only the auth prefix changes:
+### Step 0 — pick the right surface before you write a query
 
-```python
-from s1_client import S1Client
-c = S1Client()
-# REST / GraphQL:  Authorization: ApiToken <jwt>   (c.api_token)
-# LRQ:             Authorization: Bearer   <jwt>   (same value, Bearer prefix)
-```
+| The user wants… | Use | Why |
+|---|---|---|
+| Raw event telemetry (EDR, third-party logs, SDL data) | **`scripts/pq.py`** (LRQ PowerQuery) | This is what SDL/PowerQuery is for. All `dataSource.*`, `event.*`, `src.process.*`, `tgt.file.*`, `i.scheme="edr"` filters. |
+| Triage/filter/note/status on an existing alert | `scripts/unified_alerts.py` (UAM GraphQL) | Alerts are entities, not log events. UAM filter syntax is GraphQL `FilterInput`, NOT PowerQuery. Do not confuse the two. |
+| Legacy STAR/cloud-detection alert REST shape | `/web/api/v2.1/cloud-detection/alerts` | Only when you need `agentDetectionInfo` / `sourceProcess` etc. Otherwise UAM. |
+| A console entity — threat, agent, site, policy, IOC, group | REST via `s1_client.py` | Not a log query. `GET /web/api/v2.1/{threats,agents,sites,...}`. |
+| Natural-language hunt that can be hand-reviewed | `purple_ai.purple_query(...)` then LRQ-execute the returned PQ | Purple generates PQ text; `pq.py` runs it. |
 
-Use this in two situations:
+If the user names a vendor ("Prompt Security", "Zscaler", "Okta", "FortiGate") and says "query" or "search logs", that is always the PQ path, never UAM filter syntax.
 
-1. **Fallback when the Purple MCP `powerquery` tool times out.** The MCP has tight per-call timeouts and no parallelism. When it returns a timeout or 5xx for anything past 24h or with wide filters, re-run the same query through LRQ with the existing `S1Client.api_token`. Don't shrink the time range to fit the MCP budget - LRQ will handle what the MCP can't.
-2. **Any multi-slice, long-window, or programmatic PowerQuery.** Default to LRQ rather than `/dv/events/pq` or `/api/powerQuery`, especially for ranges > 24h.
-
-Minimal fallback pattern (inline, no extra client class required):
+### Step 1 — use `scripts/pq.py`, not inline `requests`
 
 ```python
-import time, requests
+import sys
+sys.path.insert(0, "scripts")
 from s1_client import S1Client
+from pq import run_pq, list_data_sources, PQError
 
 c = S1Client()
-jwt = c.api_token
-base = c.base_url  # e.g. https://usea1-purple.sentinelone.net
-headers = {"Authorization": f"Bearer {jwt}", "Content-Type": "application/json"}
-body = {
-    "queryType": "PQ", "tenant": True,
-    "startTime": "2026-04-21T00:00:00Z", "endTime": "2026-04-22T00:00:00Z",
-    "queryPriority": "HIGH",
-    "pq": {"query": "<your PQ>", "resultType": "TABLE"},
-}
-r = requests.post(f"{base}/sdl/v2/api/queries", headers=headers, json=body, timeout=30)
-qid = r.json()["id"]
-forward_tag = r.headers["X-Dataset-Query-Forward-Tag"]
-# poll every 1-2s, cancel on completion - see the powerquery skill's lrq-api.md
+
+# One call. Handles launch, polling, forward-tag, cancel, retry, the lot.
+res = run_pq(
+    c,
+    "dataSource.name = 'Prompt Security' "
+    "| group ct = count() by event.type "
+    "| sort -ct "
+    "| limit 50",
+    hours=24,
+)
+print(res["matchCount"], "events ->", res["row_count"], "rows")
+for row in res["rows"]:
+    print(row)
 ```
 
-For anything beyond a single slice (ranges > 2-3 days, heavy aggregates, 100M+ event scans), use the full runner at `/sessions/great-serene-euler/pq_30d_max_lrq_v2.py` (two-JWT round-robin, ~29s on a 30d 574M-event aggregate) rather than hand-rolling poll/cancel. The measured perf and slicing recipes are in `references/tenant_capabilities.md` (bottom) and in the sentinelone-powerquery skill's `references/lrq-api.md`.
+The helper does ALL of this for you, so there is nothing to remember:
+
+- `Authorization: Bearer <jwt>` (flipped from the REST `ApiToken` prefix; same JWT, different scheme).
+- `POST /sdl/v2/api/queries` on the tenant console host. **NOT** `/web/api/v2.1/sdl/v2/api/queries`, **NOT** `xdr.us1.sentinelone.net`. Do not "fix" a 404 by adding `/web/api/v2.1` — that path does not exist; the fix is the shorter path.
+- Captures `X-Dataset-Query-Forward-Tag` from the POST response and echoes it on every GET / DELETE (mandatory for shard routing; without it you get rejections).
+- Sets `queryType: "PQ"`, `tenant: true`, `pq: {query, resultType: "TABLE"}` (omit `tenant` and you silently get `matchCount=0`).
+- Polls at 1s (query expires 30s after the last poll — slower polling means you lose the query).
+- Retries 5xx / 429 / connection errors with exponential backoff. Honors `Retry-After`. The DNS-cache-overflow 503s behind some egress proxies are exactly what this is for.
+- Cancels on every exit path (success, deadline, failure) to release the per-account concurrent-query budget.
+
+### Step 2 — if you get 0 rows, follow the ladder, do NOT widen the window first
+
+`run_pq` returning `row_count=0` has an ordered diagnostic. Burning time by widening the window first is the most common failure mode; the window is almost never the cause.
+
+1. **Enumerate the data sources.** If your filter names a vendor / product, first confirm it exists on THIS tenant and you have the string right. Spelling, case, and punctuation matter — the filter is a literal string match.
+
+   ```python
+   sources = list_data_sources(c, hours=24)
+   for s in sources[:30]:
+       print(s["dataSource.name"], s["dataSource.category"], s["ct"])
+   ```
+
+   If "Prompt Security" isn't in the list, the tenant isn't ingesting it — no amount of widening the window will help. If it's there under a different spelling (`"PromptSecurity"`, `"Prompt Sec"`), use the exact string.
+2. **Compare `matchCount` vs `row_count`.** `matchCount=0` means the initial filter discarded everything before any aggregation — the filter is too tight (or naming the wrong thing). `matchCount > 0` with `row_count = 0` means a post-pipe stage (`| group`, `| filter after group`) ate the rows — inspect the pipe.
+3. **Only after the above come back clean**, widen the time window — in that order: 24h → 7d → 30d.
+
+### Step 3 — for large windows / heavy aggregates, slice
+
+For ranges past 2-3 days with `event.type=*`-scale aggregates, slice the window and run slices in parallel. Full reference, measured perf (30d 574M-event aggregate lands in ~29s with two service-user JWTs), and the two-JWT runner recipe are in the `sentinelone-powerquery` skill at `references/lrq-api.md`. `run_pq` is the single-slice primitive underneath.
+
+### Step 3a — timeseries: DO NOT use `timebucket(...)`
+
+The PQ engine does not expose a `timebucket` function. Any pipeline of the form `| group n=count() by timebucket('1d'), action` fails with HTTP 500 `"undefined field 'timebucket'"`. The fix is client-side day slicing:
+
+```python
+from datetime import datetime, timedelta, timezone
+import concurrent.futures as cf
+
+def slice_day(c, base, start, end):
+    iso = lambda t: t.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return run_pq(c, base + " | group n=count() by action | sort -n",
+                  start_time=iso(start), end_time=iso(end),
+                  poll_deadline_s=90)
+
+end = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+days = [(end - timedelta(days=i+1), end - timedelta(days=i)) for i in range(7)]
+with cf.ThreadPoolExecutor(max_workers=3) as ex:   # 3rps user cap
+    results = list(ex.map(lambda se: slice_day(c, base, *se), days))
+```
+
+7 daily slices run in ~20s wall-clock (vs ~2 min for a 7d aggregate) and respect the per-user 3 rps cap. For hourly buckets over a 24h window use 24 slices at the same concurrency; for 30d use hourly slicing with 2 JWTs (see `sentinelone-powerquery` skill).
+
+### Step 3b — window-scaling playbook (performance by period)
+
+| Window | Recommended runner | Why |
+|---|---|---|
+| seconds to 1h | single `run_pq(hours=1)` | server returns in <5s |
+| 1h to 24h | single `run_pq(hours=24)` | 5-30s depending on filter selectivity |
+| 24h to 7d | single call OK for selective filters; for `event.type=*`-scale aggregates, 7 x 1d slices in parallel (max_workers=3) | single-call ~2 min; sliced ~20s |
+| 7d to 30d | mandatory slicing (daily buckets) + 2 JWTs | two-JWT runner in `sentinelone-powerquery` |
+| 30d+ | hourly slicing + 2-3 JWTs, cache results | 574M-event aggregate at 30d = ~29s with two JWTs |
+
+### Step 3c — LRQ response-shape gotchas (handled by `run_pq`)
+
+If you ever have to read a raw LRQ response (e.g. debugging), know:
+
+- `columns` is a list of dicts `{name, cellType, decimalPlaces}`, not a list of strings. Zipping values by `col["name"]` (not `str(col)`) is mandatory.
+- `matchCount` lives inside the `data` block (`response["data"]["matchCount"]`), not at top level. Default to that path; fall back to top-level for older engines.
+- `values` is an array of arrays (one per row); `run_pq` pairs it with column names for you.
+
+### Step 4 — when NOT to use `pq.py`
+
+- If the user said "purple mcp" or "mcp", defer to `mcp__purple-mcp__powerquery` first; this is the backup path when the MCP times out or 5xxs.
+- If the user is working with alerts as entities (listing, filtering, note, status), that's UAM GraphQL (`unified_alerts.py`), not PowerQuery. UAM filter syntax is `[{fieldId, stringEqual: {...}}]`; it is NOT PowerQuery `| filter` syntax. Mixing them is a common trap in screenshot-driven debugging.
+
+### Checklist before running a PQ programmatically
+
+- [ ] You called `run_pq` / `list_data_sources`, not inline `requests.post`.
+- [ ] Base URL is the tenant console (e.g. `https://usea1-purple.sentinelone.net`), not `xdr.us1.sentinelone.net`.
+- [ ] Endpoint path is `/sdl/v2/api/queries` (short form). If you see 404s, do NOT add `/web/api/v2.1` — that's wrong.
+- [ ] If you're filtering on EDR data (`src.process.*`, `event.type=*`, `tgt.file.*`), prepend `dataSource.name='SentinelOne' dataSource.category='security'` — on mixed tenants the default scope carries Scalyr/infra logs too and wide filters silently return `matchCount=0`.
+- [ ] 0 rows → ran `list_data_sources` and checked `matchCount` vs `row_count` BEFORE widening the window.
 
 ## Unified Alert Management (UAM) — PRIMARY alert API
 
@@ -429,6 +515,56 @@ uam_iface.post_alert_with_indicators(
 
 See `tests/test_uam_alert_interface_single.py` for the minimum-viable worked example, and `tests/test_uam_alert_interface_batch.py` for a batched 3-indicator / multi-observable / multi-class round-trip.
 
+## CTO report generation pipeline
+
+A source-agnostic pipeline for producing CTO-grade Word + PowerPoint reports on any SDL data source. Three scripts, one JSON artefact.
+
+1. `build_ps_report_data.py --source "<vendor>" --window <7d|24h|...>`. Runs dimension probes, a unified per-principal query, and a timeline aggregate against the tenant via `scripts/pq.py`, then writes `reports/<slug>_<window>/data.json`. Probes which of `user`, `src.ip.address`, `src.hostname`, `action`, `event.type` actually carry values, so the renderer can skip sections that would otherwise be empty.
+2. `render_charts.py <data.json>`. Emits PNG charts into `reports/<slug>_<window>/charts/`. Pure function of the JSON, no tenant calls.
+3. `build_docx.py <data.json>` and `build_pptx.py <data.json>`. Read the same JSON, emit `<Slug>_CTO_Report_<window>.docx` and `<Slug>_CTO_Deck_<window>.pptx` next to it. Every chart, section, stat card, and recommendation is gated on `data["dims"]` so a dimension-sparse source (e.g. Windows Event Logs has only `event.type`) produces a shorter but coherent report, not a broken one with empty tiles.
+
+### Data.json contract (renderers depend on this shape)
+
+- `source`, `slug`, `window_label`, `window_start`, `window_end`, `base_filter`.
+- `dims`: boolean-per-dimension probe result.
+- `summary`: derived metrics. Key fields are `total`, `intervention_rate` (only meaningful if `dims.action`), `prim_key` (name of the principal field actually used: `user`, `src.hostname`, `src.ip.address`, or null), `top_principal_key`, `top_user`, `by_action`, `rank_24h`, `n_slices`.
+- `per_user_mix_top10`: the unified top-N-principals-by-action-mix result. The renderer slices this into `by_user`, `by_action_blocks`, `by_user_bypass` rather than running three separate queries. Collector does one PQ; renderer derives the rest.
+
+### Principal key fallback
+
+Order: `user`, then `src.hostname`, then `src.ip.address`, then none. The collector picks the first dim that returned non-null; the renderer reads `summary.prim_key` and labels stat cards and takeaways accordingly (e.g. "Dominant host" vs "Dominant user").
+
+### Renderer gotchas (learned the hard way)
+
+- **Never use em-dashes or en-dashes in any commentary string.** They read as AI-generated. Use commas, colons, or parentheses.
+- **Stat card overflow.** Long labels (e.g. "Windows Event Log Creation") wrap through the card edge at 40pt. Use length-based font sizing: len<=7 gets 40pt, <=12 gets 28pt, <=18 gets 20pt, else 16pt.
+- **Chart title "dayly" is not a word.** `f"{kind}ly"` where kind="day" is wrong. Use a lookup: `{"day": "Daily", "hour": "Hourly", "week": "Weekly", "month": "Monthly"}`.
+- **X-axis label crowding on hourly charts.** A 24-slice timeline rotates 24 timestamps into each other. Sparsify with `ax.set_xticks(ticks[::step])` where `step = max(1, int(len(dates) / 10))`, BEFORE `autofmt_xdate`.
+- **Single-series legend clutter.** Gate `ax.legend(...)` on `n_series > 1`. A one-series chart needs no legend; the title carries the meaning.
+- **Bar data-labels overlap on dense charts.** Skip them when `len(dates) > 12`. The Y-axis scale is enough for dense timelines.
+- **Adaptive title on dimensionless sources.** `title_suffix = "volume by action" if has_action else "volume"`. Don't claim action breakdown when there is none.
+- **Recommendations grid leaves empty bottom cell.** With 2 cards, use a single row (not 2x2). With 1 card, full width.
+- **Fallback bullets when both `action` and `top_user` are missing.** Otherwise the "CTO takeaways" section renders empty. Fall back to dominant `prim_key`, tenant rank (24h), and the data-lake story.
+
+### Commentary generators
+
+`_intervention_note()`, `_concentration_note()`, `_bypass_note()` in `build_docx.py` and `build_pptx.py` take metric values and return commentary strings gated on thresholds (>=40 high, >=10 moderate, else low). The thresholds are tuned for LLM-app traffic; if they feel off for a new source, edit the thresholds rather than the template strings.
+
+### Running the whole thing
+
+```
+# From the skill root, with config.json filled in.
+python build_ps_report_data.py --source "Prompt Security" --window 7d
+python render_charts.py reports/Prompt_Security_7d/data.json
+python build_docx.py     reports/Prompt_Security_7d/data.json
+python build_pptx.py     reports/Prompt_Security_7d/data.json
+```
+
+Tested on 2026-04-22 on `usea1-purple` for two sources with very different dimension coverage:
+
+- `Prompt Security` (7d, 37k events, 41 users, action+user populated) produces the full-fat deck.
+- `Windows Event Logs` (24h, 396k events, only event.type populated) produces a shorter deck through the same pipeline, no empty tiles.
+
 ## Common high-value workflows
 
 - **Unified alert triage** — `list_alerts(...)` from `unified_alerts` for the modern multi-source alerts inbox (EDR + XDR + Identity + cloud + third-party); use `facets`/`group-by` for volume rollups; `set_alert_status` / `set_analyst_verdict` / `assign_alerts` for triage decisions; `add_alert_note` for context.
@@ -439,5 +575,6 @@ See `tests/test_uam_alert_interface_single.py` for the minimum-viable worked exa
 - **Site/Group inventory** — `/sites`, `/groups`, `/accounts` are the tenant-structure endpoints; many resources require filtering by `siteIds` / `accountIds`.
 - **Bulk action audit** — `/activities` is the system-wide audit log; filter by `activityTypes` and `createdAt__gte`.
 - **Push alerts + indicators INTO UAM** -- build OCSF payloads, then call `UAMAlertInterfaceClient.post_alert_with_indicators(alert, [...])` once per alert (loop for many). The helper posts indicators, sleeps 3s, and posts the single alert in the one sequence proven to surface cleanly on US1 tenants. See "UAM Alert Interface" section above for the two silent-drop failure modes (multi-alert POST, no sleep) it prevents. Use for pipeline integrations, synthetic-alert generation, and detection testing.
+- **CTO report for a data source** -- `python build_ps_report_data.py --source "<vendor>" --window <7d|24h>` then `render_charts.py`, `build_docx.py`, `build_pptx.py` on the resulting `reports/<slug>_<window>/data.json`. Works for any SDL data source; the renderer gates every section on `dims` so dimension-sparse sources (e.g. Windows Event Logs with only `event.type`) still produce a coherent deck. See "CTO report generation pipeline" for the data contract and renderer gotchas.
 
 Consult the per-tag reference files for exact parameter names — the above are orientation, not copy-paste ready.

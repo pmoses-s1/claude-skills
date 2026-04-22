@@ -1,0 +1,800 @@
+{
+  "source": "Prompt Security",
+  "slug": "Prompt_Security",
+  "days": 7.0,
+  "window_label": "7d",
+  "collected_at": "2026-04-22T16:42:31+00:00",
+  "window_start": "2026-04-15T16:42:31+00:00",
+  "window_end": "2026-04-22T16:42:31+00:00",
+  "base_filter": "dataSource.name = 'Prompt Security' (tag != 'logVolume' OR !(tag = *))",
+  "dims": {
+    "action": true,
+    "src_ip": false,
+    "user": true,
+    "src_host": false,
+    "event_type": false
+  },
+  "strategy": {
+    "window_label": "7d",
+    "slice_kind": "day",
+    "n_slices": 7,
+    "poll_deadline": 240
+  },
+  "tenant_24h_row": {
+    "dataSource.name": "Prompt Security",
+    "dataSource.category": null,
+    "ct": 226
+  },
+  "queries": {
+    "tenant_sources_24h": {
+      "name": "tenant_sources_24h",
+      "query": "dataSource.name = * | group ct = count() by dataSource.name | sort -ct | limit 30",
+      "matchCount": 20506455.0,
+      "row_count": 30,
+      "columns": [
+        "dataSource.name",
+        "ct"
+      ],
+      "rows": [
+        {
+          "dataSource.name": "SentinelOne",
+          "ct": 18541484
+        },
+        {
+          "dataSource.name": "asset",
+          "ct": 553509
+        },
+        {
+          "dataSource.name": "Windows Event Logs",
+          "ct": 420340
+        },
+        {
+          "dataSource.name": "syslogs",
+          "ct": 219399
+        },
+        {
+          "dataSource.name": "FortiGate",
+          "ct": 156941
+        },
+        {
+          "dataSource.name": "dns",
+          "ct": 113640
+        },
+        {
+          "dataSource.name": "Identity",
+          "ct": 96186
+        },
+        {
+          "dataSource.name": "Zscaler Internet Access",
+          "ct": 92740
+        },
+        {
+          "dataSource.name": "Zeek",
+          "ct": 59976
+        },
+        {
+          "dataSource.name": "Proxmox",
+          "ct": 59354
+        },
+        {
+          "dataSource.name": "Unifi",
+          "ct": 57480
+        },
+        {
+          "dataSource.name": "vulnerability",
+          "ct": 45886
+        },
+        {
+          "dataSource.name": "sample",
+          "ct": 23622
+        },
+        {
+          "dataSource.name": "misconfiguration",
+          "ct": 16351
+        },
+        {
+          "dataSource.name": "Proxmox VE",
+          "ct": 12092
+        },
+        {
+          "dataSource.name": "ActivityFeed",
+          "ct": 8596
+        },
+        {
+          "dataSource.name": "CloudTrail",
+          "ct": 6944
+        },
+        {
+          "dataSource.name": "Google Workspace",
+          "ct": 4922
+        },
+        {
+          "dataSource.name": "alert",
+          "ct": 4023
+        },
+        {
+          "dataSource.name": "AWS VPC Flow",
+          "ct": 3932
+        },
+        {
+          "dataSource.name": "Okta",
+          "ct": 2227
+        },
+        {
+          "dataSource.name": "indicator",
+          "ct": 1909
+        },
+        {
+          "dataSource.name": "Microsoft O365",
+          "ct": 1456
+        },
+        {
+          "dataSource.name": "finding",
+          "ct": 1101
+        },
+        {
+          "dataSource.name": "Cloudflare",
+          "ct": 768
+        },
+        {
+          "dataSource.name": "Cisco Umbrella",
+          "ct": 490
+        },
+        {
+          "dataSource.name": "Prompt Security",
+          "ct": 383
+        },
+        {
+          "dataSource.name": "Proofpoint",
+          "ct": 195
+        },
+        {
+          "dataSource.name": "suricata",
+          "ct": 120
+        },
+        {
+          "dataSource.name": "Mimecast",
+          "ct": 87
+        }
+      ],
+      "elapsed_s": 11.67
+    },
+    "per_user_mix_top10": {
+      "name": "per_user_mix_top10",
+      "query": "dataSource.name = 'Prompt Security' (tag != 'logVolume' OR !(tag = *)) | group n=count() by user, action | sort -n | limit 200",
+      "matchCount": 37094.0,
+      "row_count": 93,
+      "columns": [
+        "user",
+        "action",
+        "n"
+      ],
+      "rows": [
+        {
+          "user": "drjones@flybynight.ru",
+          "action": "log",
+          "n": 18605
+        },
+        {
+          "user": "drjones@flybynight.ru",
+          "action": "block",
+          "n": 15647
+        },
+        {
+          "user": "drjones@flybynight.ru",
+          "action": "modify",
+          "n": 1477
+        },
+        {
+          "user": null,
+          "action": null,
+          "n": 203
+        },
+        {
+          "user": "ori.tabac",
+          "action": "log",
+          "n": 194
+        },
+        {
+          "user": "anonymous",
+          "action": "block",
+          "n": 93
+        },
+        {
+          "user": "dcassle.2012@gmail.com",
+          "action": "block",
+          "n": 90
+        },
+        {
+          "user": null,
+          "action": "log",
+          "n": 76
+        },
+        {
+          "user": "dcassle.2012@gmail.com",
+          "action": "modify",
+          "n": 53
+        },
+        {
+          "user": "dcassle.2012@gmail.com",
+          "action": "log",
+          "n": 52
+        },
+        {
+          "user": "cassle",
+          "action": "log",
+          "n": 43
+        },
+        {
+          "user": "admin@example.com",
+          "action": "log",
+          "n": 42
+        },
+        {
+          "user": null,
+          "action": "modify",
+          "n": 41
+        },
+        {
+          "user": "anonymous",
+          "action": "log",
+          "n": 35
+        },
+        {
+          "user": "s1sec",
+          "action": "log",
+          "n": 35
+        },
+        {
+          "user": "admin@example.com",
+          "action": "modify",
+          "n": 31
+        },
+        {
+          "user": "ori.tabac",
+          "action": "modify",
+          "n": 28
+        },
+        {
+          "user": "vikram.bc",
+          "action": "log",
+          "n": 22
+        },
+        {
+          "user": "cassle",
+          "action": "block",
+          "n": 18
+        },
+        {
+          "user": "doug.cassle@sentinelone.com",
+          "action": "log",
+          "n": 17
+        },
+        {
+          "user": "mohitsanjeev",
+          "action": "log",
+          "n": 16
+        },
+        {
+          "user": "mohitsanjeev",
+          "action": "modify",
+          "n": 15
+        },
+        {
+          "user": "cassle",
+          "action": "modify",
+          "n": 15
+        },
+        {
+          "user": null,
+          "action": "block",
+          "n": 14
+        },
+        {
+          "user": "antonius.kyky@gmail.com",
+          "action": "log",
+          "n": 14
+        },
+        {
+          "user": "dcassle.2012@gmail.com",
+          "action": "bypass",
+          "n": 13
+        },
+        {
+          "user": "s1sec",
+          "action": "modify",
+          "n": 13
+        },
+        {
+          "user": "doug.cassle@sentinelone.com",
+          "action": "bypass",
+          "n": 11
+        },
+        {
+          "user": "admin@example.com",
+          "action": "block",
+          "n": 10
+        },
+        {
+          "user": "$EMAIL",
+          "action": "log",
+          "n": 9
+        },
+        {
+          "user": "ai.state.of.confusion@gmail.com",
+          "action": "log",
+          "n": 9
+        },
+        {
+          "user": "anonymous",
+          "action": "modify",
+          "n": 8
+        },
+        {
+          "user": "chadsmoto158@gmail.com",
+          "action": "log",
+          "n": 8
+        },
+        {
+          "user": "ken.sampson@sentinelone.com",
+          "action": "log",
+          "n": 6
+        },
+        {
+          "user": "mohit.sanjeev@sentinelone.com",
+          "action": "modify",
+          "n": 5
+        },
+        {
+          "user": "mohitsanjeev",
+          "action": "block",
+          "n": 5
+        },
+        {
+          "user": "ken.sampson@sentinelone.com",
+          "action": "block",
+          "n": 5
+        },
+        {
+          "user": "mihir.kansagra@sentinelone.com",
+          "action": "block",
+          "n": 5
+        },
+        {
+          "user": "aiVMS",
+          "action": "block",
+          "n": 4
+        },
+        {
+          "user": "$EMAIL",
+          "action": "modify",
+          "n": 4
+        },
+        {
+          "user": "$EMAIL",
+          "action": "block",
+          "n": 4
+        },
+        {
+          "user": "chadsmoto158@gmail.com",
+          "action": "bypass",
+          "n": 4
+        },
+        {
+          "user": "mihir.kansagra",
+          "action": "bypass",
+          "n": 4
+        },
+        {
+          "user": "mihir.kansagra",
+          "action": "log",
+          "n": 4
+        },
+        {
+          "user": "mihir.kansagra",
+          "action": "block",
+          "n": 4
+        },
+        {
+          "user": "antonius.kyky@gmail.com",
+          "action": "block",
+          "n": 4
+        },
+        {
+          "user": "roshan.kumar@sentinelone.com",
+          "action": "log",
+          "n": 4
+        },
+        {
+          "user": "normc@sentinelone.com",
+          "action": "log",
+          "n": 3
+        },
+        {
+          "user": "oritabac@prompt.security",
+          "action": "block",
+          "n": 3
+        },
+        {
+          "user": "oritabac@prompt.security",
+          "action": "log",
+          "n": 3
+        },
+        {
+          "user": null,
+          "action": "bypass",
+          "n": 3
+        },
+        {
+          "user": "oritabac@prompt.security",
+          "action": "bypass",
+          "n": 3
+        },
+        {
+          "user": "ken.sampson@sentinelone.com",
+          "action": "bypass",
+          "n": 3
+        },
+        {
+          "user": "samuel.ho@sentinelone.com",
+          "action": "log",
+          "n": 3
+        },
+        {
+          "user": "jason.siew@sentinelone.com",
+          "action": "block",
+          "n": 3
+        },
+        {
+          "user": "antonius.kyky@gmail.com",
+          "action": "bypass",
+          "n": 3
+        },
+        {
+          "user": "e2e-test",
+          "action": "log",
+          "n": 2
+        },
+        {
+          "user": "normc@sentinelone.com",
+          "action": "block",
+          "n": 2
+        },
+        {
+          "user": "aiVMS",
+          "action": "bypass",
+          "n": 2
+        },
+        {
+          "user": "aiVMS",
+          "action": "log",
+          "n": 2
+        },
+        {
+          "user": "ahamidi.sentinelone@gmail.com",
+          "action": "bypass",
+          "n": 2
+        },
+        {
+          "user": "oritabac@prompt.security",
+          "action": "modify",
+          "n": 2
+        },
+        {
+          "user": "yash.rajora@sentinelone.com",
+          "action": "block",
+          "n": 2
+        },
+        {
+          "user": "chadsmoto158@gmail.com",
+          "action": "modify",
+          "n": 2
+        },
+        {
+          "user": "chadsmoto158@gmail.com",
+          "action": "block",
+          "n": 2
+        },
+        {
+          "user": "chad.haskins@sentinelone.com",
+          "action": "block",
+          "n": 2
+        },
+        {
+          "user": "antonius.kyky@gmail.com",
+          "action": "modify",
+          "n": 2
+        },
+        {
+          "user": "e2e-test-jailbreak",
+          "action": "log",
+          "n": 1
+        },
+        {
+          "user": "e2e-test-benign",
+          "action": "log",
+          "n": 1
+        },
+        {
+          "user": "e2e-test-user",
+          "action": "log",
+          "n": 1
+        },
+        {
+          "user": "smoketest@test.com",
+          "action": "log",
+          "n": 1
+        },
+        {
+          "user": "mohit.sanjeev@sentinelone.com",
+          "action": "log",
+          "n": 1
+        },
+        {
+          "user": "mohit.sanjeev@sentinelone.com",
+          "action": "block",
+          "n": 1
+        },
+        {
+          "user": "aiVMS",
+          "action": "modify",
+          "n": 1
+        },
+        {
+          "user": "litellm-e2e-check",
+          "action": "log",
+          "n": 1
+        },
+        {
+          "user": "kylem@sentinelone.com",
+          "action": "modify",
+          "n": 1
+        },
+        {
+          "user": "sasidhar.vellamcheti@sentinelone.com",
+          "action": "modify",
+          "n": 1
+        },
+        {
+          "user": "dcassle2012@gmai.com",
+          "action": "block",
+          "n": 1
+        },
+        {
+          "user": "armin.smailhodzic@sentinelone.com",
+          "action": "modify",
+          "n": 1
+        },
+        {
+          "user": "ai.state.of.confusion@gmail.com",
+          "action": "bypass",
+          "n": 1
+        },
+        {
+          "user": "test@example.com",
+          "action": "log",
+          "n": 1
+        },
+        {
+          "user": "nick.jaldevi@sentinelone.com",
+          "action": "modify",
+          "n": 1
+        },
+        {
+          "user": "yash.rajora@sentinelone.com",
+          "action": "log",
+          "n": 1
+        },
+        {
+          "user": "samuel.ho@sentinelone.com",
+          "action": "block",
+          "n": 1
+        },
+        {
+          "user": "samuel.ho@sentinelone.com",
+          "action": "modify",
+          "n": 1
+        },
+        {
+          "user": "samuel.ho@sentinelone.com",
+          "action": "bypass",
+          "n": 1
+        },
+        {
+          "user": "ken.sampson@sentinelone.com",
+          "action": "modify",
+          "n": 1
+        },
+        {
+          "user": "sanjay.kanesamoorthy@sentinelone.com",
+          "action": "modify",
+          "n": 1
+        },
+        {
+          "user": "sanjay.kanesamoorthy@sentinelone.com",
+          "action": "block",
+          "n": 1
+        },
+        {
+          "user": "chad.haskins@sentinelone.com",
+          "action": "modify",
+          "n": 1
+        },
+        {
+          "user": "chad.haskins@sentinelone.com",
+          "action": "log",
+          "n": 1
+        },
+        {
+          "user": "doug.cassle@sentinelone.com",
+          "action": "modify",
+          "n": 1
+        },
+        {
+          "user": "doug.cassle@sentinelone.com",
+          "action": "block",
+          "n": 1
+        }
+      ],
+      "elapsed_s": 52.71
+    },
+    "by_action": {
+      "name": "by_action",
+      "query": "dataSource.name = 'Prompt Security' (tag != 'logVolume' OR !(tag = *)) | group n=count() by action | sort -n",
+      "matchCount": 37094.0,
+      "row_count": 5,
+      "columns": [
+        "action",
+        "n"
+      ],
+      "rows": [
+        {
+          "action": "log",
+          "n": 19213
+        },
+        {
+          "action": "block",
+          "n": 15922
+        },
+        {
+          "action": "modify",
+          "n": 1706
+        },
+        {
+          "action": null,
+          "n": 203
+        },
+        {
+          "action": "bypass",
+          "n": 50
+        }
+      ],
+      "elapsed_s": 56.13
+    },
+    "daily_by_action": {
+      "name": "daily_by_action",
+      "method": "client-side-day-slicing",
+      "slice_kind": "day",
+      "n_slices": 7,
+      "rows": [
+        {
+          "date": "2026-04-15",
+          "start": "2026-04-15T00:00:00Z",
+          "end": "2026-04-16T00:00:00Z",
+          "matchCount": 17971.0,
+          "by_action": {
+            "log": 9214,
+            "block": 7758,
+            "modify": 941,
+            "None": 42,
+            "bypass": 16
+          }
+        },
+        {
+          "date": "2026-04-16",
+          "start": "2026-04-16T00:00:00Z",
+          "end": "2026-04-17T00:00:00Z",
+          "matchCount": 17603.0,
+          "by_action": {
+            "log": 9058,
+            "block": 7686,
+            "modify": 816,
+            "None": 32,
+            "bypass": 11
+          }
+        },
+        {
+          "date": "2026-04-17",
+          "start": "2026-04-17T00:00:00Z",
+          "end": "2026-04-18T00:00:00Z",
+          "matchCount": 78.0,
+          "by_action": {
+            "None": 34,
+            "log": 32,
+            "modify": 7,
+            "block": 4,
+            "bypass": 1
+          }
+        },
+        {
+          "date": "2026-04-18",
+          "start": "2026-04-18T00:00:00Z",
+          "end": "2026-04-19T00:00:00Z",
+          "matchCount": 165.0,
+          "by_action": {
+            "log": 139,
+            "modify": 19,
+            "None": 3,
+            "block": 3,
+            "bypass": 1
+          }
+        },
+        {
+          "date": "2026-04-19",
+          "start": "2026-04-19T00:00:00Z",
+          "end": "2026-04-20T00:00:00Z",
+          "matchCount": 240.0,
+          "by_action": {
+            "log": 105,
+            "block": 93,
+            "modify": 24,
+            "None": 17,
+            "bypass": 1
+          }
+        },
+        {
+          "date": "2026-04-20",
+          "start": "2026-04-20T00:00:00Z",
+          "end": "2026-04-21T00:00:00Z",
+          "matchCount": 1126.0,
+          "by_action": {
+            "log": 711,
+            "block": 348,
+            "modify": 35,
+            "None": 29,
+            "bypass": 3
+          }
+        },
+        {
+          "date": "2026-04-21",
+          "start": "2026-04-21T00:00:00Z",
+          "end": "2026-04-22T00:00:00Z",
+          "matchCount": 263.0,
+          "by_action": {
+            "log": 129,
+            "modify": 52,
+            "None": 34,
+            "block": 31,
+            "bypass": 17
+          }
+        }
+      ]
+    }
+  },
+  "summary": {
+    "total": 37094,
+    "prim_key": "action",
+    "by_action": {
+      "log": 19213,
+      "block": 15922,
+      "modify": 1706,
+      "None": 203,
+      "bypass": 50
+    },
+    "block": 15922,
+    "modify": 1706,
+    "bypass": 50,
+    "log": 19213,
+    "intervention_pct": 47.522510379037044,
+    "block_pct": 42.92338383566075,
+    "bypass_pct": 0.13479268884455708,
+    "principal_count": 40,
+    "top_principal_key": "user",
+    "top_user": {
+      "user": "drjones@flybynight.ru",
+      "n": 35729
+    },
+    "top_share": 96.3201595945436,
+    "rank_24h": 27
+  }
+}

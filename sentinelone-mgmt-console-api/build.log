@@ -1,0 +1,17 @@
+Tenant:     https://usea1-purple.sentinelone.net
+Window:     2026-04-15T15:38:16+00:00 to 2026-04-22T15:38:16+00:00
+Base filter: dataSource.name = 'Prompt Security' (tag != 'logVolume' OR !(tag = *))
+
+  [by_user] 25 rows, matchCount=37103.0, 120.2s
+  [by_action] 5 rows, matchCount=37103.0, 122.4s
+  [by_user_blocks] 20 rows, matchCount=15924.0, 128.6s
+  [daily_by_action] FAILED: LRQ launch failed: HTTP 500 {"code":"internal_server_error","message":"undefined field 'timebucket'","details":[]}
+  [hourly_total] FAILED: LRQ launch failed: HTTP 500 {"code":"internal_server_error","message":"undefined field 'timebucket'","details":[]}
+  [hourly_by_action] FAILED: LRQ launch failed: HTTP 500 {"code":"internal_server_error","message":"undefined field 'timebucket'","details":[]}
+  [by_user_bypass] 12 rows, matchCount=53.0, 50.9s
+  [per_user_mix_top10] 60 rows, matchCount=37103.0, 42.7s
+
+running enumerate_sources (24h context)...
+  [tenant_sources_24h] 30 rows, matchCount=20046312.0, 10.9s
+
+wrote ps_report_data.json (17212 bytes)
