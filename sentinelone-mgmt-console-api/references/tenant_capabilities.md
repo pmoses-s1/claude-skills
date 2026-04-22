@@ -1,9 +1,8 @@
-# Tenant capabilities — auto-generated
+# Tenant capabilities - auto-generated
 
 - Generated at: 2026-04-21T23:45:29+00:00
-- Tenant: `https://usea1-purple.sentinelone.net`
+- Tenant: `<redacted>`
 - Called: 299  |  Skipped (no ID on this tenant): 68
-- Elapsed: 143.25s
 
 ## Status mix
 
@@ -303,16 +302,16 @@
 |---|---|---|---:|---|
 | GET | `/web/api/v2.1/export/agents` | Agents | None | Timeout: exceeded 45.0s batch deadline |
 | GET | `/web/api/v2.1/export/agents-light` | Agents | None | Timeout: exceeded 45.0s batch deadline |
-| GET | `/web/api/v2.1/xdr/assets/surface/cloud/filters/count` | Inventory Cloud Surface Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/container/filters/count` | Inventory Container Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/device/filters/count` | Inventory Device Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/surface/endpoint/filters/count` | Inventory Endpoint Surface Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/identity/filters/count` | Inventory Identity Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/surface/identity/filters/count` | Inventory Identity Surface Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/surface/networkDiscovery/filters/count` | Inventory Network Discovery Surface Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/server/filters/count` | Inventory Server Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/workstation/filters/count` | Inventory Workstation | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/settings/sso/sp-cert` | Settings | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/surface/cloud/filters/count` | Inventory Cloud Surface Filters | None | ReadTimeout: HTTPSConnectionPool(host='<redacted>', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/container/filters/count` | Inventory Container Filters | None | ReadTimeout: HTTPSConnectionPool(host='<redacted>', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/device/filters/count` | Inventory Device Filters | None | ReadTimeout: HTTPSConnectionPool(host='<redacted>', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/surface/endpoint/filters/count` | Inventory Endpoint Surface Filters | None | ReadTimeout: HTTPSConnectionPool(host='<redacted>', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/identity/filters/count` | Inventory Identity Filters | None | ReadTimeout: HTTPSConnectionPool(host='<redacted>', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/surface/identity/filters/count` | Inventory Identity Surface Filters | None | ReadTimeout: HTTPSConnectionPool(host='<redacted>', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/surface/networkDiscovery/filters/count` | Inventory Network Discovery Surface Filters | None | ReadTimeout: HTTPSConnectionPool(host='<redacted>', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/server/filters/count` | Inventory Server Filters | None | ReadTimeout: HTTPSConnectionPool(host='<redacted>', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/workstation/filters/count` | Inventory Workstation | None | ReadTimeout: HTTPSConnectionPool(host='<redacted>', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/settings/sso/sp-cert` | Settings | None | ReadTimeout: HTTPSConnectionPool(host='<redacted>', port=443): Read timed out. (read timeout=10.0) |
 | GET | `/web/api/v2.1/singularity-marketplace/applications` | marketplace | None | Timeout: exceeded 45.0s batch deadline |
 | GET | `/web/api/v2.1/singularity-marketplace/applications-catalog` | marketplace | None | Timeout: exceeded 45.0s batch deadline |
 | GET | `/web/api/v2.1/agents/{agent_id}/uploads/{activity_id}` | Agents | 400 | HTTP 400: Incorrect activity |
@@ -438,7 +437,7 @@
 | GET | `/web/api/v2.1/upgrade-policy/all-policies-count` | Auto Upgrade Policy | 502 | HTTP 502: Bad Gateway |
 | GET | `/web/api/v2.1/upgrade-policy/policies-count` | Auto Upgrade Policy | 502 | HTTP 502: Bad Gateway |
 
-## Skipped — no ID available on this tenant
+## Skipped - no ID available on this tenant
 
 | Path | Tag | Missing |
 |---|---|---|
@@ -511,78 +510,30 @@
 | `/web/api/v2.1/singularity-marketplace/applications/{applicationId}/config` | marketplace | applicationId |
 | `/web/api/v2.1/singularity-marketplace/applications/{id}/log` | marketplace | id |
 
-## PowerQuery 30-day performance (LRQ API)
+## PowerQuery performance guidance (LRQ API)
 
-Benchmark of the Long Running Query API (`POST /sdl/v2/api/queries`) on the same tenant (`usea1-purple.sentinelone.net`), run on 2026-04-22. Target workload: aggregate every EDR event over 30 days, grouped by `event.type`, returning the top 50.
+The Long Running Query API (`POST /sdl/v2/api/queries`) is the canonical programmatic path for PowerQueries. Both `/api/powerQuery` and the Deep Visibility `/dv/events/pq` endpoints are deprecated and sunset on 2027-02-15. `S1Client.api_token` doubles as the LRQ Bearer token: swap the `ApiToken` prefix for `Bearer` and point at the tenant's own console host.
 
-**Query:**
+### Two-ceiling bottleneck model
 
-```
-dataSource.name='SentinelOne' dataSource.category='security' event.type=*
-| group ct=count(), first_seen=min(timestamp), last_seen=max(timestamp) by event.type
-| sort -ct
-| limit 50
-```
+End-to-end wall clock on a 30-day aggregate is gated by two successive ceilings:
 
-**Scope of the aggregate:** ~574.6M events matched across 50 distinct `event.type` values.
+1. **Per-user rate cap.** Each service user is capped at roughly 3 requests per second against the LRQ endpoint. A single JWT driving multiple parallel slices saturates this ceiling quickly, so the first speedup lever is adding JWTs (distinct `sub` claims) and round-robining requests across them. Combining two service-user JWTs roughly doubles the available budget.
+2. **Slowest-slice server runtime.** Once the rate cap is no longer the bottleneck, the wall clock floor is the tail latency of the single slowest slice plus result merge. More pool width past this point does not help; to push further, add another JWT, narrow the initial filter, or swap `| group` for `| top K` (probabilistic but orders of magnitude faster on huge ranges).
 
-### v1: single user JWT, token-bucket at 2.5 rps
+### Slice-size sensitivity (filter breadth flips the optimum)
 
-Single service-user identity (one JWT). Per-user 3 rps cap is the hard ceiling; token-bucket at 2.5 rps leaves headroom for retries.
+Dividing the query window into N time slices and running them in parallel is the standard pattern. The optimal slice count depends on how much data each slice scans:
 
-| Shape      | Pool | Wall clock | vs serial |
-|------------|------|------------|-----------|
-| 30d serial | 1    | 166.35s    | 1.00x     |
-| 30 x 1d    | 3    | 86.96s     | 1.91x     |
-| 6 x 5d     | 3    | 66.25s     | 2.51x (best 1-token) |
+- **Narrow initial filter** (e.g. EDR-only, a specific `event.type`, a single data source): per-slice server runtime is small, the rate cap is the dominant ceiling, so **fewer-larger slices win** (for a 30-day range, roughly 10-15 slices at pool 6 across two JWTs).
+- **Wide initial filter** (e.g. `dataSource.name=*`, all event types): per-slice runtime climbs faster than the parallelism savings from fewer slices, so **more-smaller slices win** (for a 30-day range, roughly 30 one-day slices at pool 6 across two JWTs).
 
-Per-slice latencies in the 6x5d best: p50 33.41s, p95 34.60s, max 34.60s. Each slice is big, so the floor is the slowest single slice. Shrinking slices trades backend cost for API-call cost and is worse on a single token.
+Rule of thumb: wider filter -> smaller slices. Budget the slowest slice runtime as the wall-clock floor and size slices so that runtime stays below the rate-limited launch cadence.
 
-### v2: two distinct service-user JWTs, round-robin
+### Load characteristics to expect
 
-Two service-user tokens with different `sub` claims, each bound to its own `LRQClient` instance for the full launch-poll-cancel lifecycle (the `X-Dataset-Query-Forward-Tag` is session-scoped). Combined budget: ~5 rps.
+On most tenants, SentinelOne EDR dominates event volume, so widening the initial filter from an EDR-only scope to `dataSource.name=*` adds only a modest wall-clock penalty. On tenants with richer non-S1 ingestion (heavier third-party log mix), the penalty will be larger and the case for narrowing the filter before running long-range aggregates is stronger. `dataSource.category` has been seen with inconsistent capitalization (`security` vs `Security`) across sources, which matters if filtering by it.
 
-| Shape   | Pool | Wall clock | vs 1-tok best | vs serial |
-|---------|------|------------|---------------|-----------|
-| 30 x 1d | 6    | 34.77s     | 1.91x         | 4.78x     |
-| 15 x 2d | 6    | 28.56s     | 2.32x         | 5.83x (best 2-token) |
-| 10 x 3d | 6    | 28.52s     | 2.32x         | 5.83x     |
+### Fallback path from the Purple MCP
 
-Per-slice latencies in the 15x2d best: p50 9.24s, p95 12.72s, max 12.72s. The ~28.5s wall-clock floor is the tail of the slowest slice plus merge, not a rate-limit artefact. Load distributes cleanly across the two clients (8/7 in the 15x2d run, 5/5 in the 10x3d run).
-
-### Bottleneck model
-
-1. Per-user 3 rps rate cap is the first ceiling.
-2. Once beaten (by using 2+ service-user tokens), the new ceiling is the slowest slice's server-side runtime (p95 ~9-17s at 2-3d slices on this tenant).
-3. More pool width past the runtime ceiling does not help. To push below 20s on the same query: add a third JWT (expected 18-22s), swap `| group` for `| top K` (probabilistic but orders of magnitude faster on huge ranges), or narrow the initial filter (`event.type in ('Process Creation','File Creation','Module Load')`).
-
-### Top 10 event types (30 days)
-
-From the v2 15x2d run (matchCount 574,382,851):
-
-| Rank | event.type                  | count       | share |
-|-----:|-----------------------------|------------:|------:|
-| 1    | Process Creation            | 153,845,481 | 26.8% |
-| 2    | File Creation               |  92,737,835 | 16.1% |
-| 3    | File Deletion               |  83,193,805 | 14.5% |
-| 4    | File Rename                 |  34,323,544 |  6.0% |
-| 5    | Module Load                 |  26,700,420 |  4.6% |
-| 6    | IP Connect                  |  24,757,869 |  4.3% |
-| 7    | Registry Value Modified     |  23,218,105 |  4.0% |
-| 8    | Command Script              |  22,030,082 |  3.8% |
-| 9    | File Modification           |  18,661,647 |  3.2% |
-| 10   | Named Pipe Connection       |  13,952,148 |  2.4% |
-
-### Runners
-
-- `/sessions/great-serene-euler/pq_30d_max_lrq.py` - single-token runner with token-bucket rate limiting and three slice-shape modes. Best 30d wall: 66.25s (6x5d pool=3).
-- `/sessions/great-serene-euler/pq_30d_max_lrq_v2.py` - two-JWT round-robin runner, pool=6, ~5 rps combined. Best 30d wall: 28.52s (10x3d) / 28.56s (15x2d).
-
-Both pull their JWTs from `config.json`'s `api_token` (default) and `single_scope_api_token` entries, swap `ApiToken` for `Bearer`, and point at the tenant's own console host (not `xdr.us1.sentinelone.net`).
-
-### Takeaways for the skill
-
-- LRQ API is the canonical programmatic path for every PowerQuery against this tenant: `/api/powerQuery` and `/dv/events/pq` sunset on 2027-02-15.
-- For 30-day workloads, 15x2d pool=6 with two JWTs is the reliable sweet spot at ~29s wall clock.
-- A single-token runner can reach 66s on 30 days; anything further requires adding tokens, swapping to `| top K`, or narrowing the filter.
-- Use the Purple MCP `powerquery` tool for interactive 24h hunts; fall back to the LRQ runner (same JWT, Bearer prefix) whenever the MCP times out or the window exceeds a few days.
+Use the Purple MCP `powerquery` tool for interactive hunts over short windows (typically the last 24 hours). When the MCP times out or the query spans multiple days, fall back to the LRQ runner using the same JWT (only the prefix changes to `Bearer`) against the tenant's own console host. See the `sentinelone-powerquery` skill for the canonical fallback pattern.
