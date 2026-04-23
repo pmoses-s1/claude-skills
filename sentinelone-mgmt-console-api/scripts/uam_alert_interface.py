@@ -635,6 +635,8 @@ def build_alert_referencing(
     title: str,
     description: str,
     severity_id: int = 2,
+    detection_product: str = "smoke-product",
+    detection_vendor: str = "smoke-vendor",
 ) -> Dict[str, Any]:
     """S1 SecurityAlert that references one OR many indicators.
 
@@ -643,6 +645,16 @@ def build_alert_referencing(
     `finding_info.related_events[]` entry per indicator, linked by
     metadata.uid. Observables are carried through on each related_events
     entry so the UAM Indicators tab surfaces the right data.
+
+    `detection_product` / `detection_vendor` populate `metadata.product`
+    on the posted alert. These drive how UAM classifies the synthetic
+    asset created for the alert (visible in `assets[].category` /
+    `subcategory` on the GraphQL side). Empirical findings:
+      * "smoke-product" / "smoke-vendor" (default)  -> category "Device", subcategory "Other Device"
+      * "SentinelOne" / "SentinelOne"               -> category "Server", subcategory "Virtual Machine"
+    Neither path populates `assets[].agentUuid` (that linkage is only
+    established when the alert originates from an installed S1 agent on
+    the tenant). See references/ASSET_LINKAGE.md for the full matrix.
     """
     if not indicators:
         raise ValueError("alert must reference at least one indicator")
@@ -702,7 +714,7 @@ def build_alert_referencing(
         "metadata": {
             "version": "1.6.0-dev",
             "extension": {"name": "s1", "uid": "998", "version": "0.1.0"},
-            "product": {"name": "smoke-product", "vendor_name": "smoke-vendor"},
+            "product": {"name": detection_product, "vendor_name": detection_vendor},
             "logged_time": now_ms,
             "modified_time": now_ms,
         },

@@ -150,6 +150,20 @@ _ALERT_CORE_FIELDS = (
     "detectionSource { product vendor } assignee { fullName email }"
 )
 
+# Expanded selection for single-alert lookups (`get_alert`). Includes the
+# `assets` block so callers can see whether an alert is bound to a real
+# S1 agent (agentUuid populated) or to a synthesized/ingested asset
+# (agentUuid null, category driven by metadata.product on ingest). Not
+# used as the list-alerts default because pulling assets for every edge
+# in a large paginated page is wasteful. See references/ASSET_LINKAGE.md
+# for the empirics on what ingest payloads populate which asset fields.
+_ALERT_DETAIL_FIELDS = _ALERT_CORE_FIELDS + (
+    " assets { id name agentUuid category subcategory osType osVersion "
+    "primary accessible decommissioned deleted status agentVersion "
+    "lastLoggedInUser } "
+    "dataSources { id name }"
+)
+
 
 def list_alerts(
     client: S1Client,
@@ -251,9 +265,17 @@ def get_alert(
     client: S1Client,
     alert_id: str,
     *,
-    fields: str = _ALERT_CORE_FIELDS,
+    fields: str = _ALERT_DETAIL_FIELDS,
 ) -> Dict[str, Any]:
-    """Fetch a single alert by id."""
+    """Fetch a single alert by id.
+
+    Default selection (`_ALERT_DETAIL_FIELDS`) includes the `assets`
+    block so callers can immediately tell whether an alert is bound to
+    real S1 agent inventory (`agentUuid` populated) or to an ingested
+    synthetic asset (`agentUuid` null, category driven by the ingest
+    payload's `metadata.product/vendor_name`). Pass `fields=_ALERT_CORE_FIELDS`
+    to skip the asset join on latency-sensitive calls.
+    """
     query = f"""
     query alertOne($id: ID!) {{
       alert(id: $id) {{ {fields} }}

@@ -516,6 +516,19 @@ uam_iface.post_alert_with_indicators(
 
 See `tests/test_uam_alert_interface_single.py` for the minimum-viable worked example, and `tests/test_uam_alert_interface_batch.py` for a batched 3-indicator / multi-observable / multi-class round-trip.
 
+### Asset linkage on ingested alerts
+
+Ingested alerts always create a synthetic `assets[]` entry derived from `resources[]`; they **never** populate `assets[].agentUuid`. That linkage to real tenant inventory is only established when the alert originates from an installed S1 agent (real detection, STAR rule hit, or Hyperautomation `sendCustomEvent`). No OCSF field combination on the ingest path (tested: `resources[].agent_list`, `device.agent_uuid`, matching real agent UUIDs, `os.type_id` hints, etc.) reconciles against inventory.
+
+What IS controllable is the asset classification. `metadata.product.name` + `metadata.product.vendor_name` on the alert envelope drive `assets[].category` / `assets[].subcategory`:
+
+- Defaults (`smoke-product` / `smoke-vendor`) classify as "Device / Other Device"
+- `SentinelOne` / `SentinelOne` classifies as "Server / Virtual Machine"
+
+Pass these via `build_alert_referencing(detection_product=..., detection_vendor=...)` when you want a demo alert to visually resemble an agent-generated alert. `get_alert` now defaults to `_ALERT_DETAIL_FIELDS` which includes the `assets { ... }` block; `list_alerts` / `paginate_alerts` still default to `_ALERT_CORE_FIELDS` (cheap) and accept an explicit `fields=_ALERT_DETAIL_FIELDS` override when callers want the asset join on every edge.
+
+Full empirical matrix including per-field behavior and probing recipes: `references/ASSET_LINKAGE.md`.
+
 ## Data source + schema discovery
 
 Before you write queries, dashboards, or detections against an SDL data source, discover two things: (1) what sources exist on this tenant and which are actively ingesting, and (2) for a given source, what attributes the parser actually emits. Hardcoded field lists are the number-one reason queries return 0 rows on a new tenant. This workflow replaces them.
