@@ -71,6 +71,7 @@ It enumerates every GET plus a curated allow-list of read-only query POSTs, reco
 - `tests/test_ioc_lifecycle.py` — reversible CREATE → LIST → DELETE → VERIFY round-trip for Threat Intelligence IOCs. Uses a unique run-tag per invocation, scopes to a single account, and cleans up before exit. Covers the one "create content" path against the S1 detection surface.
 - `tests/test_alerts_dual_api.py` — dual-API round-trip for alerts: GraphQL list/detail/addNote/notes/deleteNote plus a parallel REST `/cloud-detection/alerts` read. Demonstrates that UAM GraphQL is the PRIMARY alert surface and REST is SECONDARY, with the note mutation cleaned up before exit (handles the `mgmt_note_id` propagation delay).
 - `scripts/pq.py` — foolproof PowerQuery runner over the LRQ API. Wraps launch/poll/cancel, auth flip to `Bearer`, `X-Dataset-Query-Forward-Tag` capture, exponential backoff on 5xx/429/connection errors, and a best-effort cancel. One call: `run_pq(client, "<query>", hours=24)` returns `{row_count, columns, rows, matchCount, ...}`. Also exposes `list_data_sources(client, hours=24)` for the first-response "does this data source actually exist on this tenant?" check. Use this any time a user says "query logs", "run a PQ", "search for events" via the mgmt console API.
+- `scripts/inspect_source.py` — source-agnostic schema discovery. For any `dataSource.name`, samples raw events via the LRQ `LOG` queryType (or sync `/sdl/api/query` when available) and classifies every attribute the parser emits into `principal_user` / `principal_host` / `principal_ip` / `action` / `temporal` / `network` / `file` / `process` / `grouping_candidate` / `other`. Picks `prim_key` + `action_key` from whatever the source actually carries, so downstream code never hardcodes field names. Exports `discover_schema(client, source, hours, sample, extra_filter, backend, escalate)` and `pick_keys(schema)`; CLI: `python scripts/inspect_source.py --source "<name>" --window 24h`. See "Data source + schema discovery" below.
 - `scripts/uam_alert_interface.py` — UAM (Unified Alert Management) Alert Interface client for pushing OCSF indicators + alerts INTO UAM via `POST /v1/indicators` and `POST /v1/alerts` on `ingest.us1.sentinelone.net`. Handles the gzip-compressed concatenated-JSON body, `Bearer` auth (the endpoint rejects `ApiToken`), and the `S1-Scope` header. Exposes `UAMAlertInterfaceClient`, plus `build_file_indicator()`, `build_process_indicator()`, `build_network_indicator()`, and `build_alert_referencing()` payload helpers. URL is configurable via `uam_alert_interface_url` in `config.json` (defaults to `https://ingest.us1.sentinelone.net`; legacy key `ingestion_gateway_url` is still honored as a fallback).
 - `tests/test_uam_alert_interface_single.py` — minimum-viable reversible write-side round-trip: POST one OCSF FileSystem-Activity indicator + one SecurityAlert referencing it, poll UAM GraphQL until the alert surfaces, verify the indicator is stitched in, then close the alert via bulk-ops (status=RESOLVED, analystVerdict=TRUE_POSITIVE_BENIGN). Covers the single-indicator happy path into UAM.
 - `tests/test_uam_alert_interface_batch.py` — comprehensive reversible round-trip: batched POST of 3 indicators (OCSF classes 1001 FileSystem Activity, 1007 Process Activity, 4001 Network Activity) each carrying 3+ observables, referenced by a single SecurityAlert via `finding_info.related_events[]`. Verifies all 3 metadata.uids and their observable names surface in `alert.rawIndicators`, then closes the alert. Covers batching, multi-observable, and multi-indicator linkage.
@@ -514,6 +515,99 @@ uam_iface.post_alert_with_indicators(
 - `tests/test_uam_alert_interface_batch.py` -- CONFIRMED WORKING end-to-end. 3 indicators batched into one POST, alert with 3 related_events surfaces in UAM, all 3 indicators stitch into `alert.rawIndicators` within 2-5s, cleanup verified. Per-observable name assertion treated as informational due to GraphQL server-side rendering quirk noted above.
 
 See `tests/test_uam_alert_interface_single.py` for the minimum-viable worked example, and `tests/test_uam_alert_interface_batch.py` for a batched 3-indicator / multi-observable / multi-class round-trip.
+
+## Data source + schema discovery
+
+Before you write queries, dashboards, or detections against an SDL data source, discover two things: (1) what sources exist on this tenant and which are actively ingesting, and (2) for a given source, what attributes the parser actually emits. Hardcoded field lists are the number-one reason queries return 0 rows on a new tenant. This workflow replaces them.
+
+### Step 1 — enumerate sources (`dataSource.name = *`)
+
+```python
+from pq import list_data_sources
+sources = list_data_sources(client, hours=24, limit=200)
+# -> [{"dataSource.name": "SentinelOne", "dataSource.category": "security", "ct": 18304051}, ...]
+```
+
+CLI: `python scripts/inspect_source.py --list` prints a ranked table of every source that ingested in the last 24h. If a name the user asked for isn't in the list, fuzzy-match and surface candidates rather than running a query that will return 0.
+
+Rules of thumb:
+- There can be multiple rows with the same `dataSource.name` under different `dataSource.category` values (e.g. `SentinelOne / security`, `SentinelOne / None`, `SentinelOne / telemetry`). Treat category as metadata, not part of the name.
+- A source with non-zero `ct` in 24h is live. Anything else is either decommissioned, in a different time window, or scoped out of the current token.
+
+### Step 2 — discover the schema for one source (`discover_schema`)
+
+```python
+from inspect_source import discover_schema, pick_keys
+
+schema = discover_schema(
+    client, "Prompt Security",
+    hours=24, sample=150,
+    extra_filter="(tag != 'logVolume' OR !(tag = *))",  # ALWAYS exclude logVolume
+    backend="auto",   # sync SDL first, LRQ LOG fallback
+    escalate=True,    # 1h -> 4h -> 24h until min_events rung satisfied
+)
+prim_key, action_key = pick_keys(schema)
+```
+
+CLI: `python scripts/inspect_source.py --source "<name>" --window 24h`.
+
+Key points:
+- Uses the LRQ `LOG` queryType (not PowerQuery). PQ has no wildcard column projection; `| columns *` errors and `| limit N` only returns `timestamp + message`. `LOG` returns every flat attribute the parser emits under `matches[].values`, which is how the Event Search UI populates its "Event properties" panel.
+- Sync SDL `/sdl/api/query` is ~30% faster than async LRQ on usea1-purple. The dispatcher prefers it and falls back to LRQ LOG on HTTP 404/401/403. Force a backend with `backend="sdl"` or `backend="lrq"` if benchmarking.
+- Escalating window (1h -> 4h -> 24h -> requested) keeps busy sources ~3s. Only sparse sources (audit, low-volume demos) pay the full widening cost. Override with `escalate=False` for a single-rung run at `hours=`.
+- Each field is classified: `principal_user` / `principal_host` / `principal_ip` / `action` / `temporal` / `network` / `file` / `process` / `grouping_candidate` / `other`. `pick_keys(schema)` returns `(prim_key, action_key)` picked from whatever is populated, preferring `user > hostname > IP`, then shortest name, then exact-name action hits (`action`, `event.type`, `outcome`, `result`, `severity`, ...) in that priority.
+- `extra_filter` is passed through verbatim and appended to the base `dataSource.name='...'` filter.
+
+### ALWAYS exclude `tag='logVolume'` from discovery samples
+
+Many SentinelOne parsers emit metric events alongside real data, tagged `tag='logVolume'`. They have `metric`, `value`, `path1` fields and nothing else useful. If you don't exclude them, they crowd out real events in a sample window and the classifier picks `severity` as the action key because it's the only field at 100% populated. Pass:
+
+```python
+extra_filter="(tag != 'logVolume' OR !(tag = *))"
+```
+
+The `OR !(tag = *)` half keeps sources that don't emit `tag` at all (rather than excluding them as null). `build_source_report.py` always passes this filter. Do the same in any new caller.
+
+### Benchmarked results (5 sources, usea1-purple, 24h ceiling)
+
+| Source | Wall | Effective | n sampled | attrs | prim_key | action_key |
+|---|---|---|---|---|---|---|
+| SentinelOne | 2.9s | 1h | 150 | 333 | `src.process.eUserName` | `event.type` |
+| Windows Event Logs | 3.1s | 1h | 150 | 148 | `winEventLog.data.event.eventData.subjectUserName` | `event.type` |
+| FortiGate | 2.5s | 1h | 150 | 247 | `device.name` | `event.type` |
+| Zscaler Internet Access | 2.5s | 1h | 150 | 47 | `None` | `action` |
+| Prompt Security | 16.8s | 24h | 133 | 59 | `user` | `action` |
+
+Four of five land in ~3s because busy sources satisfy the `min_events=50` threshold on the 1h rung. Only low-volume sources (demo Prompt Security) pay the full escalation cost (1h -> 4h -> 24h = 3 rungs). Reproduce with `python scripts/bench_5_sources.py`.
+
+Zscaler returning `prim_key=None` is a real classifier gap: its user-ish fields are named `deviceowner` / `department` without a separator, so they don't match the `principal_user` regex. This is visible, not hidden. Operators can inspect the `other` class in the report and manually set the prim_key for downstream queries.
+
+### Using the discovered schema in code
+
+```python
+base = f"dataSource.name = '{source}' (tag != 'logVolume' OR !(tag = *))"
+
+# volume-by-action breakdown (always safe; default to count() if no action key)
+if action_key:
+    q = f"{base} | group n=count() by {action_key} | sort -n"
+else:
+    q = f"{base} | group n=count()"
+
+# per-principal mix (skip if no principal)
+if prim_key and action_key:
+    q = f"{base} | group n=count() by {prim_key}, {action_key} | sort -n | limit 60"
+elif prim_key:
+    q = f"{base} | group n=count() by {prim_key} | sort -n | limit 25"
+```
+
+`build_source_report.py` is the reference consumer of this pattern. Read it before writing a new pipeline that needs the same keys.
+
+### When to re-run discovery
+
+- Before writing any query against a source you haven't touched on this tenant.
+- When a previously-working query starts returning 0 rows (parser may have changed field names after a platform update).
+- On tenant handover — different customers enable different parser versions, especially for XDR connectors.
+- Before authoring a detection rule body (STAR / Custom Detection / PowerQuery Alert), to confirm the fields the rule references actually exist. Pass the discovered schema through to the rule author in the body of the request.
 
 ## CTO report generation pipeline
 
