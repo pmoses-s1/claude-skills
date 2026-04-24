@@ -29,17 +29,14 @@ The canonical LRQ runner, body schema, auth, forward-tag routing, rate-limit str
 
 ## Setup — configure credentials first
 
-Credentials live in `config.json` at the skill root. Fill in the fields you need:
+Credentials are loaded from `~/.config/sentinelone/credentials.json`. Add only the keys you need:
 
 ```json
 {
-  "base_url": "https://xdr.us1.sentinelone.net",
-  "log_write_key":   "0Z1Fy0...",
-  "log_read_key":    "0tzj/CPYTZX6...",
-  "config_read_key": "0MQTxgjueeKjo...",
-  "config_write_key":"0mXas6PD1Zvg...",
-  "console_api_token": "",
-  "s1_scope": ""
+  "SDL_BASE_URL":          "https://xdr.us1.sentinelone.net",
+  "SDL_CONSOLE_API_TOKEN": "eyJ...your-token...",
+  "SDL_LOG_WRITE_KEY":     "0Z1Fy0...",
+  "SDL_CONFIG_WRITE_KEY":  "0mXas6PD1Zvg..."
 }
 ```
 
@@ -51,11 +48,11 @@ Each key type unlocks a specific set of methods (matrix below). The client picks
 | Log Read Access         | `query`, `numericQuery`, `facetQuery`, `timeseriesQuery`, `powerQuery` |
 | Configuration Read      | All Log Read methods, plus `getFile`, `listFiles` |
 | Configuration Write     | All of the above, plus `putFile` |
-| Console User API token  | All query + config methods (NOT `uploadLogs`); set `s1_scope` if multi-site/account |
+| Console User API token  | All query + config methods (NOT `uploadLogs`); set `SDL_S1_SCOPE` if multi-site/account |
 
-Environment variables override `config.json`: `SDL_BASE_URL`, `SDL_LOG_WRITE_KEY`, `SDL_LOG_READ_KEY`, `SDL_CONFIG_READ_KEY`, `SDL_CONFIG_WRITE_KEY`, `SDL_CONSOLE_API_TOKEN`, `SDL_S1_SCOPE`, `SDL_VERIFY_TLS`.
+Environment variables (`SDL_BASE_URL`, `SDL_LOG_WRITE_KEY`, etc.) override the credentials file if set.
 
-Before running anything, confirm `base_url` is set and at least one key for the operation chain is present. If not, stop and ask the user.
+Before running anything, confirm `SDL_BASE_URL` is set and at least one key for the operation chain is present. If not, stop and ask the user to update `~/.config/sentinelone/credentials.json`.
 
 ## Workflow
 
@@ -68,7 +65,7 @@ When the user asks for something involving the SDL API:
 
 ## Files in this skill
 
-- `config.json` — credentials. The user updates these.
+- `~/.config/sentinelone/credentials.json` — credentials (set `SDL_BASE_URL` and the keys you need; see Setup above).
 - `scripts/sdl_client.py` — importable Python client (`SDLClient`). Picks the right key per method, retries with exponential backoff, exposes ergonomic method names.
 - `scripts/sdl_cli.py` — CLI runner: `python scripts/sdl_cli.py power-query "dataset='accesslog' | group count() by status" --start 1h`.
 - `references/methods.md` — single per-method reference (parameters, defaults, response shape, gotchas) for all 10 SDL endpoints.

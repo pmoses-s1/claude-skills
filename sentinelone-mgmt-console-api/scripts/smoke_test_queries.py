@@ -4,7 +4,7 @@ Non-destructive smoke test of SentinelOne Management Console read APIs.
 Purpose
 -------
 Hit every GET endpoint + a curated allow-list of read-only query POSTs
-against the tenant in config.json and record which ones work on THIS
+against the configured tenant and record which ones work on THIS
 tenant. Writes two artifacts:
 
   references/tenant_capabilities.json   (machine-readable)

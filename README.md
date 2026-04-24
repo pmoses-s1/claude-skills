@@ -1,21 +1,96 @@
 # claude-skills
 
-Claude skills for working with SentinelOne. Each subfolder is a standalone skill with its own `SKILL.md` that Claude will read when triggered.
+SentinelOne skills for Claude. Install the plugin to get everything — no individual skill setup needed.
 
-## Skills
+## Quick start
 
-- **[sentinelone-mgmt-console-api](./sentinelone-mgmt-console-api/)** — Query and act on a SentinelOne Management Console (threats, alerts, agents, sites, RemoteOps, Deep Visibility, Hyperautomation, etc.). Wraps the full S1 Mgmt Console API (v2.1) with a Python client, cursor-based pagination, and a searchable endpoint index.
-- **[sentinelone-powerquery](./sentinelone-powerquery/)** — Author, debug, optimize, and run SentinelOne PowerQuery (PQ) for Deep Visibility / Event Search, XDR/EDR threat hunting, STAR / Custom Detection rules, and Singularity Data Lake dashboards.
-- **[sentinelone-sdl-api](./sentinelone-sdl-api/)** — Read and write the SentinelOne Singularity Data Lake (SDL) API: ingest events (`uploadLogs`, `addEvents`), run queries (`query`, `powerQuery`, `facetQuery`, `timeseriesQuery`, `numericQuery`), and manage configuration files (`listFiles`, `getFile`, `putFile`) — parsers, dashboards, alerts, lookups, datatables. Ships with a Python client, CLI, and an end-to-end smoke test.
-- **[sentinelone-sdl-log-parser](./sentinelone-sdl-log-parser/)** — Author, edit, debug, and validate SentinelOne Singularity Data Lake (SDL) log parsers — the augmented-JSON definitions at `/logParsers/` that extract fields from raw log text before ingestion. **Maps to OCSF by default:** every parser emits Open Cybersecurity Schema Framework field names (`src_endpoint.ip`, `actor.user.email_addr`, `file.hashes[].value`, …) so downstream PowerQuery hunts, STAR rules, dashboards, and Marketplace content work out of the box across vendors. Covers CEF, syslog, JSON, key=value, CSV, and multi-line formats with strategy templates, the ai-siem catalog recipe, and end-to-end validation (putFile → uploadLogs → query) via the `sentinelone-sdl-api` skill.
+1. Download the latest `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/)
+2. Double-click it to install into Claude
+3. Create `~/.config/sentinelone/credentials.json` with your tenant credentials (see [Configuration](#configuration) below)
 
-  How it works: Claude reads the raw log sample, picks a strategy (alias a built-in parser, single-line format with named-regex patterns, repeating key/value catch-all, JSON envelope with `{parse=json}`, multi-line `lineGroupers`, or a `gron` + `mappings` block for full OCSF restructuring), then drafts a parser that either captures directly into OCSF dotted names or captures vendor-native fields and renames them via `mappings`. Every parser ships the four required default attributes (`metadata.version`, `dataSource.category`, `dataSource.vendor`, `class_uid`/`class_name`), is deployed to `/logParsers/` via `putFile`, exercised with a sample via `uploadLogs`, and confirmed by querying the parsed OCSF fields back out — so the skill never reports done until the live ingest path works.
+That's it. All five skills are active immediately.
+
+## What's included
+
+The plugin bundles every skill in this repo — installing the plugin is sufficient, there is no need to install skills individually.
+
+| Skill | What it does |
+|-------|-------------|
+| sentinelone-mgmt-console-api | Query and act on the Management Console: threats, alerts, agents, sites, RemoteOps, Deep Visibility, Hyperautomation, Purple AI, UAM |
+| sentinelone-powerquery | Write, debug, and run PowerQuery for threat hunting, STAR detection rules, and SDL dashboards |
+| sentinelone-sdl-api | Ingest events, run queries, and manage configuration files (parsers, dashboards, lookups) via the Singularity Data Lake API |
+| sentinelone-sdl-log-parser | Author and validate SDL log parsers for any log format, with OCSF field mapping by default |
+| sentinelone-hyperautomation | Design and generate Hyperautomation workflow JSON, with optional live console import |
 
 ## Installing
 
-Drop a skill folder into your Claude skills directory (for Claude Code / Cowork, typically `~/.claude/skills/`). Claude will pick it up on next session.
-OR
-Clone and zip the folder, upload the skill to Claude Cowork. Note: the sentinelone-mgmt-console-api and sentinelone-sdl-api need a valid config.json - ensure you use it responsibly with an RO token, plan and validate actions before executing any changes. 
+**Plugin (recommended)** — download from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/) and double-click. All five skills are installed in one step.
+
+**Individual skills (for development only)** — drop a skill folder into `~/.claude/skills/`. Claude will pick it up on next session.
+
+## Configuration
+
+All skills read credentials from `~/.config/sentinelone/credentials.json`. Create this file once and every skill picks it up automatically — no editing files inside the plugin or skill folder needed.
+
+**macOS / Linux:**
+
+```bash
+mkdir -p ~/.config/sentinelone
+cat > ~/.config/sentinelone/credentials.json << 'EOF'
+{
+  "S1_BASE_URL": "https://usea1-acme.sentinelone.net",
+  "S1_API_TOKEN": "eyJ...your-management-console-api-token...",
+  "SDL_BASE_URL": "https://xdr.us1.sentinelone.net",
+  "SDL_CONSOLE_API_TOKEN": "eyJ...your-sdl-console-api-token..."
+}
+EOF
+```
+
+**Windows (PowerShell):**
+
+```powershell
+$dir = "$env:USERPROFILE\.config\sentinelone"
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+@'
+{
+  "S1_BASE_URL": "https://usea1-acme.sentinelone.net",
+  "S1_API_TOKEN": "eyJ...your-management-console-api-token...",
+  "SDL_BASE_URL": "https://xdr.us1.sentinelone.net",
+  "SDL_CONSOLE_API_TOKEN": "eyJ...your-sdl-console-api-token..."
+}
+'@ | Set-Content "$dir\credentials.json" -Encoding UTF8
+```
+
+A fully annotated example with all optional keys is in [`credentials.example.json`](./credentials.example.json).
+
+| Credential key | Required for |
+|---|---|
+| `S1_BASE_URL` | All management console skills |
+| `S1_API_TOKEN` | `sentinelone-mgmt-console-api`, `sentinelone-powerquery` |
+| `SDL_BASE_URL` | `sentinelone-sdl-api`, `sentinelone-sdl-log-parser` |
+| `SDL_CONSOLE_API_TOKEN` | SDL query and config methods (not `uploadLogs`) |
+| `SDL_LOG_WRITE_KEY` | `uploadLogs` only |
+| `SDL_CONFIG_WRITE_KEY` | Deploying parsers/dashboards via `putFile` |
+
+Environment variables override the credentials file if set.
+
+## sentinelone-skills-plugin
+
+The [`sentinelone-skills-plugin/`](./sentinelone-skills-plugin/) directory contains the distributable Claude plugin that bundles all five skills (including `sentinelone-hyperautomation` by Marco Rottigni). The built `.plugin` file lives in `sentinelone-skills-plugin/dist/`.
+
+To rebuild after syncing skill changes:
+
+```bash
+cd sentinelone-skills-plugin
+./sync.sh --build-only
+```
+
+To sync from this repo and rebuild:
+
+```bash
+cd sentinelone-skills-plugin
+./sync.sh
+```
 
 ## Windsurf
 
@@ -25,19 +100,3 @@ This repo includes Windsurf workflow files in `.windsurf/workflows/`. Each workf
 - `sentinelone-powerquery.md` — PowerQuery authoring, debugging, and detection rules.
 - `sentinelone-sdl-api.md` — Singularity Data Lake API (ingest, query, config files).
 - `sentinelone-sdl-log-parser.md` — SDL log parser authoring with OCSF mapping.
-
-## Configuration
-
-`sentinelone-mgmt-console-api` and `sentinelone-sdl-api` both need tenant credentials. Copy each example config and fill in your values:
-
-```bash
-cd sentinelone-mgmt-console-api
-cp config.json.example config.json
-# edit config.json with your tenant URL and API token
-
-cd ../sentinelone-sdl-api
-cp config.json.example config.json
-# edit config.json with your tenant URL and SDL API key(s)
-```
-
-`config.json` is gitignored — do not commit real tokens.

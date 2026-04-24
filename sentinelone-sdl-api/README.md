@@ -18,22 +18,16 @@ In Cowork/Claude Code, the path is:
 
 ## Configure
 
-The SDL API has four scoped key types plus (optionally) a console user API token. Only fill in the keys you need.
-
-```bash
-cp config.json.example config.json
-# edit config.json
-```
+The SDL API has four scoped key types plus (optionally) a console user API token. Add only the keys you need to `~/.config/sentinelone/credentials.json` (see [`credentials.example.json`](../credentials.example.json) for all available keys):
 
 ```json
 {
-  "base_url": "https://xdr.us1.sentinelone.net",
-  "log_write_key":   "0Z1Fy0...",
-  "log_read_key":    "0tzj/CPYT...",
-  "config_read_key": "0MQTxgj...",
-  "config_write_key":"0mXas6PD...",
-  "console_api_token": "",
-  "s1_scope": ""
+  "SDL_BASE_URL":          "https://xdr.us1.sentinelone.net",
+  "SDL_CONSOLE_API_TOKEN": "eyJ...your-token...",
+  "SDL_LOG_WRITE_KEY":     "0Z1Fy0...",
+  "SDL_LOG_READ_KEY":      "0tzj/CPYT...",
+  "SDL_CONFIG_READ_KEY":   "0MQTxgj...",
+  "SDL_CONFIG_WRITE_KEY":  "0mXas6PD..."
 }
 ```
 
@@ -65,7 +59,7 @@ The client picks the narrowest matching key per method (principle of least privi
 
 `console_api_token` is only used as a fallback for any of the above (except `uploadLogs`) when the matching SDL key is blank.
 
-Env vars override `config.json`: `SDL_BASE_URL`, `SDL_LOG_WRITE_KEY`, `SDL_LOG_READ_KEY`, `SDL_CONFIG_READ_KEY`, `SDL_CONFIG_WRITE_KEY`, `SDL_CONSOLE_API_TOKEN`, `SDL_S1_SCOPE`, `SDL_VERIFY_TLS`.
+Environment variables (`SDL_BASE_URL`, `SDL_LOG_WRITE_KEY`, etc.) override the credentials file if set.
 
 ## Quick test
 
@@ -134,7 +128,7 @@ The client picks the right key per method automatically, retries on 429/5xx/`err
 ## Layout
 
 - `SKILL.md` — instructions Claude reads when the skill triggers
-- `config.json` — credentials (gitignored; `config.json.example` is the template)
+- `~/.config/sentinelone/credentials.json` — credentials (set `SDL_BASE_URL` and the keys you need)
 - `scripts/sdl_client.py` — `SDLClient` (auto key selection across 4 scoped keys + console token, `Bearer` auth, retries, `iter_query` pagination)
 - `scripts/sdl_cli.py` — shell CLI covering every method
 - `references/methods.md` — per-method reference (params, defaults, response shape, gotchas)

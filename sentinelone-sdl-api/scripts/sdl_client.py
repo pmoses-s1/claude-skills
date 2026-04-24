@@ -5,7 +5,7 @@ The SDL API has four scoped key types plus console user API tokens. Each
 method below picks the correct key automatically; callers do not need to
 worry about which token to send.
 
-Credential resolution order (env wins over config.json):
+Credential resolution order (env wins over ~/.config/sentinelone/credentials.json):
   SDL_BASE_URL            -> base_url  (e.g. https://xdr.us1.sentinelone.net)
   SDL_LOG_WRITE_KEY       -> log_write_key     (uploadLogs, addEvents)
   SDL_LOG_READ_KEY        -> log_read_key      (query/numeric/facet/timeseries/powerQuery)
@@ -52,6 +52,7 @@ import requests
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = SKILL_DIR / "config.json"
+HOME_CREDS_PATH = Path.home() / ".config" / "sentinelone" / "credentials.json"
 
 
 class SDLAPIError(RuntimeError):
@@ -62,14 +63,7 @@ class SDLAPIError(RuntimeError):
 
 
 def _load_config() -> Dict[str, Any]:
-    cfg: Dict[str, Any] = {}
-    if CONFIG_PATH.exists():
-        try:
-            cfg = json.loads(CONFIG_PATH.read_text())
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"config.json is not valid JSON: {e}")
-
-    env_map = {
+    _env_map = {
         "SDL_BASE_URL": "base_url",
         "SDL_LOG_WRITE_KEY": "log_write_key",
         "SDL_LOG_READ_KEY": "log_read_key",
@@ -78,7 +72,29 @@ def _load_config() -> Dict[str, Any]:
         "SDL_CONSOLE_API_TOKEN": "console_api_token",
         "SDL_S1_SCOPE": "s1_scope",
     }
-    for env, field in env_map.items():
+
+    # Layer 1: plugin-local config.json (lowest priority, not recommended)
+    cfg: Dict[str, Any] = {}
+    if CONFIG_PATH.exists():
+        try:
+            cfg = json.loads(CONFIG_PATH.read_text())
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"config.json is not valid JSON: {e}")
+
+    # Layer 2: ~/.config/sentinelone/credentials.json
+    # Works for GUI apps (Claude Desktop) that don't source ~/.zshenv.
+    # Keys match env var names: SDL_BASE_URL, SDL_CONSOLE_API_TOKEN, etc.
+    if HOME_CREDS_PATH.exists():
+        try:
+            home_creds = json.loads(HOME_CREDS_PATH.read_text())
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"{HOME_CREDS_PATH} is not valid JSON: {e}")
+        for env, field in _env_map.items():
+            if home_creds.get(env):
+                cfg[field] = home_creds[env]
+
+    # Layer 3: environment variables (highest priority)
+    for env, field in _env_map.items():
         if os.environ.get(env):
             cfg[field] = os.environ[env]
     if os.environ.get("SDL_VERIFY_TLS"):
@@ -117,7 +133,7 @@ class SDLClient:
         self.base_url = (base_url or cfg.get("base_url") or "").rstrip("/")
         if not self.base_url or "REPLACE-ME" in self.base_url:
             raise RuntimeError(
-                "SDL base_url is not set. Edit config.json or export SDL_BASE_URL."
+                "SDL base_url is not set. Add SDL_BASE_URL to ~/.config/sentinelone/credentials.json or export SDL_BASE_URL."
             )
 
         self.keys = {
@@ -143,7 +159,7 @@ class SDLClient:
                 return self.keys[field]
         raise RuntimeError(
             f"No API key configured for chain '{chain_name}'. Tried {chain}. "
-            "Check config.json."
+            "Check ~/.config/sentinelone/credentials.json."
         )
 
     def _auth_headers(self, chain_name: str, content_type: str = "application/json") -> Dict[str, str]:

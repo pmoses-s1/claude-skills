@@ -145,7 +145,7 @@ def main() -> int:
 
     # IOCs reject multi-scope tokens with code 4030010 ("This page doesn't
     # support multi-scopes users yet"). Use the single-scope token that's
-    # pinned to one account in config.json.
+    # pinned to one account via S1_API_TOKEN_SINGLE_SCOPE in credentials.json.
     client = S1Client(timeout=30, token_kind="single_scope")
     run_tag = RUN_TAG
     iocs = build_test_iocs(run_tag, args.count)

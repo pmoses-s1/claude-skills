@@ -29,7 +29,7 @@ Wire contract
 Auth token
 ----------
 The interface accepts the same service-user JWT used for the Mgmt
-Console API (this client reads it from config.json via S1Client.api_token).
+Console API (loaded from ~/.config/sentinelone/credentials.json via S1Client.api_token).
 `ApiToken <token>` is rejected with HTTP 401
 `{"details":"Unsupported auth type: ApiToken"}`, so callers MUST switch
 to the `Bearer` scheme when talking to this endpoint family.
@@ -103,8 +103,8 @@ from typing import Any, Dict, Iterable, List, Optional
 
 _DEFAULT_PROD_HOST = "https://ingest.us1.sentinelone.net"
 
-# Config key (same config.json as the rest of the skill). Kept optional:
-# if not present the helper falls back to _DEFAULT_PROD_HOST.
+# Optional override key in ~/.config/sentinelone/credentials.json or config.json.
+# If not present the helper falls back to _DEFAULT_PROD_HOST.
 _CONFIG_KEY = "uam_alert_interface_url"
 _LEGACY_CONFIG_KEYS = ("ingestion_gateway_url",)   # previous name
 
@@ -157,17 +157,20 @@ def _enrich_observable_for_alert(obs: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _load_config_url() -> Optional[str]:
-    cfg_path = Path(__file__).resolve().parent.parent / "config.json"
-    if not cfg_path.is_file():
-        return None
-    try:
-        cfg = json.loads(cfg_path.read_text())
-    except Exception:
-        return None
-    for key in (_CONFIG_KEY, *_LEGACY_CONFIG_KEYS):
-        url = cfg.get(key)
-        if isinstance(url, str) and url.strip():
-            return url.rstrip("/")
+    # Check ~/.config/sentinelone/credentials.json first, fall back to local config.json
+    _home_creds = Path.home() / ".config" / "sentinelone" / "credentials.json"
+    candidates = [_home_creds, Path(__file__).resolve().parent.parent / "config.json"]
+    for cfg_path in candidates:
+        if not cfg_path.is_file():
+            continue
+        try:
+            cfg = json.loads(cfg_path.read_text())
+        except Exception:
+            continue
+        for key in (_CONFIG_KEY, *_LEGACY_CONFIG_KEYS):
+            url = cfg.get(key)
+            if isinstance(url, str) and url.strip():
+                return url.rstrip("/")
     return None
 
 

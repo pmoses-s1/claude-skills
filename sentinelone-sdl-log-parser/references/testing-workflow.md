@@ -4,11 +4,11 @@ There is **no dedicated `testParser` REST endpoint** on the SDL tenant. The in-c
 
 ## Prerequisites
 
-- `sentinelone-sdl-api` skill is installed at `/sessions/dazzling-ecstatic-volta/mnt/.claude/skills/sentinelone-sdl-api/`.
-- Its `config.json` has (at minimum) a `config_write_key`, a `log_write_key`, and a `log_read_key`. Check with:
+- `sentinelone-sdl-api` skill is installed.
+- `~/.config/sentinelone/credentials.json` has (at minimum) `SDL_CONFIG_WRITE_KEY`, `SDL_LOG_WRITE_KEY`, and `SDL_LOG_READ_KEY` (or `SDL_CONSOLE_API_TOKEN`). Check with:
 
 ```bash
-cat /sessions/dazzling-ecstatic-volta/mnt/.claude/skills/sentinelone-sdl-api/config.json
+cat ~/.config/sentinelone/credentials.json
 ```
 
 - You have a draft parser JSON and a sample log file.

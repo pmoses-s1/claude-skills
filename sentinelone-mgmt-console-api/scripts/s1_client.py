@@ -3,7 +3,8 @@ SentinelOne Management Console API client.
 
 Loads credentials (in priority order):
   1. Environment variables: S1_BASE_URL, S1_API_TOKEN
-  2. <skill>/config.json
+  2. ~/.config/sentinelone/credentials.json
+  3. <skill>/config.json  (last resort, not recommended)
 
 Usage:
     from s1_client import S1Client
@@ -54,6 +55,7 @@ from requests.adapters import HTTPAdapter
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = SKILL_DIR / "config.json"
+HOME_CREDS_PATH = Path.home() / ".config" / "sentinelone" / "credentials.json"
 
 # Endpoints where caching is safe — they change rarely during a session.
 # Prefix match, base_url stripped.
@@ -79,13 +81,28 @@ class S1APIError(RuntimeError):
 
 
 def _load_config() -> Dict[str, Any]:
+    # Layer 1: plugin-local config.json (lowest priority, not recommended)
     cfg: Dict[str, Any] = {}
     if CONFIG_PATH.exists():
         try:
             cfg = json.loads(CONFIG_PATH.read_text())
         except json.JSONDecodeError as e:
             raise RuntimeError(f"config.json is not valid JSON: {e}")
-    # env wins
+
+    # Layer 2: ~/.config/sentinelone/credentials.json
+    # Works for GUI apps (Claude Desktop) that don't source ~/.zshenv.
+    # Keys match env var names: S1_BASE_URL, S1_API_TOKEN, etc.
+    if HOME_CREDS_PATH.exists():
+        try:
+            home_creds = json.loads(HOME_CREDS_PATH.read_text())
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"{HOME_CREDS_PATH} is not valid JSON: {e}")
+        if home_creds.get("S1_BASE_URL"):
+            cfg["base_url"] = home_creds["S1_BASE_URL"]
+        if home_creds.get("S1_API_TOKEN"):
+            cfg["api_token"] = home_creds["S1_API_TOKEN"]
+
+    # Layer 3: environment variables (highest priority)
     if os.environ.get("S1_BASE_URL"):
         cfg["base_url"] = os.environ["S1_BASE_URL"]
     if os.environ.get("S1_API_TOKEN"):
@@ -112,7 +129,7 @@ class S1Client:
         token_kind: str = "default",
     ):
         """
-        token_kind selects which token to read from config.json when no
+        token_kind selects which token to read from ~/.config/sentinelone/credentials.json when no
         explicit `api_token` argument or S1_API_TOKEN env var is supplied.
 
           - "default"       → `api_token` (typically multi-scope).
@@ -126,7 +143,7 @@ class S1Client:
                               need a single-scope token should check the
                               resulting `self.token_kind_effective`.
 
-        Both tokens are optional in config.json: the skill works with
+        Both tokens are optional in credentials.json: the skill works with
         either one alone, or both. Explicit `api_token=` or S1_API_TOKEN
         always wins over the config selection.
         """
@@ -156,11 +173,11 @@ class S1Client:
 
         if not self.base_url or "REPLACE-ME" in self.base_url:
             raise RuntimeError(
-                "S1 base_url is not set. Edit config.json or export S1_BASE_URL."
+                "S1 base_url is not set. Add S1_BASE_URL to ~/.config/sentinelone/credentials.json or export S1_BASE_URL."
             )
         if not self.api_token or "REPLACE" in self.api_token:
             raise RuntimeError(
-                "S1 api_token is not set. Edit config.json or export S1_API_TOKEN."
+                "S1 api_token is not set. Add S1_API_TOKEN to ~/.config/sentinelone/credentials.json or export S1_API_TOKEN."
             )
 
         # Session with pooled connection adapter — allows many parallel GETs
