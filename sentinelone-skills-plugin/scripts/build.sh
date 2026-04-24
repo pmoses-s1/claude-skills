@@ -63,6 +63,21 @@ echo "Building sentinelone-skills v$VERSION"
 echo "  Repo root : $REPO_ROOT"
 echo "  Plugin dir: $PLUGIN_DIR"
 
+# ---------------------------------------------------------------------------
+# 0. Sync shared reference files
+#    lrq-api.md lives in sentinelone-powerquery and is referenced by two
+#    other skills. Copy it so each skill stays self-contained.
+# ---------------------------------------------------------------------------
+LRQ_SRC="$REPO_ROOT/sentinelone-powerquery/references/lrq-api.md"
+for skill_name in sentinelone-mgmt-console-api sentinelone-sdl-api; do
+    dest="$REPO_ROOT/$skill_name/references/lrq-api.md"
+    if [ -f "$LRQ_SRC" ]; then
+        cp "$LRQ_SRC" "$dest"
+    else
+        echo "  WARNING: $LRQ_SRC not found, skipping sync for $skill_name" >&2
+    fi
+done
+
 # Build into a temp directory first to avoid filesystem permission issues
 TMP_DIST="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIST"' EXIT
