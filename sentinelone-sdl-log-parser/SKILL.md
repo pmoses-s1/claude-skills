@@ -37,16 +37,18 @@ Follow this loop. Skipping steps 1 (catalog check) and 5 (end-to-end validation)
 
 ```js
 "metadata.version":    "1.0.0",       // semver; bump on substantive parser changes
-"dataSource.category": "security",    // high-level taxonomy — see below
-"dataSource.name":     "AWS RDS",     // specific product/service
-"dataSource.vendor":   "AWS"          // parent vendor
+"dataSource.category": "security",    // ALWAYS hardcoded to "security" — never change this
+"dataSource.name":     "AWS RDS",     // specific product/service name
+"dataSource.vendor":   "AWS"          // parent vendor / company name
 ```
 
-They are required by the downstream SDL pipeline (Marketplace routing, parser catalog, content-pack grouping). Omitting them produces a non-conformant parser even when field extraction is correct.
+They are required by the downstream SDL pipeline (Marketplace routing, parser catalog, content-pack grouping). Omitting any of them produces a non-conformant parser even when field extraction is correct.
 
-`dataSource.category` taxonomy: `security`, `network`, `application`, `identity`, `endpoint`, `cloud`, `iot`, `ot`. Pick the one that best describes the source's primary purpose (a firewall log is `network`; an EDR log is `endpoint`; an Okta log is `identity`).
+**`dataSource.category` MUST always be hardcoded to `"security"`.** This is not a taxonomy pick — it is a fixed constant. Never substitute another value regardless of the source type.
 
 `dataSource.vendor` is the parent company (`Cisco` for Umbrella, `Microsoft` for Azure AD). `dataSource.name` is the specific product (`Cisco Umbrella`, `Azure AD`).
+
+These three — `dataSource.category`, `dataSource.name`, `dataSource.vendor` — are mandatory on every parser you write or edit. Always include them. If you are editing an existing parser that is missing any of them, add them.
 
 ## Default output schema: OCSF
 
@@ -70,7 +72,7 @@ A parser file is augmented JSON (unquoted keys allowed, `//` and `/* */` comment
   attributes: {
     // REQUIRED defaults on every parser
     "metadata.version":    "1.0.0",
-    "dataSource.category": "network",
+    "dataSource.category": "security",    // always "security" — hardcoded, never change
     "dataSource.name":     "Juniper SRX",
     "dataSource.vendor":   "Juniper",
     // OCSF class metadata + vendor product metadata
@@ -122,7 +124,7 @@ For the full directive list see `references/syntax.md` and `references/parse-dir
 
 Apply in order — first match wins:
 
-1. **Is there a parser in the ai-siem catalog?** Search `Sentinel-One/ai-siem` for the vendor/product name. If so, start from that parser (see `references/ai-siem-catalog.md` for the fetch recipe and per-shape template map). Add the four required default attributes if missing, optionally re-emit OCSF field names if the catalog parser used vendor-native, bump `metadata.version`, and validate.
+1. **Is there a parser in the ai-siem catalog?** Search `Sentinel-One/ai-siem` for the vendor/product name. If so, start from that parser (see `references/ai-siem-catalog.md` for the fetch recipe and per-shape template map). Add or correct the four required default attributes if missing — especially ensure `dataSource.category` is `"security"` (catalog parsers often use other values). Optionally re-emit OCSF field names if the catalog parser used vendor-native, bump `metadata.version`, and validate.
 2. **Is there a built-in parser?** Web access logs → `accessLog`. Pure JSON-per-line → `json` or `dottedJson`. Syslog → `systemLog`. Key=value pairs → `keyValue`. Heroku logplex → `heroku-logplex`. MySQL/Postgres → their dedicated parsers. CloudFront/ELB/S3/Redshift → AWS parsers. See `references/builtin-parsers.md`. If a built-in fits, recommend it and (optionally) just author an alias parser: `{ aliasTo: "json" }`.
 3. **Is the log JSON-per-line but with a vendor envelope?** Use one format that captures the envelope and applies `{parse=json}` (or `dottedJson`/`escapedJson`/`urlEncodedJson`/`base64EncodedJson`) on the embedded body. Add `discardAttributes: ["message"]` to save storage.
 4. **Is the whole line an OCSF/JSON blob you want flattened?** Use the gron-capture-then-mappings idiom: `format: "$unmapped.{parse=gron}$"` at the top, then rename/copy/cast everything in a `mappings` block. See `examples/08-gron-capture-template.json` and the `community/PARSER_TEMPLATE/` reference.
