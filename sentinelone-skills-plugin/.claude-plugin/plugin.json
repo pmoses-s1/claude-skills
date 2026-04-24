@@ -5,5 +5,5 @@
   "author": {
     "name": "SentinelOne"
   },
-  "keywords": ["sentinelone", "secops", "siem", "powerquery", "edr", "xdr", "hyperautomation"]
+  "keywords": ["sentinelone", "secops", "siem", "powerquery", "pq", "query", "edr", "xdr", "hyperautomation"]
 }
