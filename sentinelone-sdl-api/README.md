@@ -18,7 +18,7 @@ In Cowork/Claude Code, the path is:
 
 ## Configure
 
-The SDL API has four scoped key types plus (optionally) a console user API token. Add only the keys you need to `~/.config/sentinelone/credentials.json` (see [`credentials.example.json`](../credentials.example.json) for all available keys):
+The SDL API has four scoped key types plus (optionally) a console user API token. Add only the keys you need to `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` (in Cowork; falls back to `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` in terminal) (see [`credentials.example.json`](../credentials.example.json) for all available keys):
 
 ```json
 {
@@ -128,7 +128,7 @@ The client picks the right key per method automatically, retries on 429/5xx/`err
 ## Layout
 
 - `SKILL.md` — instructions Claude reads when the skill triggers
-- `~/.config/sentinelone/credentials.json` — credentials (set `SDL_BASE_URL` and the keys you need)
+- `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` — credentials (set `SDL_BASE_URL` and the keys you need)
 - `scripts/sdl_client.py` — `SDLClient` (auto key selection across 4 scoped keys + console token, `Bearer` auth, retries, `iter_query` pagination)
 - `scripts/sdl_cli.py` — shell CLI covering every method
 - `references/methods.md` — per-method reference (params, defaults, response shape, gotchas)

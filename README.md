@@ -6,9 +6,9 @@ SentinelOne skills for Claude. Install the plugin to get everything — no indiv
 
 1. Download the latest `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/)
 2. Double-click it to install into Claude
-3. Create `~/.config/sentinelone/credentials.json` with your tenant credentials (see [Configuration](#configuration) below)
+3. Create `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` with your tenant credentials (see [Configuration](#configuration) below)
 
-That's it. All five skills are active immediately.
+That's it. All six skills are active immediately.
 
 ## What's included
 
@@ -19,24 +19,27 @@ The plugin bundles every skill in this repo — installing the plugin is suffici
 | sentinelone-mgmt-console-api | Query and act on the Management Console: threats, alerts, agents, sites, RemoteOps, Deep Visibility, Hyperautomation, Purple AI, UAM |
 | sentinelone-powerquery | Write, debug, and run PowerQuery for threat hunting, STAR detection rules, and SDL dashboards |
 | sentinelone-sdl-api | Ingest events, run queries, and manage configuration files (parsers, dashboards, lookups) via the Singularity Data Lake API |
+| sentinelone-sdl-dashboard | Design, author, and deploy SDL dashboards — panels, tabs, parameters, and full dashboard JSON |
 | sentinelone-sdl-log-parser | Author and validate SDL log parsers for any log format, with OCSF field mapping by default |
 | sentinelone-hyperautomation | Design and generate Hyperautomation workflow JSON, with optional live console import |
 
 ## Installing
 
-**Plugin (recommended)** — download from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/) and double-click. All five skills are installed in one step.
+**Plugin (recommended)** — download from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/) and double-click. All six skills are installed in one step.
 
 **Individual skills (for development only)** — drop a skill folder into `~/.claude/skills/`. Claude will pick it up on next session.
 
 ## Configuration
 
-All skills read credentials from `~/.config/sentinelone/credentials.json`. Create this file once and every skill picks it up automatically — no editing files inside the plugin or skill folder needed.
+All skills read credentials from `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` when running inside Cowork (recommended), or from `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` as a fallback when running in a terminal or Claude Code.
+
+> **Cowork users:** `CLAUDE_CONFIG_DIR` is set automatically and points to your project's `.claude/` folder. The full Mac path is `<your-project>/.claude/sentinelone/credentials.json`. Create this file once and every skill in the plugin shares it — no per-skill config needed.
 
 **macOS / Linux:**
 
 ```bash
-mkdir -p ~/.config/sentinelone
-cat > ~/.config/sentinelone/credentials.json << 'EOF'
+mkdir -p "$CLAUDE_CONFIG_DIR/sentinelone"
+cat > "$CLAUDE_CONFIG_DIR/sentinelone/credentials.json" << 'EOF'
 {
   "S1_BASE_URL": "https://usea1-acme.sentinelone.net",
   "S1_API_TOKEN": "eyJ...your-management-console-api-token...",
@@ -51,6 +54,8 @@ EOF
 **Windows (PowerShell):**
 
 ```powershell
+# In Cowork: use $CLAUDE_CONFIG_DIR/sentinelone/credentials.json (set automatically)
+# In terminal, use:
 $dir = "$env:USERPROFILE\.config\sentinelone"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 @'
@@ -71,7 +76,7 @@ A fully annotated example with all optional keys is in [`credentials.example.jso
 |---|---|
 | `S1_BASE_URL` | All management console skills |
 | `S1_API_TOKEN` | `sentinelone-mgmt-console-api`, `sentinelone-powerquery` |
-| `SDL_BASE_URL` | `sentinelone-sdl-api`, `sentinelone-sdl-log-parser` |
+| `SDL_BASE_URL` | `sentinelone-sdl-api`, `sentinelone-sdl-dashboard`, `sentinelone-sdl-log-parser` |
 | `SDL_CONSOLE_API_TOKEN` | SDL query and config methods (not `uploadLogs`) |
 | `SDL_LOG_WRITE_KEY` | `uploadLogs` only |
 | `SDL_CONFIG_WRITE_KEY` | Deploying parsers/dashboards via `putFile` |
@@ -80,20 +85,20 @@ Environment variables override the credentials file if set.
 
 ## sentinelone-skills-plugin
 
-The [`sentinelone-skills-plugin/`](./sentinelone-skills-plugin/) directory contains the distributable Claude plugin that bundles all five skills (including `sentinelone-hyperautomation` by Marco Rottigni). The built `.plugin` file lives in `sentinelone-skills-plugin/dist/`.
+The [`sentinelone-skills-plugin/`](./sentinelone-skills-plugin/) directory contains the distributable Claude plugin that bundles all six skills (including `sentinelone-hyperautomation` by Marco Rottigni). The built `.plugin` file lives in `sentinelone-skills-plugin/dist/`.
 
 To rebuild after syncing skill changes:
 
 ```bash
 cd sentinelone-skills-plugin
-./sync.sh --build-only
+bash scripts/build.sh
 ```
 
-To sync from this repo and rebuild:
+To rebuild from scratch (removes old dist files first):
 
 ```bash
 cd sentinelone-skills-plugin
-./sync.sh
+bash scripts/build.sh --clean
 ```
 
 ## Windsurf

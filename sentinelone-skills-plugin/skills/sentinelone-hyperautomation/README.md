@@ -23,7 +23,7 @@ cp -r sentinelone-hyperautomation ~/.claude/skills/
 
 ## Configure
 
-For API submission to a live console, provide credentials in `~/.config/sentinelone/credentials.json`:
+For API submission to a live console, provide credentials in `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` (Cowork auto-sets this env var; falls back to `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` in terminal):
 
 ```json
 {

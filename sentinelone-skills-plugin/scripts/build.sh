@@ -10,6 +10,7 @@
 #     sentinelone-mgmt-console-api/   <- source skill
 #     sentinelone-powerquery/          <- source skill
 #     sentinelone-sdl-api/             <- source skill
+#     sentinelone-sdl-dashboard/       <- source skill
 #     sentinelone-sdl-log-parser/      <- source skill
 #     sentinelone-skills-plugin/
 #       .claude-plugin/plugin.json
@@ -38,6 +39,7 @@ SOURCE_SKILLS=(
     sentinelone-mgmt-console-api
     sentinelone-powerquery
     sentinelone-sdl-api
+    sentinelone-sdl-dashboard
     sentinelone-sdl-log-parser
 )
 

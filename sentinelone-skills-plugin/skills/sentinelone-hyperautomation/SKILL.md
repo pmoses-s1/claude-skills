@@ -52,15 +52,22 @@ If the user wants to submit to a live console, read `references/api-integration.
 this priority order (highest wins):
 
 1. Environment variables `S1_BASE_URL` / `S1_API_TOKEN` (highest priority)
-2. `~/.config/sentinelone/credentials.json` — keys `S1_BASE_URL` and `S1_API_TOKEN`
+2. `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` — shared plugin credentials file
 3. Ask the user to provide their console URL and personal Console User API token
 
-To read the credentials file in Python:
+The canonical credentials file is at `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`
+(Mac path: `<your-project>/.claude/sentinelone/credentials.json`). This file is shared
+across all skills in the plugin — you only need to create it once.
+
+To read credentials in Python:
 ```python
 import json, os
 from pathlib import Path
-_creds_path = Path.home() / ".config" / "sentinelone" / "credentials.json"
-_creds = json.loads(_creds_path.read_text()) if _creds_path.exists() else {}
+_claude_dir = os.environ.get("CLAUDE_CONFIG_DIR", "")
+_plugin_creds_path = Path(_claude_dir) / "sentinelone" / "credentials.json" if _claude_dir else None
+_creds = {}
+if _plugin_creds_path and _plugin_creds_path.exists():
+    _creds = json.loads(_plugin_creds_path.read_text())
 S1_BASE_URL  = os.environ.get("S1_BASE_URL")  or _creds.get("S1_BASE_URL")  or None
 S1_API_TOKEN = os.environ.get("S1_API_TOKEN") or _creds.get("S1_API_TOKEN") or None
 ```

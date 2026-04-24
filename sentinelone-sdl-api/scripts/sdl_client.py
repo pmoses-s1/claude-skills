@@ -5,7 +5,7 @@ The SDL API has four scoped key types plus console user API tokens. Each
 method below picks the correct key automatically; callers do not need to
 worry about which token to send.
 
-Credential resolution order (env wins over ~/.config/sentinelone/credentials.json):
+Credential resolution order (env wins over $CLAUDE_CONFIG_DIR/sentinelone/credentials.json):
   SDL_BASE_URL            -> base_url  (e.g. https://xdr.us1.sentinelone.net)
   SDL_LOG_WRITE_KEY       -> log_write_key     (uploadLogs, addEvents)
   SDL_LOG_READ_KEY        -> log_read_key      (query/numeric/facet/timeseries/powerQuery)
@@ -53,6 +53,12 @@ import requests
 SKILL_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = SKILL_DIR / "config.json"
 HOME_CREDS_PATH = Path.home() / ".config" / "sentinelone" / "credentials.json"
+# Shared plugin credentials — stored in the Cowork .claude config dir so all
+# skills in the plugin find the same file without per-skill config copies.
+# Mac path: <your-project>/.claude/sentinelone/credentials.json
+_CLAUDE_CONFIG_DIR = os.environ.get("CLAUDE_CONFIG_DIR", "")
+PLUGIN_CREDS_PATH = (Path(_CLAUDE_CONFIG_DIR) / "sentinelone" / "credentials.json"
+                     if _CLAUDE_CONFIG_DIR else None)
 
 
 class SDLAPIError(RuntimeError):
@@ -81,7 +87,7 @@ def _load_config() -> Dict[str, Any]:
         except json.JSONDecodeError as e:
             raise RuntimeError(f"config.json is not valid JSON: {e}")
 
-    # Layer 2: ~/.config/sentinelone/credentials.json
+    # Layer 2: $CLAUDE_CONFIG_DIR/sentinelone/credentials.json
     # Works for GUI apps (Claude Desktop) that don't source ~/.zshenv.
     # Keys match env var names: SDL_BASE_URL, SDL_CONSOLE_API_TOKEN, etc.
     if HOME_CREDS_PATH.exists():
@@ -92,6 +98,20 @@ def _load_config() -> Dict[str, Any]:
         for env, field in _env_map.items():
             if home_creds.get(env):
                 cfg[field] = home_creds[env]
+
+    # Layer 2b: $CLAUDE_CONFIG_DIR/sentinelone/credentials.json
+    # Shared across all skills in the plugin. Place once at:
+    #   <project>/.claude/sentinelone/credentials.json  (Mac / persisted)
+    # This layer overrides Layer 2 so the plugin credentials take precedence
+    # over a stale ~/.config file, but env vars still win in Layer 3.
+    if PLUGIN_CREDS_PATH and PLUGIN_CREDS_PATH.exists():
+        try:
+            plugin_creds = json.loads(PLUGIN_CREDS_PATH.read_text())
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"{PLUGIN_CREDS_PATH} is not valid JSON: {e}")
+        for env, field in _env_map.items():
+            if plugin_creds.get(env):
+                cfg[field] = plugin_creds[env]
 
     # Layer 3: environment variables (highest priority)
     for env, field in _env_map.items():
@@ -133,7 +153,7 @@ class SDLClient:
         self.base_url = (base_url or cfg.get("base_url") or "").rstrip("/")
         if not self.base_url or "REPLACE-ME" in self.base_url:
             raise RuntimeError(
-                "SDL base_url is not set. Add SDL_BASE_URL to ~/.config/sentinelone/credentials.json or export SDL_BASE_URL."
+                "SDL base_url is not set. Add SDL_BASE_URL to $CLAUDE_CONFIG_DIR/sentinelone/credentials.json or export SDL_BASE_URL."
             )
 
         self.keys = {
@@ -159,7 +179,7 @@ class SDLClient:
                 return self.keys[field]
         raise RuntimeError(
             f"No API key configured for chain '{chain_name}'. Tried {chain}. "
-            "Check ~/.config/sentinelone/credentials.json."
+            "Check $CLAUDE_CONFIG_DIR/sentinelone/credentials.json."
         )
 
     def _auth_headers(self, chain_name: str, content_type: str = "application/json") -> Dict[str, str]:

@@ -6,7 +6,7 @@ Examples:
     python scripts/call_endpoint.py GET /web/api/v2.1/threats --param limit=100 --paginate
     python scripts/call_endpoint.py POST /web/api/v2.1/agents/actions/disconnect --body '{"filter":{"ids":["123"]}}'
 
-Reads credentials from ~/.config/sentinelone/credentials.json or env vars via s1_client.
+Reads credentials from $CLAUDE_CONFIG_DIR/sentinelone/credentials.json or env vars via s1_client.
 """
 
 from __future__ import annotations

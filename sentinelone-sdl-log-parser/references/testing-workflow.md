@@ -5,10 +5,10 @@ There is **no dedicated `testParser` REST endpoint** on the SDL tenant. The in-c
 ## Prerequisites
 
 - `sentinelone-sdl-api` skill is installed.
-- `~/.config/sentinelone/credentials.json` has (at minimum) `SDL_CONFIG_WRITE_KEY`, `SDL_LOG_WRITE_KEY`, and `SDL_LOG_READ_KEY` (or `SDL_CONSOLE_API_TOKEN`). Check with:
+- `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` has (at minimum) `SDL_CONFIG_WRITE_KEY`, `SDL_LOG_WRITE_KEY`, and `SDL_LOG_READ_KEY` (or `SDL_CONSOLE_API_TOKEN`). Check with:
 
 ```bash
-cat ~/.config/sentinelone/credentials.json
+cat "$CLAUDE_CONFIG_DIR/sentinelone/credentials.json"
 ```
 
 - You have a draft parser JSON and a sample log file.

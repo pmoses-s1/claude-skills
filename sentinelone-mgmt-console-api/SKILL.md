@@ -10,7 +10,7 @@ Wraps the SentinelOne Management Console API (Swagger 2.0, spec version 2.1, 781
 
 ## Setup — configure credentials first
 
-Credentials are loaded from `~/.config/sentinelone/credentials.json`. The two required fields are:
+Credentials are loaded from `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`. The two required fields are:
 
 ```json
 {
@@ -23,7 +23,7 @@ Credentials are loaded from `~/.config/sentinelone/credentials.json`. The two re
 
 Environment variables (`S1_BASE_URL`, `S1_API_TOKEN`, `S1_VERIFY_TLS`) override the credentials file if set.
 
-Before running anything, confirm credentials are configured. If not, stop and ask the user to create `~/.config/sentinelone/credentials.json`.
+Before running anything, confirm credentials are configured. If not, stop and ask the user to create `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`.
 
 ## Workflow
 
@@ -50,7 +50,7 @@ It enumerates every GET plus a curated allow-list of read-only query POSTs, reco
 
 ## Files in this skill
 
-- `~/.config/sentinelone/credentials.json` — credentials (set `S1_BASE_URL` and `S1_API_TOKEN`; see Setup above).
+- `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` — credentials (set `S1_BASE_URL` and `S1_API_TOKEN`; see Setup above).
 - `scripts/s1_client.py` — importable Python client. Handles auth, pooled HTTP connections, retries on 429/5xx, pagination, parallel fan-out via `get_many()`, and optional short-TTL response caching for rarely-changing reads (accounts, sites, groups, system/info, etc.).
 - `scripts/call_endpoint.py` — CLI for one-shot calls: `python scripts/call_endpoint.py GET /web/api/v2.1/agents --param limit=5`.
 - `scripts/search_endpoints.py` — ranked keyword search over the endpoint index, with synonym expansion and an `--only-works` filter that restricts to endpoints confirmed reachable on this tenant.
@@ -133,7 +133,7 @@ The safe pattern: run the matching `GET` with `countOnly=true` first to show the
 
 SentinelOne exposes an undocumented GraphQL endpoint at `POST /web/api/v2.1/graphql` that powers the console's Purple AI chat. The skill wraps the `purpleLaunchQuery` operation so workflows can ask Purple AI in natural language and receive a structured response (summary text plus a generated PowerQuery).
 
-Auth is identical to REST — the same `Authorization: ApiToken <token>` header. No extra credential setup beyond `~/.config/sentinelone/credentials.json`.
+Auth is identical to REST — the same `Authorization: ApiToken <token>` header. No extra credential setup beyond `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`.
 
 ```python
 import sys
@@ -388,7 +388,7 @@ Everything else in this skill talks to `<tenant>.sentinelone.net/web/api/v2.1/..
 
 **Host and wire contract:**
 
-- Prod (US1): `https://ingest.us1.sentinelone.net`. Override via `uam_alert_interface_url` in `~/.config/sentinelone/credentials.json` or the `--uam-url` flag / `S1_UAM_ALERT_INTERFACE_URL` env var. The legacy config key `ingestion_gateway_url` and env var `S1_IGW_URL` are still honored as fallbacks.
+- Prod (US1): `https://ingest.us1.sentinelone.net`. Override via `uam_alert_interface_url` in `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` or the `--uam-url` flag / `S1_UAM_ALERT_INTERFACE_URL` env var. The legacy config key `ingestion_gateway_url` and env var `S1_IGW_URL` are still honored as fallbacks.
 - Auth: `Authorization: Bearer <JWT>`. NOT `ApiToken`. The mgmt-console JWT from `S1_API_TOKEN` works; the endpoint rejects `ApiToken ...` with HTTP 401 `"Unsupported auth type"`.
 - Body: concatenated JSON (one or more objects back-to-back, optionally newline-separated), gzip-compressed. `Content-Encoding: gzip` is mandatory. zstd also accepted.
 - Scope: `S1-Scope: <accountId>` or `<accountId>:<siteId>[:<groupId>]` is mandatory.
@@ -661,7 +661,7 @@ Order: `user`, then `src.hostname`, then `src.ip.address`, then none. The collec
 ### Running the whole thing
 
 ```
-# From the skill root, with ~/.config/sentinelone/credentials.json configured.
+# From the skill root, with $CLAUDE_CONFIG_DIR/sentinelone/credentials.json configured.
 python scripts/build_source_report.py --source "<vendor>" --window <7d|24h|...>
 python scripts/render_charts.py reports/<slug>_<window>/data.json
 python scripts/build_docx.py    reports/<slug>_<window>/data.json

@@ -1,12 +1,13 @@
 # SentinelOne Skills Plugin
 
-Claude skills for SentinelOne SecOps workflows. Five skills are included:
+Claude skills for SentinelOne SecOps workflows. Six skills are included:
 
 | Skill | What it does |
 |-------|-------------|
 | sentinelone-powerquery | Write, debug, and run PowerQuery threat hunts and STAR detection rules |
 | sentinelone-mgmt-console-api | Query and act on the Management Console (threats, alerts, agents, IOCs, RemoteOps, UAM, Purple AI) |
 | sentinelone-sdl-api | Read and write data via the Singularity Data Lake API (ingest, queries, parsers, dashboards) |
+| sentinelone-sdl-dashboard | Design, author, and deploy SDL dashboards — panels, tabs, parameters, and full dashboard JSON |
 | sentinelone-sdl-log-parser | Author and validate SDL log parsers for any log format |
 | sentinelone-hyperautomation | Design and generate Hyperautomation workflow JSON, with optional live console import |
 
@@ -43,7 +44,7 @@ no environment variables or shell config needed.
 
 | OS | Credentials file location |
 |----|--------------------------|
-| macOS / Linux | `~/.config/sentinelone/credentials.json` |
+| macOS / Linux | `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` |
 | Windows | `%USERPROFILE%\.config\sentinelone\credentials.json` |
 
 The file format is the same on all platforms. A fully annotated example is included in this repo at [`credentials.example.json`](credentials.example.json):
@@ -66,8 +67,13 @@ Add `SDL_*` keys only if you use the SDL API or log parser skills.
 
 **macOS / Linux** — paste into Terminal:
 ```bash
-mkdir -p ~/.config/sentinelone
-cat > ~/.config/sentinelone/credentials.json << 'EOF'
+# Cowork (recommended):
+mkdir -p "$CLAUDE_CONFIG_DIR/sentinelone"
+cat > "$CLAUDE_CONFIG_DIR/sentinelone/credentials.json" << 'EOF'
+
+# Terminal fallback:
+# mkdir -p ~/.config/sentinelone
+# cat > $CLAUDE_CONFIG_DIR/sentinelone/credentials.json << 'EOF'
 {
   "S1_BASE_URL": "https://usea1-acme.sentinelone.net",
   "S1_API_TOKEN": "eyJ...your-token...",
@@ -81,6 +87,7 @@ EOF
 
 **Windows** — paste into PowerShell:
 ```powershell
+# In Cowork use $CLAUDE_CONFIG_DIR/sentinelone/credentials.json instead
 $dir = "$env:USERPROFILE\.config\sentinelone"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 @'
@@ -106,6 +113,8 @@ Restart Claude after creating the file.
 **sentinelone-mgmt-console-api** -- Interact with the SentinelOne Management Console REST and GraphQL APIs (UAM, Purple AI). Covers threats, alerts, agents, sites, groups, exclusions, RemoteOps, Hyperautomation, and IOCs.
 
 **sentinelone-sdl-api** -- Read and write data through the Singularity Data Lake API. Supports event ingestion, PowerQuery execution, and configuration file management (parsers, dashboards, lookups).
+
+**sentinelone-sdl-dashboard** -- Design, author, and deploy Singularity Data Lake dashboards. Covers all panel types (line, bar, pie, table, number, honeycomb, markdown), multi-tab layouts, parameters, and full dashboard JSON authoring with community examples.
 
 **sentinelone-sdl-log-parser** -- Author, edit, debug, and validate SDL log parsers. Handles CEF, syslog, JSON, key=value, multi-line, CSV, and custom formats. Validates end-to-end against a live SDL tenant.
 

@@ -18,7 +18,7 @@ In Cowork/Claude Code, the path is:
 
 ## Configure
 
-Create `~/.config/sentinelone/credentials.json` with your tenant details (see [`../credentials.example.json`](../credentials.example.json) for all available keys):
+Create `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` with your tenant details (in Cowork, `CLAUDE_CONFIG_DIR` is set automatically; outside Cowork it falls back to `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`) (see [`../credentials.example.json`](../credentials.example.json) for all available keys):
 
 ```json
 {
@@ -77,7 +77,7 @@ Purple AI answers questions about SDL telemetry (process/network/file events, in
 ## Layout
 
 - `SKILL.md` — instructions Claude reads when the skill triggers
-- `~/.config/sentinelone/credentials.json` — credentials (set `S1_BASE_URL` and `S1_API_TOKEN`)
+- `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` — credentials (set `S1_BASE_URL` and `S1_API_TOKEN`)
 - `scripts/s1_client.py` — REST client (auth, pooled HTTP, retries, cursor pagination, parallel `get_many()`, optional cache)
 - `scripts/call_endpoint.py` — REST CLI wrapper
 - `scripts/search_endpoints.py` — ranked keyword search over the endpoint index (verb-aware, `--only-works` filter)

@@ -29,7 +29,7 @@ Wire contract
 Auth token
 ----------
 The interface accepts the same service-user JWT used for the Mgmt
-Console API (loaded from ~/.config/sentinelone/credentials.json via S1Client.api_token).
+Console API (loaded from $CLAUDE_CONFIG_DIR/sentinelone/credentials.json via S1Client.api_token).
 `ApiToken <token>` is rejected with HTTP 401
 `{"details":"Unsupported auth type: ApiToken"}`, so callers MUST switch
 to the `Bearer` scheme when talking to this endpoint family.
@@ -103,7 +103,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 _DEFAULT_PROD_HOST = "https://ingest.us1.sentinelone.net"
 
-# Optional override key in ~/.config/sentinelone/credentials.json or config.json.
+# Optional override key in $CLAUDE_CONFIG_DIR/sentinelone/credentials.json or config.json.
 # If not present the helper falls back to _DEFAULT_PROD_HOST.
 _CONFIG_KEY = "uam_alert_interface_url"
 _LEGACY_CONFIG_KEYS = ("ingestion_gateway_url",)   # previous name
@@ -157,9 +157,14 @@ def _enrich_observable_for_alert(obs: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _load_config_url() -> Optional[str]:
-    # Check ~/.config/sentinelone/credentials.json first, fall back to local config.json
+    # Check $CLAUDE_CONFIG_DIR/sentinelone/credentials.json first (shared plugin creds),
+    # then fall back to ~/.config/sentinelone/credentials.json, then local config.json.
+    _claude_config_dir = os.environ.get("CLAUDE_CONFIG_DIR", "")
+    _plugin_creds = (Path(_claude_config_dir) / "sentinelone" / "credentials.json"
+                     if _claude_config_dir else None)
     _home_creds = Path.home() / ".config" / "sentinelone" / "credentials.json"
-    candidates = [_home_creds, Path(__file__).resolve().parent.parent / "config.json"]
+    _local_config = Path(__file__).resolve().parent.parent / "config.json"
+    candidates = [p for p in [_plugin_creds, _home_creds, _local_config] if p]
     for cfg_path in candidates:
         if not cfg_path.is_file():
             continue
