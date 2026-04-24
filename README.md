@@ -5,7 +5,7 @@ SentinelOne skills for Claude. Install the plugin to get everything — no indiv
 ## Quick start
 
 1. Download the latest `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/)
-2. Double-click it to install into Claude
+2. In Cowork, go to **Settings → Capabilities → Plugin** and click **Upload**, then select the `.plugin` file
 3. Create `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` with your tenant credentials (see [Configuration](#configuration) below)
 
 That's it. All six skills are active immediately.
@@ -25,7 +25,7 @@ The plugin bundles every skill in this repo — installing the plugin is suffici
 
 ## Installing
 
-**Plugin (recommended)** — download from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/) and double-click. All six skills are installed in one step.
+**Plugin (recommended)** — download from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/), then in Cowork go to **Settings → Capabilities → Plugin → Upload** and select the file. All six skills are installed in one step.
 
 **Individual skills (for development only)** — drop a skill folder into `~/.claude/skills/`. Claude will pick it up on next session.
 
