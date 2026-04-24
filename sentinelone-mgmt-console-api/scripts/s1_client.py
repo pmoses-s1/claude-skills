@@ -1,10 +1,12 @@
 """
 SentinelOne Management Console API client.
 
-Loads credentials (in priority order):
+Loads credentials (in priority order, highest wins):
   1. Environment variables: S1_BASE_URL, S1_API_TOKEN
-  2. $CLAUDE_CONFIG_DIR/sentinelone/credentials.json
-  3. <skill>/config.json  (last resort, not recommended)
+  2. $CLAUDE_CONFIG_DIR/sentinelone/credentials.json  (Cowork session)
+  3. ~/.claude/sentinelone/credentials.json           (persistent Mac path)
+  4. ~/.config/sentinelone/credentials.json           (terminal fallback)
+  5. <skill>/config.json                              (last resort, not recommended)
 
 Usage:
     from s1_client import S1Client
@@ -56,9 +58,10 @@ from requests.adapters import HTTPAdapter
 SKILL_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = SKILL_DIR / "config.json"
 HOME_CREDS_PATH = Path.home() / ".config" / "sentinelone" / "credentials.json"
-# Shared plugin credentials — stored in the Cowork .claude config dir so all
-# skills in the plugin find the same file without per-skill config copies.
-# Mac path: <your-project>/.claude/sentinelone/credentials.json
+# ~/.claude/sentinelone/credentials.json — persistent Mac path, editable from
+# outside the sandbox without knowing CLAUDE_CONFIG_DIR.
+DOTCLAUDE_CREDS_PATH = Path.home() / ".claude" / "sentinelone" / "credentials.json"
+# Shared plugin credentials — set by Cowork at session start.
 _CLAUDE_CONFIG_DIR = os.environ.get("CLAUDE_CONFIG_DIR", "")
 PLUGIN_CREDS_PATH = (Path(_CLAUDE_CONFIG_DIR) / "sentinelone" / "credentials.json"
                      if _CLAUDE_CONFIG_DIR else None)
@@ -95,9 +98,8 @@ def _load_config() -> Dict[str, Any]:
         except json.JSONDecodeError as e:
             raise RuntimeError(f"config.json is not valid JSON: {e}")
 
-    # Layer 2: $CLAUDE_CONFIG_DIR/sentinelone/credentials.json
-    # Works for GUI apps (Claude Desktop) that don't source ~/.zshenv.
-    # Keys match env var names: S1_BASE_URL, S1_API_TOKEN, etc.
+    # Layer 2: ~/.config/sentinelone/credentials.json (terminal fallback)
+    # Works for CLI users; lowest-priority file source.
     if HOME_CREDS_PATH.exists():
         try:
             home_creds = json.loads(HOME_CREDS_PATH.read_text())
@@ -108,11 +110,22 @@ def _load_config() -> Dict[str, Any]:
         if home_creds.get("S1_API_TOKEN"):
             cfg["api_token"] = home_creds["S1_API_TOKEN"]
 
-    # Layer 2b: $CLAUDE_CONFIG_DIR/sentinelone/credentials.json
-    # Shared across all skills in the plugin. Place once at:
-    #   <project>/.claude/sentinelone/credentials.json  (Mac / persisted)
-    # This layer overrides Layer 2 so the plugin credentials take precedence
-    # over a stale ~/.config file, but env vars still win in Layer 3.
+    # Layer 3: ~/.claude/sentinelone/credentials.json
+    # Persistent Mac path — edit directly without knowing CLAUDE_CONFIG_DIR.
+    # Overrides ~/.config so the canonical file always wins.
+    if DOTCLAUDE_CREDS_PATH.exists():
+        try:
+            dotclaude_creds = json.loads(DOTCLAUDE_CREDS_PATH.read_text())
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"{DOTCLAUDE_CREDS_PATH} is not valid JSON: {e}")
+        if dotclaude_creds.get("S1_BASE_URL"):
+            cfg["base_url"] = dotclaude_creds["S1_BASE_URL"]
+        if dotclaude_creds.get("S1_API_TOKEN"):
+            cfg["api_token"] = dotclaude_creds["S1_API_TOKEN"]
+
+    # Layer 4: $CLAUDE_CONFIG_DIR/sentinelone/credentials.json (Cowork session)
+    # Set automatically by Cowork. Overrides all file layers so the active
+    # session config always takes precedence, but env vars still win in Layer 5.
     if PLUGIN_CREDS_PATH and PLUGIN_CREDS_PATH.exists():
         try:
             plugin_creds = json.loads(PLUGIN_CREDS_PATH.read_text())
@@ -194,11 +207,11 @@ class S1Client:
 
         if not self.base_url or "REPLACE-ME" in self.base_url:
             raise RuntimeError(
-                "S1 base_url is not set. Add S1_BASE_URL to $CLAUDE_CONFIG_DIR/sentinelone/credentials.json or export S1_BASE_URL."
+                "S1 base_url is not set. Add S1_BASE_URL to ~/.claude/sentinelone/credentials.json or export S1_BASE_URL."
             )
         if not self.api_token or "REPLACE" in self.api_token:
             raise RuntimeError(
-                "S1 api_token is not set. Add S1_API_TOKEN to $CLAUDE_CONFIG_DIR/sentinelone/credentials.json or export S1_API_TOKEN."
+                "S1 api_token is not set. Add S1_API_TOKEN to ~/.claude/sentinelone/credentials.json or export S1_API_TOKEN."
             )
 
         # Session with pooled connection adapter — allows many parallel GETs

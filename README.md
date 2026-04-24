@@ -31,15 +31,25 @@ The plugin bundles every skill in this repo — installing the plugin is suffici
 
 ## Configuration
 
-All skills read credentials from `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` when running inside Cowork (recommended), or from `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` as a fallback when running in a terminal or Claude Code.
+All skills read credentials from a single JSON file. The recommended path that works everywhere — both inside Cowork and from your terminal — is:
 
-> **Cowork users:** `CLAUDE_CONFIG_DIR` is set automatically and points to your project's `.claude/` folder. The full Mac path is `<your-project>/.claude/sentinelone/credentials.json`. Create this file once and every skill in the plugin shares it — no per-skill config needed.
+```
+~/.claude/sentinelone/credentials.json
+```
+
+> **Why this path?** `~/.claude/` is your home-level Claude config directory. It's always accessible from your terminal without needing to know `CLAUDE_CONFIG_DIR`, and Cowork picks it up automatically too.
+
+Full credential resolution order (highest priority wins):
+1. Environment variables (`S1_BASE_URL`, `S1_API_TOKEN`, `SDL_*`)
+2. `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` — Cowork session config (set automatically)
+3. `~/.claude/sentinelone/credentials.json` — **recommended persistent path**
+4. `~/.config/sentinelone/credentials.json` — legacy terminal fallback
 
 **macOS / Linux:**
 
 ```bash
-mkdir -p "$CLAUDE_CONFIG_DIR/sentinelone"
-cat > "$CLAUDE_CONFIG_DIR/sentinelone/credentials.json" << 'EOF'
+mkdir -p ~/.claude/sentinelone
+cat > ~/.claude/sentinelone/credentials.json << 'EOF'
 {
   "S1_BASE_URL": "https://usea1-acme.sentinelone.net",
   "S1_API_TOKEN": "eyJ...your-management-console-api-token...",

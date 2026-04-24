@@ -157,14 +157,15 @@ def _enrich_observable_for_alert(obs: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _load_config_url() -> Optional[str]:
-    # Check $CLAUDE_CONFIG_DIR/sentinelone/credentials.json first (shared plugin creds),
-    # then fall back to ~/.config/sentinelone/credentials.json, then local config.json.
+    # Priority: $CLAUDE_CONFIG_DIR (Cowork session) > ~/.claude (persistent Mac)
+    # > ~/.config (terminal fallback) > local config.json.
     _claude_config_dir = os.environ.get("CLAUDE_CONFIG_DIR", "")
     _plugin_creds = (Path(_claude_config_dir) / "sentinelone" / "credentials.json"
                      if _claude_config_dir else None)
+    _dotclaude_creds = Path.home() / ".claude" / "sentinelone" / "credentials.json"
     _home_creds = Path.home() / ".config" / "sentinelone" / "credentials.json"
     _local_config = Path(__file__).resolve().parent.parent / "config.json"
-    candidates = [p for p in [_plugin_creds, _home_creds, _local_config] if p]
+    candidates = [p for p in [_plugin_creds, _dotclaude_creds, _home_creds, _local_config] if p]
     for cfg_path in candidates:
         if not cfg_path.is_file():
             continue
