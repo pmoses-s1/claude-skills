@@ -1,9 +1,12 @@
 # Credentials - never commit real tokens
 skills/*/config.json
 
-# Build output
+# Build output - track dist/ contents, ignore transient junk
 *.plugin
-dist/
+*.skill
+!dist/*.plugin
+!dist/*.skill
+dist/.DS_Store
 
 # Python
 __pycache__/
