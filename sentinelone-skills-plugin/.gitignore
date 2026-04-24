@@ -1,9 +1,10 @@
 # Credentials - never commit real tokens
 skills/*/config.json
 
-# Build output
+# Build output — dist/ is tracked so customers can download from GitHub
+# Ignore .plugin files anywhere except dist/
 *.plugin
-dist/
+!dist/*.plugin
 
 # Python
 __pycache__/
