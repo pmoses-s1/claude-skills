@@ -1,5 +1,6 @@
 ---
 name: sentinelone-sdl-log-parser
+author: Prithvi Moses <prithvi.moses@sentinelone.com>
 description: Use whenever the user wants to author, edit, debug, validate, or explain a SentinelOne Singularity Data Lake (SDL) log parser — the augmented-JSON files at /logParsers/ that extract fields from raw log text before ingestion. Trigger on "SDL parser", "Skylight parser", "log parser", "parser editor", "write a parser", "test parser", or any pasted raw log the user wants turned into structured fields. Also trigger on parser-DSL keywords like `formats:`, `patterns:`, `lineGroupers:`, `rewrites:`, `discardAttributes:`, `aliasTo:`, `{parse=...}`, `{regex=...}`. Especially trigger when the user pastes a raw log (CEF, syslog, JSON, key=value, multi-line, CSV) and asks to extract fields, normalize timestamps, or drop noise. If the project is SDL/Singularity/Scalyr and the user says "parse this log", use this skill. Always validates end-to-end via sentinelone-sdl-api (putFile → uploadLogs → query). NOT for PowerQuery (use sentinelone-powerquery), NOT for plain ingest without a parser (use sentinelone-sdl-api).
 ---
 

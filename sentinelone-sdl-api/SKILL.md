@@ -1,5 +1,6 @@
 ---
 name: sentinelone-sdl-api
+author: Prithvi Moses <prithvi.moses@sentinelone.com>
 description: Use whenever the user wants to read or write data through the SentinelOne Singularity Data Lake (SDL) API — ingest events, run queries, or manage configuration files (parsers, dashboards, alerts, lookups, datatables) on a Scalyr/SDL/XDR tenant. Trigger on "SDL", "SDL API", "Singularity Data Lake", "Scalyr", "DataSet", "xdr.us1.sentinelone.net" or any "*.sentinelone.net/api/*" URL, and on the method names "uploadLogs", "addEvents", "query", "powerQuery", "facetQuery", "timeseriesQuery", "numericQuery", "getFile", "putFile", "listFiles". Also trigger on tasks like "ingest a log file into SDL", "send a JSON event to the data lake", "run a powerQuery", "list configuration files", "edit my parser via API", "deploy a dashboard JSON", "compute the rate of failures over time", or anything involving Log Read / Log Write / Configuration Read / Configuration Write SDL keys, Bearer-token auth, or the S1-Scope header. Wraps every SDL method with a Python client and CLI.
 ---
 
