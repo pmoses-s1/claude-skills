@@ -41,7 +41,9 @@ cat > ~/.config/sentinelone/credentials.json << 'EOF'
   "S1_BASE_URL": "https://usea1-acme.sentinelone.net",
   "S1_API_TOKEN": "eyJ...your-management-console-api-token...",
   "SDL_BASE_URL": "https://xdr.us1.sentinelone.net",
-  "SDL_CONSOLE_API_TOKEN": "eyJ...your-sdl-console-api-token..."
+  "SDL_CONSOLE_API_TOKEN": "eyJ...your-sdl-console-api-token...",
+  "SDL_LOG_WRITE_KEY": "0Z1Fy0...your-log-write-key...",
+  "SDL_CONFIG_WRITE_KEY": "0mXas6PD...your-config-write-key..."
 }
 EOF
 ```
@@ -56,7 +58,9 @@ New-Item -ItemType Directory -Force -Path $dir | Out-Null
   "S1_BASE_URL": "https://usea1-acme.sentinelone.net",
   "S1_API_TOKEN": "eyJ...your-management-console-api-token...",
   "SDL_BASE_URL": "https://xdr.us1.sentinelone.net",
-  "SDL_CONSOLE_API_TOKEN": "eyJ...your-sdl-console-api-token..."
+  "SDL_CONSOLE_API_TOKEN": "eyJ...your-sdl-console-api-token...",
+  "SDL_LOG_WRITE_KEY": "0Z1Fy0...your-log-write-key...",
+  "SDL_CONFIG_WRITE_KEY": "0mXas6PD...your-config-write-key..."
 }
 '@ | Set-Content "$dir\credentials.json" -Encoding UTF8
 ```
