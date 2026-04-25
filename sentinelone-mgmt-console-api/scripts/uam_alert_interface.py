@@ -7,12 +7,9 @@ indicators. Separate host + wire contract from the Mgmt Console REST
 and the UAM GraphQL query layer (both of which are READ/mutate on
 pre-existing state).
 
-Prod host family (not the same as the mgmt console host):
+Host (region-specific, e.g. US1 shown — see https://community.sentinelone.com/s/article/000004961 for your region):
     https://ingest.us1.sentinelone.net
 
-Non-prod hosts (from internal docs):
-    Int (yukon):   https://igw.intus1.scalyr.com
-    Stage (yukon): https://ingest.stagingus.scalyr.com
 
 Wire contract
 -------------

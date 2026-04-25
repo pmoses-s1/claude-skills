@@ -283,8 +283,8 @@ SOC queue.
 This is a **different API family** from everything else in the skill. All
 other tests hit `<tenant>.sentinelone.net/web/api/v2.1/...`. The UAM
 Alert Interface (formerly "Ingestion Gateway") lives on a separate host
-family (`ingest.us1.sentinelone.net` in prod, `igw.intus1.scalyr.com` in
-int, `ingest.stagingus.scalyr.com` in stage) with its own wire contract:
+family (e.g. `ingest.us1.sentinelone.net`). Find your region endpoint at
+https://community.sentinelone.com/s/article/000004961. The interface uses its own wire contract:
 
 - Auth header is `Bearer <JWT>`, NOT `ApiToken <JWT>`. The mgmt console
   REST scheme is rejected with HTTP 401 `"Unsupported auth type: ApiToken"`.
@@ -346,7 +346,7 @@ touches real infrastructure. Hashes are deterministic per `run_tag`.
 Same wire contract, same "semi-reversible" cleanup as test #9; the only
 delta is the payload shape.
 
-**Payload constraints (empirically confirmed on `usea1-purple`
+**Payload constraints (empirically confirmed on `your-tenant`
 2026-04-22):**
 
 1. **Alerts that span multiple devices are silently dropped by the

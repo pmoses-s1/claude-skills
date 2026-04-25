@@ -37,7 +37,7 @@ The plugin bundles every skill in this repo — installing the plugin is suffici
 | **Mean investigation time under 5 minutes** | Investigation workflows that take 45–60 minutes manually compress to under 5 minutes. Continuous hunting catches threats between analyst shifts. |
 | **Full data estate coverage** | Queries OCSF-normalised logs, non-OCSF vendor logs, and raw syslog. Discovers field schemas dynamically at session start — no hardcoded assumptions about what sources are present. |
 | **Fast-track detection creation** | Natural language detection authoring across any data source. Recommends new STAR rules and custom detections as threats are identified during investigation. |
-| **Deliver the capability today** | Complex natural language security questions that don't reliably work in Purple AI alone work consistently when orchestrated through this architecture. |
+| **Deliver the capability today** | Purple AI becomes even more powerful when orchestrated through this multi-layer architecture — combining deep enrichment, cross-source correlation, and external threat intelligence in every investigation. |
 | **Federated search across the data estate** | Search, correlate, and hunt across endpoint, network, identity, and cloud log sources via MCP/API in a single session. Cross-source correlation connects signals that are invisible in any one source. |
 
 **Key metrics:** `< 5 min` mean investigation time · `100%` IOC enrichment coverage · `Real-time` MITRE ATT&CK mapping · `70%+` L1 capacity freed
