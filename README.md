@@ -1,31 +1,31 @@
 # claude-skills
 
-SentinelOne skills for Claude. Install the plugin to get everything — no individual skill setup needed.
+SentinelOne skills for Claude. Install the plugin to get everything; no individual skill setup needed.
 
 ## Quick start
 
 1. Download the latest `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/)
-2. In Cowork, go to **Settings → Capabilities → Plugin** and click **Upload**, then select the `.plugin` file
+2. In Cowork, go to **Capabilities → Skills → Customise → Plugins → Personal plugins** and click **Upload plugin**, then select the `.plugin` file
 3. Create `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` with your tenant credentials (see [Configuration](#configuration) below)
 
 That's it. All six skills are active immediately.
 
 ## What's included
 
-The plugin bundles every skill in this repo — installing the plugin is sufficient, there is no need to install skills individually.
+The plugin bundles every skill in this repo; installing the plugin is sufficient, there is no need to install skills individually.
 
 | Skill | What it does |
 |-------|-------------|
 | sentinelone-mgmt-console-api | Query and act on the Management Console: threats, alerts, agents, sites, RemoteOps, Deep Visibility, Hyperautomation, Purple AI, UAM |
 | sentinelone-powerquery | Write, debug, and run PowerQuery for threat hunting, STAR detection rules, and SDL dashboards |
 | sentinelone-sdl-api | Ingest events, run queries, and manage configuration files (parsers, dashboards, lookups) via the Singularity Data Lake API |
-| sentinelone-sdl-dashboard | Design, author, and deploy SDL dashboards — panels, tabs, parameters, and full dashboard JSON |
+| sentinelone-sdl-dashboard | Design, author, and deploy SDL dashboards: panels, tabs, parameters, and full dashboard JSON |
 | sentinelone-sdl-log-parser | Author and validate SDL log parsers for any log format, with OCSF field mapping by default |
 | sentinelone-hyperautomation | Design and generate Hyperautomation workflow JSON, with optional live console import |
 
 ## PrincipalSOCAnalyst Project
 
-`CLAUDE.md` at the root of this repo transforms Claude into a **Principal SOC Analyst** — a structured investigator that runs the same enrichment, correlation, and reasoning process a senior analyst would, on every alert, every time. Set it up once as a named Cowork project and every session starts fully briefed.
+`CLAUDE.md` at the root of this repo transforms Claude into a **Principal SOC Analyst**: a structured investigator that runs the same enrichment, correlation, and reasoning process a senior analyst would, on every alert, every time. Set it up once as a named Cowork project and every session starts fully briefed.
 
 ### What it delivers
 
@@ -33,11 +33,11 @@ The plugin bundles every skill in this repo — installing the plugin is suffici
 |---------|-----|
 | **Reduce L1 SOC workload by 70%+** | Automated triage, mandatory VirusTotal enrichment, and verdict generation eliminate repetitive alert investigation. L1 analysts focus on exceptions, not routine. |
 | **Elevate every analyst to principal grade** | Junior analysts get the same structured investigation framework, enrichment depth, and analytical reasoning that only senior staff possess today. |
-| **External threat intelligence on every IOC** | Mandatory VirusTotal enrichment on every IP, domain, hash, and URL — 70+ AV engines, threat actor attribution, and full infrastructure mapping on every finding. |
+| **External threat intelligence on every IOC** | Mandatory VirusTotal enrichment on every IP, domain, hash, and URL, with 70+ AV engines, threat actor attribution, and full infrastructure mapping on every finding. |
 | **Mean investigation time under 5 minutes** | Investigation workflows that take 45–60 minutes manually compress to under 5 minutes. Continuous hunting catches threats between analyst shifts. |
-| **Full data estate coverage** | Queries OCSF-normalised logs, non-OCSF vendor logs, and raw syslog. Discovers field schemas dynamically at session start — no hardcoded assumptions about what sources are present. |
+| **Full data estate coverage** | Queries OCSF-normalised logs, non-OCSF vendor logs, and raw syslog. Discovers field schemas dynamically at session start, with no hardcoded assumptions about what sources are present. |
 | **Fast-track detection creation** | Natural language detection authoring across any data source. Recommends new STAR rules and custom detections as threats are identified during investigation. |
-| **Deliver the capability today** | Purple AI becomes even more powerful when orchestrated through this multi-layer architecture — combining deep enrichment, cross-source correlation, and external threat intelligence in every investigation. |
+| **Deliver the capability today** | Purple AI becomes even more powerful when orchestrated through this multi-layer architecture, combining deep enrichment, cross-source correlation, and external threat intelligence in every investigation. |
 | **Federated search across the data estate** | Search, correlate, and hunt across endpoint, network, identity, and cloud log sources via MCP/API in a single session. Cross-source correlation connects signals that are invisible in any one source. |
 
 **Key metrics:** `< 5 min` mean investigation time · `100%` IOC enrichment coverage · `Real-time` MITRE ATT&CK mapping · `70%+` L1 capacity freed
@@ -48,35 +48,35 @@ The plugin bundles every skill in this repo — installing the plugin is suffici
 
 **Prerequisites**
 
-The full investigation workflow requires three components to be installed and connected. All three are needed — the skills handle SDL and Management Console operations, Purple MCP provides the live investigation and hunting interface, and the threat intel MCP provides the external validation that makes true positive classification reliable.
+The full investigation workflow requires three components to be installed and connected. All three are needed: the skills handle SDL and Management Console operations, Purple MCP provides the live investigation and hunting interface, and the threat intel MCP provides the external validation that makes true positive classification reliable.
 
 | Component | Purpose | Install |
 |-----------|---------|---------|
 | `sentinelone-skills` plugin | SDL queries, Management Console API, dashboards, parsers, Hyperautomation | See [Installing](#installing) below |
 | **Purple MCP** | Live alert triage, Purple AI hunting, Deep Visibility, UAM, asset and vulnerability context | [github.com/Sentinel-One/purple-mcp](https://github.com/Sentinel-One/purple-mcp) |
-| **Threat intel MCP** (e.g. VirusTotal) | External IOC enrichment — mandatory for true positive classification; no finding is classified CRITICAL without independent TI confirmation | Install via your MCP marketplace or connect directly |
+| **Threat intel MCP** (e.g. VirusTotal) | External IOC enrichment, mandatory for true positive classification; no finding is classified CRITICAL without independent TI confirmation | Install via your MCP marketplace or connect directly |
 
 > **Why all three?** The CLAUDE.md operating instructions enforce a rule: no alert may be classified CRITICAL or TRUE POSITIVE based on a SentinelOne detection alone. Purple MCP provides the investigation surface; the threat intel MCP provides the independent confirmation that makes verdicts trustworthy.
 
-**Step 1 — Create the project**
+**Step 1: Create the project**
 
 1. Open Cowork and click **New Project**
 2. Name it **PrincipalSOCAnalyst**
 3. Click **Select Folder** and choose this `claude-skills` folder (which contains `CLAUDE.md`)
 4. Click **Create**
 
-**Step 2 — Verify all components are active**
+**Step 2: Verify all components are active**
 
-Go to **Settings → Capabilities** and confirm:
-- `sentinelone-skills` plugin is listed under Plugins
+Go to **Capabilities → Skills → Customise → Plugins** and confirm:
+- `sentinelone-skills` is listed under Personal plugins
 - Purple MCP is connected under MCP Servers
 - Your threat intel MCP (e.g. VirusTotal) is connected under MCP Servers
 
-**Step 3 — Start a session**
+**Step 3: Start a session**
 
 Open the **PrincipalSOCAnalyst** project and start a new chat. Claude reads `CLAUDE.md` automatically and immediately runs:
-- Data source enumeration — discovers every log source present in your SDL
-- Alert triage — pulls open alerts in parallel while enumeration runs
+- Data source enumeration: discovers every log source present in your SDL
+- Alert triage: pulls open alerts in parallel while enumeration runs
 
 From this point the session operates as a Principal SOC Analyst for its full duration.
 
@@ -101,18 +101,18 @@ Copy the contents of `CLAUDE.md` into **Settings → Custom Instructions** (or e
 ### What happens in a session
 
 **Session initialisation (automatic, every session)**
-1. Enumerates all live `dataSource.name` values in SDL — confirms which log sources are actually present and queryable
-2. Runs alert triage in parallel — pulls open/critical alerts while enumeration executes
+1. Enumerates all live `dataSource.name` values in SDL, confirming which log sources are actually present and queryable
+2. Runs alert triage in parallel, pulling open/critical alerts while enumeration executes
 3. For any non-OCSF source discovered, runs schema discovery before writing any query
 
 **Investigation workflow**
-- Triage and context gathering — alert details, analyst notes, MDR verdicts, asset criticality
-- VirusTotal enrichment — every IP, domain, hash, and URL enriched before any verdict; no finding classified CRITICAL without independent TI confirmation
-- Infrastructure pivoting — C2 infrastructure, threat actor attribution, SSL certificate reuse, sibling domains, dropped payloads, execution chain reconstruction
-- Cross-source correlation — IOC found in any source is immediately hunted across all other connected sources
-- Anomaly analysis — every query result checked for frequency, timing, geolocation, baseline, volume, new entity, privilege, and chain anomalies
-- MITRE ATT&CK mapping — every finding mapped to tactic and technique; kill chain gaps identified
-- Composite risk scoring — cross-source anomaly scores determine escalation priority
+- Triage and context gathering: alert details, analyst notes, MDR verdicts, asset criticality
+- VirusTotal enrichment: every IP, domain, hash, and URL enriched before any verdict; no finding classified CRITICAL without independent TI confirmation
+- Infrastructure pivoting: C2 infrastructure, threat actor attribution, SSL certificate reuse, sibling domains, dropped payloads, execution chain reconstruction
+- Cross-source correlation: IOC found in any source is immediately hunted across all other connected sources
+- Anomaly analysis: every query result checked for frequency, timing, geolocation, baseline, volume, new entity, privilege, and chain anomalies
+- MITRE ATT&CK mapping: every finding mapped to tactic and technique; kill chain gaps identified
+- Composite risk scoring: cross-source anomaly scores determine escalation priority
 
 **Report generation**
 
@@ -126,7 +126,7 @@ Start a new investigation session
 Triage today's open alerts and flag anything requiring immediate action
 ```
 ```
-Investigate alert ID <id> — full enrichment, verdict, and recommended response
+Investigate alert ID <id>: full enrichment, verdict, and recommended response
 ```
 ```
 Hunt for lateral movement across all connected sources in the last 24 hours
@@ -139,19 +139,19 @@ Write a SOC Leader report for this investigation as a Word document
 
 ## What you can do
 
-These skills turn Claude into a hands-on SentinelOne analyst and engineer. Once the plugin is installed and credentials are configured, you can talk to your tenant in plain English — Claude handles the API calls, query writing, and JSON authoring and explains what it found or built.
+These skills turn Claude into a hands-on SentinelOne analyst and engineer. Once the plugin is installed and credentials are configured, you can talk to your tenant in plain English. Claude handles the API calls, query writing, and JSON authoring and explains what it found or built.
 
-**Threat hunting and investigation** — ask Claude to hunt for specific TTPs, IOCs, or behaviours across your SDL telemetry. It writes and runs PowerQuery automatically, pages through results, and summarises findings. You can go from a vague question ("any PowerShell reaching out to the internet?") to a ranked table of suspicious endpoints in one message.
+**Threat hunting and investigation**: ask Claude to hunt for specific TTPs, IOCs, or behaviours across your SDL telemetry. It writes and runs PowerQuery automatically, pages through results, and summarises findings. You can go from a vague question ("any PowerShell reaching out to the internet?") to a ranked table of suspicious endpoints in one message.
 
-**Alert and threat management** — list open threats, triage UAM alerts, add analyst notes, change status, or isolate an endpoint, all by describing what you want. Claude maps your intent to the right Management Console API calls and confirms what it did.
+**Alert and threat management**: list open threats, triage UAM alerts, add analyst notes, change status, or isolate an endpoint, all by describing what you want. Claude maps your intent to the right Management Console API calls and confirms what it did.
 
-**Dashboard authoring** — describe the panels you want ("a SOC overview with threat timeline, top noisy endpoints, and outbound connection breakdown") and Claude produces deployment-ready SDL dashboard JSON, with queries validated against your tenant before it deploys.
+**Dashboard authoring**: describe the panels you want ("a SOC overview with threat timeline, top noisy endpoints, and outbound connection breakdown") and Claude produces deployment-ready SDL dashboard JSON, with queries validated against your tenant before it deploys.
 
-**Log parser authoring** — paste a raw log sample and Claude writes a complete SDL parser definition, maps fields to OCSF, validates it against the parser engine, ingests a test event, and confirms the fields appear correctly — end to end in one session.
+**Log parser authoring**: paste a raw log sample and Claude writes a complete SDL parser definition, maps fields to OCSF, validates it against the parser engine, ingests a test event, and confirms the fields appear correctly, end to end in one session.
 
-**Automation and response** — describe a response workflow in natural language ("when a high-severity alert fires on a server, isolate the endpoint, create an IOC for any hash in the alert, and notify the team") and Claude generates the Hyperautomation workflow JSON ready to import.
+**Automation and response**: describe a response workflow in natural language ("when a high-severity alert fires on a server, isolate the endpoint, create an IOC for any hash in the alert, and notify the team") and Claude generates the Hyperautomation workflow JSON ready to import.
 
-**Data lake operations** — ingest custom telemetry, list and manage configuration files, deploy or update parsers and dashboards, and run arbitrary queries through the SDL API.
+**Data lake operations**: ingest custom telemetry, list and manage configuration files, deploy or update parsers and dashboards, and run arbitrary queries through the SDL API.
 
 ---
 
@@ -161,7 +161,7 @@ These are real questions you can ask. Claude will pick the right skill automatic
 
 ### Threat hunting
 
-- *"Hunt for any process that opened a connection to a non-RFC1918 IP in the last 7 days — show me top endpoints by hit count"*
+- *"Hunt for any process that opened a connection to a non-RFC1918 IP in the last 7 days; show me top endpoints by hit count"*
 - *"Write a PowerQuery that finds lsass memory reads by non-system processes"*
 - *"Are there any HIFI indicators for Mimikatz or BloodHound on my tenant in the last 30 days?"*
 - *"Find PowerShell scripts that encoded a Base64 command, group by endpoint"*
@@ -188,7 +188,7 @@ These are real questions you can ask. Claude will pick the right skill automatic
 ### Log parsers
 
 - *"Write an SDL parser for this Palo Alto syslog sample: `<paste log>`"*
-- *"I have a CEF log from CrowdStrike — create a parser with OCSF field mapping"*
+- *"I have a CEF log from CrowdStrike: create a parser with OCSF field mapping"*
 - *"My FortiGate parser isn't extracting the destination IP correctly, here's the JSON: `<paste parser>`"*
 - *"Check the ai-siem catalog and see if there's already a parser for Okta logs"*
 - *"Validate my parser and ingest a test event to confirm the fields look right"*
@@ -202,23 +202,23 @@ These are real questions you can ask. Claude will pick the right skill automatic
 
 ### SOC investigation and triage (SOC Analyst Mode)
 
-- *"Start a new investigation session — enumerate live data sources and pull today's open alerts"*
-- *"Triage alert ID `abc123` — get the full details, check notes and history, enrich any IOCs in VirusTotal, and give me a verdict"*
-- *"Enrich this file hash `aabbccdd...` — detection ratio, behavioral analysis, C2 infrastructure, and threat actor attribution"*
-- *"Pivot on IP `1.2.3.4` — what malware communicates with it, what domains resolve to it, and is it associated with any APT group?"*
-- *"A suspicious domain `evil-update.com` appeared in DNS logs — do a full domain report including subdomains, sibling domains, SSL certificate history, and threat actor links"*
-- *"Cross-correlate this IOC across all connected data sources — check firewall, Okta, Zeek, and CloudTrail for any trace of `1.2.3.4`"*
-- *"Check endpoint `DESKTOP-XYZ` for anomalies — run the full anomaly checklist across process, network, and identity data"*
-- *"Apply the MITRE ATT&CK framework to what we've found so far — what techniques are mapped and where are the detection gaps?"*
+- *"Start a new investigation session: enumerate live data sources and pull today's open alerts"*
+- *"Triage alert ID `abc123`: get the full details, check notes and history, enrich any IOCs in VirusTotal, and give me a verdict"*
+- *"Enrich this file hash `aabbccdd...`: detection ratio, behavioral analysis, C2 infrastructure, and threat actor attribution"*
+- *"Pivot on IP `1.2.3.4`: what malware communicates with it, what domains resolve to it, and is it associated with any APT group?"*
+- *"A suspicious domain `evil-update.com` appeared in DNS logs: do a full domain report including subdomains, sibling domains, SSL certificate history, and threat actor links"*
+- *"Cross-correlate this IOC across all connected data sources: check firewall, Okta, Zeek, and CloudTrail for any trace of `1.2.3.4`"*
+- *"Check endpoint `DESKTOP-XYZ` for anomalies: run the full anomaly checklist across process, network, and identity data"*
+- *"Apply the MITRE ATT&CK framework to what we've found so far: what techniques are mapped and where are the detection gaps?"*
 - *"Score the current investigation using the cross-source anomaly framework and tell me if we should escalate to IR"*
 
 ### Reporting
 
-- *"Write a SOC Leader report for this investigation as a Word document — executive summary, incident timeline, IOC table with VT verdicts, MITRE mapping, root cause, and recommendations"*
+- *"Write a SOC Leader report for this investigation as a Word document: executive summary, incident timeline, IOC table with VT verdicts, MITRE mapping, root cause, and recommendations"*
 - *"Generate a weekly threat summary for SOC leadership covering alerts triaged, true positives confirmed, top IOCs, and any active campaigns"*
 - *"Produce an IOC table for all indicators found in the last 24 hours, including VirusTotal verdict, detection ratio, and threat actor attribution"*
-- *"Write up the root cause analysis for the PowerShell alert on `HOST-001` — trace the execution chain and map it to the kill chain"*
-- *"Give me an executive-level summary of the firewall beaconing pattern we found — one paragraph, business risk focus, no jargon"*
+- *"Write up the root cause analysis for the PowerShell alert on `HOST-001`: trace the execution chain and map it to the kill chain"*
+- *"Give me an executive-level summary of the firewall beaconing pattern we found: one paragraph, business risk focus, no jargon"*
 - *"Create a threat actor profile for the group attributed in the last investigation, including TTPs, typical targets, and known tooling"*
 
 ### Hyperautomation workflows
@@ -232,13 +232,13 @@ These are real questions you can ask. Claude will pick the right skill automatic
 
 ## Installing
 
-**Plugin (recommended)** — download from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/), then in Cowork go to **Settings → Capabilities → Plugin → Upload** and select the file. All six skills are installed in one step.
+**Plugin (recommended)**: download from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/), then in Cowork go to **Capabilities → Skills → Customise → Plugins → Personal plugins** and click **Upload plugin**. All six skills are installed in one step.
 
-**Individual skills (for development only)** — drop a skill folder into `~/.claude/skills/`. Claude will pick it up on next session.
+**Individual skills (for development only)**: drop a skill folder into `~/.claude/skills/`. Claude will pick it up on next session.
 
 ## Configuration
 
-All skills read credentials from a single JSON file. The recommended path that works everywhere — both inside Cowork and from your terminal — is:
+All skills read credentials from a single JSON file. The recommended path that works everywhere, both inside Cowork and from your terminal, is:
 
 ```
 ~/.claude/sentinelone/credentials.json
@@ -248,9 +248,9 @@ All skills read credentials from a single JSON file. The recommended path that w
 
 Full credential resolution order (highest priority wins):
 1. Environment variables (`S1_BASE_URL`, `S1_API_TOKEN`, `SDL_*`)
-2. `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` — Cowork session config (set automatically)
-3. `~/.claude/sentinelone/credentials.json` — **recommended persistent path**
-4. `~/.config/sentinelone/credentials.json` — legacy terminal fallback
+2. `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` (Cowork session config, set automatically)
+3. `~/.claude/sentinelone/credentials.json` (**recommended persistent path**)
+4. `~/.config/sentinelone/credentials.json` (legacy terminal fallback)
 
 **macOS / Linux:**
 
@@ -294,7 +294,7 @@ A fully annotated example with all optional keys is in [`credentials.example.jso
 | `S1_BASE_URL` | All management console skills | Your console URL, e.g. `https://usea1-acme.sentinelone.net` |
 | `S1_API_TOKEN` | `sentinelone-mgmt-console-api`, `sentinelone-powerquery` | Settings → Users → Service Users → Create New Service User → copy the API token. See [Creating service users](https://community.sentinelone.com/s/article/000005291) |
 | `SDL_BASE_URL` | `sentinelone-sdl-api`, `sentinelone-sdl-dashboard`, `sentinelone-sdl-log-parser` | Your SDL tenant URL, e.g. `https://xdr.us1.sentinelone.net` |
-| `SDL_CONSOLE_API_TOKEN` | SDL query and config methods (not `uploadLogs`) | Same token as `S1_API_TOKEN` — console tokens support the SDL API from Management version Z SP5+. See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+| `SDL_CONSOLE_API_TOKEN` | SDL query and config methods (not `uploadLogs`) | Same token as `S1_API_TOKEN`. Console tokens support the SDL API from Management version Z SP5+. See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
 | `SDL_LOG_WRITE_KEY` | `uploadLogs` only | In Singularity Data Lake → menu next to username → API Keys → Log Access Keys → New Key (Log Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
 | `SDL_CONFIG_WRITE_KEY` | Deploying parsers/dashboards via `putFile` | In Singularity Data Lake → menu next to username → API Keys → Configuration Access Keys → New Key (Configuration Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
 
@@ -320,9 +320,9 @@ bash scripts/build.sh --clean
 
 ## Windsurf
 
-This repo includes Windsurf workflow files in `.windsurf/workflows/`. Each workflow is a thin pointer that directs Cascade to read the canonical `SKILL.md` and reference docs in the matching skill folder — no duplicated content.
+This repo includes Windsurf workflow files in `.windsurf/workflows/`. Each workflow is a thin pointer that directs Cascade to read the canonical `SKILL.md` and reference docs in the matching skill folder; no duplicated content.
 
-- `sentinelone-api.md` — Management Console API (agents, threats, alerts, sites, Purple AI, UAM).
-- `sentinelone-powerquery.md` — PowerQuery authoring, debugging, and detection rules.
-- `sentinelone-sdl-api.md` — Singularity Data Lake API (ingest, query, config files).
-- `sentinelone-sdl-log-parser.md` — SDL log parser authoring with OCSF mapping.
+- `sentinelone-api.md`: Management Console API (agents, threats, alerts, sites, Purple AI, UAM).
+- `sentinelone-powerquery.md`: PowerQuery authoring, debugging, and detection rules.
+- `sentinelone-sdl-api.md`: Singularity Data Lake API (ingest, query, config files).
+- `sentinelone-sdl-log-parser.md`: SDL log parser authoring with OCSF mapping.
