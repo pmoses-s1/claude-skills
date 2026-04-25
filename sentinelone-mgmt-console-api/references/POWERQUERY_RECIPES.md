@@ -1,6 +1,6 @@
 # PowerQuery recipes for UAM indicators and alerts
 
-Tested on `usea1-purple` 2026-04-22 (Singularity Data Lake behind the
+Tested on `your-tenant` 2026-04-22 (Singularity Data Lake behind the
 same console). These recipes cover the queries SecOps pre-sales most
 often needs when proving UAM / XDR telemetry end-to-end: indicator
 prevalence, outbound command-and-control, login-failure triage, and

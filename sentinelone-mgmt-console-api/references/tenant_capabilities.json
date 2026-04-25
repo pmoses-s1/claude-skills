@@ -1,7 +1,7 @@
 {
   "summary": {
     "generated_at": "2026-04-21T23:45:29+00:00",
-    "base_url": "https://usea1-purple.sentinelone.net",
+    "base_url": "https://your-tenant.sentinelone.net",
     "total_planned": 367,
     "total_called": 299,
     "total_skipped": 68,
@@ -2507,7 +2507,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10012.0,
       "shape": null
     },
@@ -2574,7 +2574,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10012.7,
       "shape": null
     },
@@ -2860,7 +2860,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10018.0,
       "shape": null
     },
@@ -2927,7 +2927,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10012.7,
       "shape": null
     },
@@ -3191,7 +3191,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10007.7,
       "shape": null
     },
@@ -3258,7 +3258,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10016.2,
       "shape": null
     },
@@ -3347,7 +3347,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10011.6,
       "shape": null
     },
@@ -3465,7 +3465,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10015.7,
       "shape": null
     },
@@ -3624,7 +3624,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10013.5,
       "shape": null
     },
@@ -4691,7 +4691,7 @@
       "summary": "Get SSO Service Provider Certificate",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10011.4,
       "shape": null
     },

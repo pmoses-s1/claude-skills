@@ -14,7 +14,7 @@ The SDL API is distinct from the Management Console API. It speaks JSON over `Be
 
 The query methods on this skill (`query`, `powerQuery`, `facetQuery`, `timeseriesQuery`, `numericQuery`) wrap the V1 SDL endpoints (`/api/query`, `/api/powerQuery`, etc.) at the centralized host `xdr.us1.sentinelone.net`. Those endpoints are **deprecated and sunset on 2027-02-15** (also applies to the Deep Visibility `/web/api/v2.1/dv/events/pq` endpoint).
 
-**The LRQ API is NOT a replacement available through this skill.** LRQ runs at `POST /sdl/v2/api/queries` on the tenant's own **Management Console** host (e.g. `usea1-purple.sentinelone.net`) — it is part of the Mgmt Console API surface, not the SDL API (`xdr.us1.sentinelone.net`). To run PowerQueries programmatically, use the **`sentinelone-mgmt-console-api`** skill which holds the LRQ runner, auth pattern, and slicing strategy.
+**The LRQ API is NOT a replacement available through this skill.** LRQ runs at `POST /sdl/v2/api/queries` on the tenant's own **Management Console** host (e.g. `your-tenant.sentinelone.net`) — it is part of the Mgmt Console API surface, not the SDL API (`xdr.us1.sentinelone.net`). To run PowerQueries programmatically, use the **`sentinelone-mgmt-console-api`** skill which holds the LRQ runner, auth pattern, and slicing strategy.
 
 **SDL dashboard panels do not use LRQ either.** Dashboard panel queries are executed by the SDL console's own built-in rendering engine when a user loads the dashboard in their browser. The panel JSON just stores the query string — no API call is needed. Do not attempt to test or run dashboard panel queries via LRQ.
 

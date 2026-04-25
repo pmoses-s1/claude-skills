@@ -307,7 +307,7 @@ If you ever have to read a raw LRQ response (e.g. debugging), know:
 ### Checklist before running a PQ programmatically
 
 - [ ] You called `run_pq` / `list_data_sources`, not inline `requests.post`.
-- [ ] Base URL is the tenant console (e.g. `https://usea1-purple.sentinelone.net`), not `xdr.us1.sentinelone.net`.
+- [ ] Base URL is the tenant console (e.g. `https://your-tenant.sentinelone.net`), not `xdr.us1.sentinelone.net`.
 - [ ] Endpoint path is `/sdl/v2/api/queries` (short form). If you see 404s, do NOT add `/web/api/v2.1` — that's wrong.
 - [ ] If you're filtering on EDR data (`src.process.*`, `event.type=*`, `tgt.file.*`), prepend `dataSource.name='SentinelOne' dataSource.category='security'` — on mixed tenants the default scope carries Scalyr/infra logs too and wide filters silently return `matchCount=0`.
 - [ ] 0 rows → ran `list_data_sources` and checked `matchCount` vs `row_count` BEFORE widening the window.
@@ -397,7 +397,7 @@ Everything else in this skill talks to `<tenant>.sentinelone.net/web/api/v2.1/..
 **Endpoints:**
 
 - `POST /v1/indicators` -- raw behavioral indicators. Each must carry `metadata.profiles = ["s1/security_indicator"]` and a unique `metadata.uid` (this is the join key). Batching: send many indicators in one call by passing a list; the client concatenates + gzips.
-- `POST /v1/alerts` -- SecurityAlert wrappers. Each references its indicator(s) via `finding_info.related_events[].uid == indicator.metadata.uid`. A single alert can reference multiple indicators (one entry per indicator). The server stitches them into `alert.rawIndicators` / the UAM Indicators tab once both land. **Call with ONE alert per POST.** The wire format accepts multi-alert bodies and the gateway returns HTTP 202, but the stitcher silently drops all but one alert in a multi-alert batch (usea1-purple 2026-04-22); loop one at a time, or use `post_alert_with_indicators` which enforces the safe pattern.
+- `POST /v1/alerts` -- SecurityAlert wrappers. Each references its indicator(s) via `finding_info.related_events[].uid == indicator.metadata.uid`. A single alert can reference multiple indicators (one entry per indicator). The server stitches them into `alert.rawIndicators` / the UAM Indicators tab once both land. **Call with ONE alert per POST.** The wire format accepts multi-alert bodies and the gateway returns HTTP 202, but the stitcher silently drops all but one alert in a multi-alert batch (your-tenant 2026-04-22); loop one at a time, or use `post_alert_with_indicators` which enforces the safe pattern.
 
 **Supported indicator classes (via builders):**
 
@@ -456,7 +456,7 @@ uam_iface.post_alert_with_indicators(
 **Cleanup:** ingested alerts are not hard-deletable via public API. The standard reversibility pattern is to set `status=RESOLVED` and `analystVerdict=TRUE_POSITIVE_BENIGN` via the bulk-ops mutations in `unified_alerts` so the alert exits the active SOC queue and is tagged as synthetic.
 
 **Multi-indicator alert constraints** (empirically confirmed on
-`usea1-purple` 2026-04-22):
+`your-tenant` 2026-04-22):
 
 - **One alert per `POST /v1/alerts` call.** The wire format accepts
   concatenated JSON for N alerts in one body and the gateway returns
@@ -510,7 +510,7 @@ uam_iface.post_alert_with_indicators(
   consumers should assert on `metadata.uid` presence, not on flattened
   `observables[N].name` fields, in batch mode.
 
-**Tested on `usea1-purple` 2026-04-22:**
+**Tested on `your-tenant` 2026-04-22:**
 
 - `tests/test_uam_alert_interface_single.py` -- CONFIRMED WORKING end-to-end. 1 indicator + 1 alert, indicator stitches inside 30s, cleanup verified.
 - `tests/test_uam_alert_interface_batch.py` -- CONFIRMED WORKING end-to-end. 3 indicators batched into one POST, alert with 3 related_events surfaces in UAM, all 3 indicators stitch into `alert.rawIndicators` within 2-5s, cleanup verified. Per-observable name assertion treated as informational due to GraphQL server-side rendering quirk noted above.
@@ -567,7 +567,7 @@ CLI: `python scripts/inspect_source.py --source "<name>" --window 24h`.
 
 Key points:
 - Uses the LRQ `LOG` queryType (not PowerQuery). PQ has no wildcard column projection; `| columns *` errors and `| limit N` only returns `timestamp + message`. `LOG` returns every flat attribute the parser emits under `matches[].values`, which is how the Event Search UI populates its "Event properties" panel.
-- Sync SDL `/sdl/api/query` is ~30% faster than async LRQ on usea1-purple. The dispatcher prefers it and falls back to LRQ LOG on HTTP 404/401/403. Force a backend with `backend="sdl"` or `backend="lrq"` if benchmarking.
+- Sync SDL `/sdl/api/query` is ~30% faster than async LRQ on your-tenant. The dispatcher prefers it and falls back to LRQ LOG on HTTP 404/401/403. Force a backend with `backend="sdl"` or `backend="lrq"` if benchmarking.
 - Escalating window (1h -> 4h -> 24h -> requested) keeps busy sources ~3s. Only sparse sources (audit, low-volume demos) pay the full widening cost. Override with `escalate=False` for a single-rung run at `hours=`.
 - Each field is classified: `principal_user` / `principal_host` / `principal_ip` / `action` / `temporal` / `network` / `file` / `process` / `grouping_candidate` / `other`. `pick_keys(schema)` returns `(prim_key, action_key)` picked from whatever is populated, preferring `user > hostname > IP`, then shortest name, then exact-name action hits (`action`, `event.type`, `outcome`, `result`, `severity`, ...) in that priority.
 - `extra_filter` is passed through verbatim and appended to the base `dataSource.name='...'` filter.
@@ -582,7 +582,7 @@ extra_filter="(tag != 'logVolume' OR !(tag = *))"
 
 The `OR !(tag = *)` half keeps sources that don't emit `tag` at all (rather than excluding them as null). `build_source_report.py` always passes this filter. Do the same in any new caller.
 
-### Benchmarked results (5 sources, usea1-purple, 24h ceiling)
+### Benchmarked results (5 sources, your-tenant, 24h ceiling)
 
 | Source | Wall | Effective | n sampled | attrs | prim_key | action_key |
 |---|---|---|---|---|---|---|

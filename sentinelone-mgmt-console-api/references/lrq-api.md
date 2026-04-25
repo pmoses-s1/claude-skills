@@ -10,7 +10,7 @@ GET    https://<console>.sentinelone.net/sdl/v2/api/queries/{id}?lastStepSeen=N
 DELETE https://<console>.sentinelone.net/sdl/v2/api/queries/{id}
 ```
 
-The console host is tenant-specific (for example `usea1-purple.sentinelone.net`), not a centralized URL. Do not point at `xdr.us1.sentinelone.net` - that was the V1 SDL endpoint.
+The console host is tenant-specific (for example `your-tenant.sentinelone.net`), not a centralized URL. Do not point at `xdr.us1.sentinelone.net` - that was the V1 SDL endpoint.
 
 ## Auth: Bearer, not ApiToken
 
@@ -115,7 +115,7 @@ or equivalently:
 i.scheme="edr"
 ```
 
-Without this, an `event.type=*` aggregate on `usea1-purple` over 30 days returned `matchCount=0` until the filter was added; with it, 574M events across 50 types.
+Without this, an `event.type=*` aggregate on `your-tenant` over 30 days returned `matchCount=0` until the filter was added; with it, 574M events across 50 types.
 
 ## PQ functions that fail on the LRQ engine
 
@@ -132,7 +132,7 @@ For long windows, split the time range into slices and run them in parallel, the
 
 **Slice sizing.** Each slice costs launch + N polls + cancel against your rate budget. Fewer, larger slices beats many small ones when you are rate-capped. Once you are runtime-capped, medium slices (2-3 days) win because they parallelize cleanly without each one becoming a long tail.
 
-### Measured on `usea1-purple`
+### Measured on `your-tenant`
 
 Query: `dataSource.name='SentinelOne' dataSource.category='security' event.type=* | group ct=count(), first_seen=min(timestamp), last_seen=max(timestamp) by event.type | sort -ct | limit 50`. 30-day window, 574M events aggregated.
 

@@ -121,7 +121,7 @@ DELETE https://<console>.sentinelone.net/sdl/v2/api/queries/{id}     -> cancel w
 
 **Query expires 30s after launch or 30s after the last poll.** Poll every 1-2s; don't let the deadline slip.
 
-**Sizing & parallelism.** Two bottlenecks stack: per-user rate cap first, then slowest-slice server runtime. Measured on `usea1-purple` for a 30d count-by-event.type over 574M events:
+**Sizing & parallelism.** Two bottlenecks stack: per-user rate cap first, then slowest-slice server runtime. Measured on `your-tenant` for a 30d count-by-event.type over 574M events:
 
 - **1 token, 2.5 rps:** 30d serial 166s | 30x1d pool=3 87s | 6x5d pool=3 **66s** (best 1-token)
 - **2 tokens, ~5 rps combined, round-robin:** 30x1d pool=6 35s | 15x2d pool=6 **29s** | 10x3d pool=6 **29s** (best 2-token)
@@ -141,7 +141,7 @@ from sentinelone_sdl_lrq import LRQClient, run_lrq_pq, parallel_run_roundrobin, 
 
 s1 = S1Client()                                # same client the mgmt skill uses
 jwt = s1.api_token                              # raw JWT - no prefix
-base = s1.base_url                              # e.g. https://usea1-purple.sentinelone.net
+base = s1.base_url                              # e.g. https://your-tenant.sentinelone.net
 lrq = LRQClient(base, jwt, label="fallback", rps=2.5)
 result = run_lrq_pq(lrq, query, start_iso, end_iso)   # launches, polls 1s, cancels
 ```
