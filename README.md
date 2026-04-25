@@ -23,6 +23,107 @@ The plugin bundles every skill in this repo — installing the plugin is suffici
 | sentinelone-sdl-log-parser | Author and validate SDL log parsers for any log format, with OCSF field mapping by default |
 | sentinelone-hyperautomation | Design and generate Hyperautomation workflow JSON, with optional live console import |
 
+## PrincipalSOCAnalyst Project
+
+`CLAUDE.md` at the root of this repo transforms Claude into a **Principal SOC Analyst** — a structured investigator that runs the same enrichment, correlation, and reasoning process a senior analyst would, on every alert, every time. Set it up once as a named Cowork project and every session starts fully briefed.
+
+### What it delivers
+
+| Outcome | How |
+|---------|-----|
+| **Reduce L1 SOC workload by 70%+** | Automated triage, mandatory VirusTotal enrichment, and verdict generation eliminate repetitive alert investigation. L1 analysts focus on exceptions, not routine. |
+| **Elevate every analyst to principal grade** | Junior analysts get the same structured investigation framework, enrichment depth, and analytical reasoning that only senior staff possess today. |
+| **External threat intelligence on every IOC** | Mandatory VirusTotal enrichment on every IP, domain, hash, and URL — 70+ AV engines, threat actor attribution, and full infrastructure mapping on every finding. |
+| **Mean investigation time under 5 minutes** | Investigation workflows that take 45–60 minutes manually compress to under 5 minutes. Continuous hunting catches threats between analyst shifts. |
+| **Full data estate coverage** | Queries OCSF-normalised logs, non-OCSF vendor logs, and raw syslog. Discovers field schemas dynamically at session start — no hardcoded assumptions about what sources are present. |
+| **Fast-track detection creation** | Natural language detection authoring across any data source. Recommends new STAR rules and custom detections as threats are identified during investigation. |
+| **Deliver the capability today** | Complex natural language security questions that don't reliably work in Purple AI alone work consistently when orchestrated through this architecture. |
+| **Federated search across the data estate** | Search, correlate, and hunt across endpoint, network, identity, and cloud log sources via MCP/API in a single session. Cross-source correlation connects signals that are invisible in any one source. |
+
+**Key metrics:** `< 5 min` mean investigation time · `100%` IOC enrichment coverage · `Real-time` MITRE ATT&CK mapping · `70%+` L1 capacity freed
+
+---
+
+### Setting up the PrincipalSOCAnalyst project in Cowork
+
+**Prerequisites:** `sentinelone-skills` plugin installed · credentials configured (see [Configuration](#configuration))
+
+**Step 1 — Create the project**
+
+1. Open Cowork and click **New Project**
+2. Name it **PrincipalSOCAnalyst**
+3. Click **Select Folder** and choose this `claude-skills` folder (which contains `CLAUDE.md`)
+4. Click **Create**
+
+**Step 2 — Verify the plugin is active**
+
+Go to **Settings → Capabilities → Plugin** and confirm `sentinelone-skills` is listed. If not, upload the `.plugin` file from `sentinelone-skills-plugin/dist/`.
+
+**Step 3 — Start a session**
+
+Open the **PrincipalSOCAnalyst** project and start a new chat. Claude reads `CLAUDE.md` automatically and immediately runs:
+- Data source enumeration — discovers every log source present in your SDL
+- Alert triage — pulls open alerts in parallel while enumeration runs
+
+From this point the session operates as a Principal SOC Analyst for its full duration.
+
+> **Tip:** Keep a `reports/` subfolder inside your project folder. When Claude generates a SOC report, save it there so it persists across sessions.
+
+---
+
+### How to activate it in other environments
+
+**Claude Code (terminal)**
+```bash
+cd ~/path/to/claude-skills   # any folder containing CLAUDE.md
+claude                        # CLAUDE.md is read automatically on startup
+```
+
+**Any Claude session**
+
+Copy the contents of `CLAUDE.md` into **Settings → Custom Instructions** (or equivalent system prompt field) of any Claude session that has the plugin installed.
+
+---
+
+### What happens in a session
+
+**Session initialisation (automatic, every session)**
+1. Enumerates all live `dataSource.name` values in SDL — confirms which log sources are actually present and queryable
+2. Runs alert triage in parallel — pulls open/critical alerts while enumeration executes
+3. For any non-OCSF source discovered, runs schema discovery before writing any query
+
+**Investigation workflow**
+- Triage and context gathering — alert details, analyst notes, MDR verdicts, asset criticality
+- VirusTotal enrichment — every IP, domain, hash, and URL enriched before any verdict; no finding classified CRITICAL without independent TI confirmation
+- Infrastructure pivoting — C2 infrastructure, threat actor attribution, SSL certificate reuse, sibling domains, dropped payloads, execution chain reconstruction
+- Cross-source correlation — IOC found in any source is immediately hunted across all other connected sources
+- Anomaly analysis — every query result checked for frequency, timing, geolocation, baseline, volume, new entity, privilege, and chain anomalies
+- MITRE ATT&CK mapping — every finding mapped to tactic and technique; kill chain gaps identified
+- Composite risk scoring — cross-source anomaly scores determine escalation priority
+
+**Report generation**
+
+At the end of any significant investigation, ask Claude to produce a SOC report. It generates a structured `.docx` file containing: executive summary, incident timeline, affected assets, full IOC table with VT verdicts, threat actor profile, MITRE ATT&CK mapping, root cause analysis, VirusTotal intelligence summary, actions taken, and recommendations.
+
+**Example session starters**
+```
+Start a new investigation session
+```
+```
+Triage today's open alerts and flag anything requiring immediate action
+```
+```
+Investigate alert ID <id> — full enrichment, verdict, and recommended response
+```
+```
+Hunt for lateral movement across all connected sources in the last 24 hours
+```
+```
+Write a SOC Leader report for this investigation as a Word document
+```
+
+---
+
 ## What you can do
 
 These skills turn Claude into a hands-on SentinelOne analyst and engineer. Once the plugin is installed and credentials are configured, you can talk to your tenant in plain English — Claude handles the API calls, query writing, and JSON authoring and explains what it found or built.
@@ -85,6 +186,27 @@ These are real questions you can ask. Claude will pick the right skill automatic
 - *"Ingest this JSON array of events into SDL with the source name `custom-app`"*
 - *"Run this PowerQuery against my tenant and return the results as a table: `<query>`"*
 - *"Download the current version of my `/logParsers/fortinet-fortigate` parser"*
+
+### SOC investigation and triage (SOC Analyst Mode)
+
+- *"Start a new investigation session — enumerate live data sources and pull today's open alerts"*
+- *"Triage alert ID `abc123` — get the full details, check notes and history, enrich any IOCs in VirusTotal, and give me a verdict"*
+- *"Enrich this file hash `aabbccdd...` — detection ratio, behavioral analysis, C2 infrastructure, and threat actor attribution"*
+- *"Pivot on IP `1.2.3.4` — what malware communicates with it, what domains resolve to it, and is it associated with any APT group?"*
+- *"A suspicious domain `evil-update.com` appeared in DNS logs — do a full domain report including subdomains, sibling domains, SSL certificate history, and threat actor links"*
+- *"Cross-correlate this IOC across all connected data sources — check firewall, Okta, Zeek, and CloudTrail for any trace of `1.2.3.4`"*
+- *"Check endpoint `DESKTOP-XYZ` for anomalies — run the full anomaly checklist across process, network, and identity data"*
+- *"Apply the MITRE ATT&CK framework to what we've found so far — what techniques are mapped and where are the detection gaps?"*
+- *"Score the current investigation using the cross-source anomaly framework and tell me if we should escalate to IR"*
+
+### Reporting
+
+- *"Write a SOC Leader report for this investigation as a Word document — executive summary, incident timeline, IOC table with VT verdicts, MITRE mapping, root cause, and recommendations"*
+- *"Generate a weekly threat summary for SOC leadership covering alerts triaged, true positives confirmed, top IOCs, and any active campaigns"*
+- *"Produce an IOC table for all indicators found in the last 24 hours, including VirusTotal verdict, detection ratio, and threat actor attribution"*
+- *"Write up the root cause analysis for the PowerShell alert on `HOST-001` — trace the execution chain and map it to the kill chain"*
+- *"Give me an executive-level summary of the firewall beaconing pattern we found — one paragraph, business risk focus, no jargon"*
+- *"Create a threat actor profile for the group attributed in the last investigation, including TTPs, typical targets, and known tooling"*
 
 ### Hyperautomation workflows
 
