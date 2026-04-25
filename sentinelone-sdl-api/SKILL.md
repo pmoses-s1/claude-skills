@@ -28,18 +28,24 @@ The query methods on this skill (`query`, `powerQuery`, `facetQuery`, `timeserie
 
 ## Setup — configure credentials first
 
-Credentials are loaded from `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`. Add only the keys you need:
+Drop a file at `$COWORK_WORKSPACE/.sentinelone/credentials.json` (or any folder Cowork has access to under `.sentinelone/credentials.json`) with the keys you need:
 
 ```json
 {
-  "SDL_BASE_URL":          "https://xdr.us1.sentinelone.net",
-  "SDL_CONSOLE_API_TOKEN": "eyJ...your-token...",
-  "SDL_LOG_WRITE_KEY":     "0Z1Fy0...",
-  "SDL_CONFIG_WRITE_KEY":  "0mXas6PD1Zvg..."
+  "SDL_XDR_URL":          "https://xdr.us1.sentinelone.net",
+  "S1_CONSOLE_API_TOKEN": "eyJ...your-token...",
+  "SDL_LOG_WRITE_KEY":    "0Z1Fy0...",
+  "SDL_CONFIG_WRITE_KEY": "0mXas6PD1Zvg..."
 }
 ```
 
-Each key type unlocks a specific set of methods (matrix below). The client picks the right key per method automatically — callers never hand-pick a token.
+The plugin's SessionStart hook auto-copies the file to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of every session, so the SDL client picks it up with no preflight. To trigger a manual refresh:
+
+```bash
+bash scripts/bootstrap_creds.sh   # idempotent, returns the destination path
+```
+
+Each key type unlocks a specific set of methods (matrix below). The client picks the right key per method automatically; callers never hand-pick a token.
 
 | Key | Methods unlocked |
 |-----|-----------------|
@@ -47,11 +53,11 @@ Each key type unlocks a specific set of methods (matrix below). The client picks
 | Log Read Access         | `query`, `numericQuery`, `facetQuery`, `timeseriesQuery`, `powerQuery` |
 | Configuration Read      | All Log Read methods, plus `getFile`, `listFiles` |
 | Configuration Write     | All of the above, plus `putFile` |
-| Console User API token  | All query + config methods (NOT `uploadLogs`); set `SDL_S1_SCOPE` if multi-site/account |
+| `S1_CONSOLE_API_TOKEN` (mgmt-console JWT)  | All query + config methods (NOT `uploadLogs`); set `SDL_S1_SCOPE` if multi-site/account. Same JWT used by `S1Client`. (Legacy alias `SDL_CONSOLE_API_TOKEN` still recognised.) |
 
-Environment variables (`SDL_BASE_URL`, `SDL_LOG_WRITE_KEY`, etc.) override the credentials file if set.
+Environment variables (`SDL_XDR_URL`, `S1_CONSOLE_API_TOKEN`, `SDL_LOG_WRITE_KEY`, etc.) still override the credentials file if set. Legacy paths (`~/.config/sentinelone/credentials.json`, `~/.claude/sentinelone/credentials.json`, `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`) are read as fallbacks.
 
-Before running anything, confirm `SDL_BASE_URL` is set and at least one key for the operation chain is present. If not, stop and ask the user to update `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`.
+Before running anything, confirm `SDL_XDR_URL` is set and at least one key for the operation chain is present. If not, stop and ask the user to drop `credentials.json` into a folder Cowork can access.
 
 ## Workflow
 
@@ -64,7 +70,8 @@ When the user asks for something involving the SDL API:
 
 ## Files in this skill
 
-- `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` — credentials (set `SDL_BASE_URL` and the keys you need; see Setup above).
+- `$COWORK_WORKSPACE/.sentinelone/credentials.json` — credentials (set `SDL_XDR_URL` and the keys you need; see Setup above). Auto-copied to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox by the plugin's SessionStart hook.
+- `scripts/bootstrap_creds.sh` — idempotent helper that copies workspace creds into the sandbox-local path. Wired to the plugin's SessionStart hook; safe to re-run manually.
 - `scripts/sdl_client.py` — importable Python client (`SDLClient`). Picks the right key per method, retries with exponential backoff, exposes ergonomic method names.
 - `scripts/sdl_cli.py` — CLI runner: `python scripts/sdl_cli.py power-query "dataset='accesslog' | group count() by status" --start 1h`.
 - `references/methods.md` — single per-method reference (parameters, defaults, response shape, gotchas) for all 10 SDL endpoints.

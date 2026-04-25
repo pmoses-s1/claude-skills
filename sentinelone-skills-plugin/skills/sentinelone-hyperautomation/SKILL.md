@@ -48,28 +48,38 @@ Self-check against `references/validation-rules.md` before presenting the workfl
 ### Step 5 — API submission (optional)
 If the user wants to submit to a live console, read `references/api-integration.md`.
 
-**Credentials**: Before making any API call, resolve `S1_BASE_URL` and `S1_API_TOKEN` using
-this priority order (highest wins):
+**Credentials**: The plugin's SessionStart hook auto-copies credentials from any
+Cowork-accessible folder (preferring `$COWORK_WORKSPACE/.sentinelone/credentials.json`)
+to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of
+every session. Read from there. If the file is missing, ask the user to drop a
+`credentials.json` into a folder Cowork can access.
 
-1. Environment variables `S1_BASE_URL` / `S1_API_TOKEN` (highest priority)
-2. `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` — shared plugin credentials file
-3. Ask the user to provide their console URL and personal Console User API token
+Resolution priority (highest wins):
 
-The canonical credentials file is at `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`
-(Mac path: `<your-project>/.claude/sentinelone/credentials.json`). This file is shared
-across all skills in the plugin — you only need to create it once.
+1. Environment variables `S1_CONSOLE_URL` / `S1_CONSOLE_API_TOKEN`
+2. `$HOME/.claude/sentinelone/credentials.json` (sandbox-local; populated by the SessionStart hook)
+3. Other layered fallbacks: `$COWORK_WORKSPACE/.sentinelone/credentials.json` direct,
+   `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`, `~/.config/sentinelone/credentials.json`
+4. Ask the user to provide their console URL and personal Console User API token
 
 To read credentials in Python:
 ```python
 import json, os
 from pathlib import Path
-_claude_dir = os.environ.get("CLAUDE_CONFIG_DIR", "")
-_plugin_creds_path = Path(_claude_dir) / "sentinelone" / "credentials.json" if _claude_dir else None
 _creds = {}
-if _plugin_creds_path and _plugin_creds_path.exists():
-    _creds = json.loads(_plugin_creds_path.read_text())
-S1_BASE_URL  = os.environ.get("S1_BASE_URL")  or _creds.get("S1_BASE_URL")  or None
-S1_API_TOKEN = os.environ.get("S1_API_TOKEN") or _creds.get("S1_API_TOKEN") or None
+for candidate in (
+    Path.home() / ".claude" / "sentinelone" / "credentials.json",
+    Path(os.environ.get("COWORK_WORKSPACE", "")) / ".sentinelone" / "credentials.json"
+        if os.environ.get("COWORK_WORKSPACE") else None,
+    Path(os.environ.get("CLAUDE_CONFIG_DIR", "")) / "sentinelone" / "credentials.json"
+        if os.environ.get("CLAUDE_CONFIG_DIR") else None,
+    Path.home() / ".config" / "sentinelone" / "credentials.json",
+):
+    if candidate and candidate.is_file():
+        _creds = json.loads(candidate.read_text())
+        break
+S1_CONSOLE_URL  = os.environ.get("S1_CONSOLE_URL")  or _creds.get("S1_CONSOLE_URL")  or None
+S1_CONSOLE_API_TOKEN = os.environ.get("S1_CONSOLE_API_TOKEN") or _creds.get("S1_CONSOLE_API_TOKEN") or None
 ```
 
 Once resolved, validate them using the two-step test in `references/api-integration.md`

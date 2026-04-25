@@ -18,12 +18,12 @@ In Cowork/Claude Code, the path is:
 
 ## Configure
 
-The SDL API has four scoped key types plus (optionally) a console user API token. Add only the keys you need to `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` (in Cowork; falls back to `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` in terminal) (see [`credentials.example.json`](../credentials.example.json) for all available keys):
+The SDL API has four scoped key types plus (optionally) the same management-console API token used by `sentinelone-mgmt-console-api` (`S1_CONSOLE_API_TOKEN`). Drop a `credentials.json` into a folder Cowork has access to (recommended: `$COWORK_WORKSPACE/.sentinelone/credentials.json`) with the keys you need (see [`credentials.example.json`](../credentials.example.json) for all available keys). The plugin's SessionStart hook auto-copies it to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of every session, or run `bash scripts/bootstrap_creds.sh` to refresh manually:
 
 ```json
 {
-  "SDL_BASE_URL":          "https://xdr.us1.sentinelone.net",
-  "SDL_CONSOLE_API_TOKEN": "eyJ...your-token...",
+  "SDL_XDR_URL":          "https://xdr.us1.sentinelone.net",
+  "S1_CONSOLE_API_TOKEN":          "eyJ...your-token...",
   "SDL_LOG_WRITE_KEY":     "0Z1Fy0...",
   "SDL_LOG_READ_KEY":      "0tzj/CPYT...",
   "SDL_CONFIG_READ_KEY":   "0MQTxgj...",
@@ -45,8 +45,8 @@ Generate SDL keys in SDL Console → your-user menu → **API Keys**. Scope-spec
 
 - **`base_url`** — always required.
 - **SDL keys** — fill in only the ones that match what you want the skill to do. Ingesting? `log_write_key`. Running queries? `log_read_key`. Reading parsers/dashboards? `config_read_key`. Editing/deleting them? `config_write_key`. If you only ever need to query, you can skip the other three.
-- **`console_api_token`** — optional alternative to SDL keys. SentinelOne Console user API tokens (same tokens `sentinelone-mgmt-console-api` uses) work for every SDL method **except** `uploadLogs`. Useful if you already have a console token and don't want to generate a second set of keys. Leave blank if you're using the scoped SDL keys.
-- **`s1_scope`** — only relevant when `console_api_token` is set **and** that user has access to multiple sites or accounts. Format: `<accountId>:<siteId>` for site scope, `<accountId>` for account scope. Ignored when SDL keys are used.
+- **`S1_CONSOLE_API_TOKEN`**: optional alternative to SDL keys. The same management-console JWT used by `sentinelone-mgmt-console-api` works for every SDL method **except** `uploadLogs`. Useful if you already have a console token and don't want to generate a second set of keys. Leave blank if you're using the scoped SDL keys. (Legacy alias `SDL_CONSOLE_API_TOKEN` is still recognised but emits a deprecation warning.)
+- **`SDL_S1_SCOPE`**: only relevant when `S1_CONSOLE_API_TOKEN` is set **and** that user has access to multiple sites or accounts. Format: `<accountId>:<siteId>` for site scope, `<accountId>` for account scope. Ignored when SDL keys are used.
 
 The client picks the narrowest matching key per method (principle of least privilege). If you fill in all 4 SDL keys, each config field maps to one method group:
 
@@ -59,7 +59,7 @@ The client picks the narrowest matching key per method (principle of least privi
 
 `console_api_token` is only used as a fallback for any of the above (except `uploadLogs`) when the matching SDL key is blank.
 
-Environment variables (`SDL_BASE_URL`, `SDL_LOG_WRITE_KEY`, etc.) override the credentials file if set.
+Environment variables (`SDL_XDR_URL`, `SDL_LOG_WRITE_KEY`, etc.) override the credentials file if set. Legacy paths (`~/.config/sentinelone/credentials.json`, `~/.claude/sentinelone/credentials.json`, `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`) are read as fallbacks.
 
 ## Quick test
 
@@ -128,7 +128,8 @@ The client picks the right key per method automatically, retries on 429/5xx/`err
 ## Layout
 
 - `SKILL.md` — instructions Claude reads when the skill triggers
-- `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` — credentials (set `SDL_BASE_URL` and the keys you need)
+- `$COWORK_WORKSPACE/.sentinelone/credentials.json` — credentials (set `SDL_XDR_URL` and the keys you need); auto-copied to the sandbox by the plugin's SessionStart hook
+- `scripts/bootstrap_creds.sh` — idempotent helper to copy workspace creds into the sandbox-local path
 - `scripts/sdl_client.py` — `SDLClient` (auto key selection across 4 scoped keys + console token, `Bearer` auth, retries, `iter_query` pagination)
 - `scripts/sdl_cli.py` — shell CLI covering every method
 - `references/methods.md` — per-method reference (params, defaults, response shape, gotchas)

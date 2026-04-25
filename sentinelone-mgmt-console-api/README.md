@@ -18,18 +18,23 @@ In Cowork/Claude Code, the path is:
 
 ## Configure
 
-Create `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` with your tenant details (in Cowork, `CLAUDE_CONFIG_DIR` is set automatically; outside Cowork it falls back to `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`) (see [`../credentials.example.json`](../credentials.example.json) for all available keys):
+Drop a file at `$COWORK_WORKSPACE/.sentinelone/credentials.json` (or any folder Cowork has access to under `.sentinelone/credentials.json`) with your tenant details (see [`../credentials.example.json`](../credentials.example.json) for all available keys):
 
 ```json
 {
-  "S1_BASE_URL": "https://usea1-acme.sentinelone.net",
-  "S1_API_TOKEN": "eyJ...your-api-token..."
+  "S1_CONSOLE_URL": "https://usea1-acme.sentinelone.net",
+  "S1_CONSOLE_API_TOKEN": "eyJ...your-api-token...",
+  "S1_HEC_INGEST_URL": "https://ingest.us1.sentinelone.net"
 }
 ```
 
+The plugin's SessionStart hook auto-copies the file to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of every session, so the client picks it up with no preflight. To trigger a manual refresh: `bash scripts/bootstrap_creds.sh`.
+
 Create the API token in the S1 console → Settings → Users → Service Users → Generate API Token. Scope it to the minimum permissions needed.
 
-Environment variables (`S1_BASE_URL`, `S1_API_TOKEN`) override the file if set.
+`S1_HEC_INGEST_URL` is the SentinelOne HEC ingest host, used by the UAM Alert Interface for OCSF alert/indicator ingest (and for log ingest via HEC). It is region-specific; look up your region's URL in [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961). Only required if you push alerts/indicators into UAM via `UAMAlertInterfaceClient`; the read-side UAM GraphQL works without it.
+
+Environment variables (`S1_CONSOLE_URL`, `S1_CONSOLE_API_TOKEN`, `S1_HEC_INGEST_URL`) override the file if set. Legacy paths (`~/.config/sentinelone/credentials.json`, `~/.claude/sentinelone/credentials.json`, `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`) are read as fallbacks.
 
 ## Quick test
 
@@ -77,7 +82,8 @@ Purple AI answers questions about SDL telemetry (process/network/file events, in
 ## Layout
 
 - `SKILL.md` — instructions Claude reads when the skill triggers
-- `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` — credentials (set `S1_BASE_URL` and `S1_API_TOKEN`)
+- `$COWORK_WORKSPACE/.sentinelone/credentials.json` — credentials (set `S1_CONSOLE_URL` and `S1_CONSOLE_API_TOKEN`); auto-copied to the sandbox by the plugin's SessionStart hook
+- `scripts/bootstrap_creds.sh` — idempotent helper to copy workspace creds into the sandbox-local path
 - `scripts/s1_client.py` — REST client (auth, pooled HTTP, retries, cursor pagination, parallel `get_many()`, optional cache)
 - `scripts/call_endpoint.py` — REST CLI wrapper
 - `scripts/search_endpoints.py` — ranked keyword search over the endpoint index (verb-aware, `--only-works` filter)

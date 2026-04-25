@@ -40,12 +40,12 @@ are assigned to more than one account simultaneously — with
 `HTTP 403 code 4030010 "This page doesn't support multi-scopes users
 yet"`. Confirmed today (2026-04-22) on `/web/api/v2.1/threat-intelligence/iocs`.
 
-Add two optional token fields to `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`:
+Add two optional token fields to your `credentials.json` (recommended path: `$COWORK_WORKSPACE/.sentinelone/credentials.json`):
 
 ```json
 {
-  "S1_API_TOKEN": "<multi-scope or single-scope>",
-  "S1_API_TOKEN_SINGLE_SCOPE": "<single-account-pinned>"
+  "S1_CONSOLE_API_TOKEN": "<multi-scope or single-scope>",
+  "S1_CONSOLE_API_TOKEN_SINGLE_SCOPE": "<single-account-pinned>"
 }
 ```
 
@@ -308,11 +308,11 @@ and `IngestionGatewayClient`) are still exported as deprecation shims.
 public API, but the cleanup step marks it TRUE_POSITIVE_BENIGN / RESOLVED
 and names it `smoke-<timestamp>-<uuid> alert`, so it is clearly tagged as
 synthetic and exits the active analyst workload. Use `--keep` to leave
-it in NEW for UI inspection. Override the host with `--uam-url` (legacy
-alias `--igw-url`), the `S1_UAM_ALERT_INTERFACE_URL` env var (legacy
-`S1_IGW_URL`), or by setting `uam_alert_interface_url` in `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`
-(legacy key `ingestion_gateway_url`). Default is
-`https://ingest.us1.sentinelone.net`.
+it in NEW for UI inspection. Configure the host via `--uam-url` (legacy
+alias `--igw-url`), the `S1_HEC_INGEST_URL` env var, or the
+`S1_HEC_INGEST_URL` key in `credentials.json` (former canonical
+`S1_UAM_ALERT_INTERFACE_URL` and legacy snake_case `uam_alert_interface_url`
+both still honored). Default is `https://ingest.us1.sentinelone.net`.
 
 ---
 

@@ -1,26 +1,40 @@
 """
 SentinelOne Singularity Data Lake (SDL) API client.
 
-The SDL API has four scoped key types plus console user API tokens. Each
-method below picks the correct key automatically; callers do not need to
-worry about which token to send.
+The SDL API has four scoped key types plus the management-console user
+API token. Each method below picks the correct key automatically;
+callers do not need to worry about which token to send.
 
-Credential resolution order (highest wins):
+Credential resolution order (highest wins, applied last):
   1. Environment variables
-  2. $CLAUDE_CONFIG_DIR/sentinelone/credentials.json  (Cowork session)
-  3. ~/.claude/sentinelone/credentials.json           (persistent Mac path)
-  4. ~/.config/sentinelone/credentials.json           (terminal fallback)
-  5. <skill>/config.json                              (last resort)
+  2. $COWORK_WORKSPACE/.sentinelone/credentials.json   (recommended for Cowork:
+     set $COWORK_WORKSPACE to your project folder, drop credentials.json there)
+  3. Auto-discovered <workspace>/.sentinelone/credentials.json
+     (cwd walk-up, then scan ~/mnt/* for any Cowork-accessible folder
+     containing .sentinelone/credentials.json. Legacy
+     .claude/sentinelone/credentials.json layout also accepted.)
+  4. $CLAUDE_CONFIG_DIR/sentinelone/credentials.json  (Cowork session)
+  5. ~/.claude/sentinelone/credentials.json           (persistent host path)
+  6. ~/.config/sentinelone/credentials.json           (legacy terminal fallback)
+  7. <skill>/config.json                              (last resort)
 
-Full key list:
-  SDL_BASE_URL            -> base_url  (e.g. https://xdr.us1.sentinelone.net)
-  SDL_LOG_WRITE_KEY       -> log_write_key     (uploadLogs, addEvents)
-  SDL_LOG_READ_KEY        -> log_read_key      (query/numeric/facet/timeseries/powerQuery)
-  SDL_CONFIG_READ_KEY     -> config_read_key   (listFiles, getFile)
-  SDL_CONFIG_WRITE_KEY    -> config_write_key  (putFile and everything above)
-  SDL_CONSOLE_API_TOKEN   -> console_api_token (works for query methods; NOT uploadLogs)
-  SDL_S1_SCOPE            -> s1_scope          (required with console token when multi-site/account)
-  SDL_VERIFY_TLS          -> verify_tls        (default true)
+Canonical keys:
+  SDL_XDR_URL            -> base_url  (e.g. https://xdr.us1.sentinelone.net)
+  SDL_LOG_WRITE_KEY      -> log_write_key     (uploadLogs, addEvents)
+  SDL_LOG_READ_KEY       -> log_read_key      (query/numeric/facet/timeseries/powerQuery)
+  SDL_CONFIG_READ_KEY    -> config_read_key   (listFiles, getFile)
+  SDL_CONFIG_WRITE_KEY   -> config_write_key  (putFile and everything above)
+  S1_CONSOLE_API_TOKEN   -> console_api_token (mgmt-console JWT; works for
+                                               SDL query and config methods,
+                                               NOT uploadLogs. Same JWT used
+                                               by S1Client.)
+  SDL_S1_SCOPE           -> s1_scope          (required with console token when multi-site/account)
+  SDL_VERIFY_TLS         -> verify_tls        (default true)
+
+Deprecated aliases (still read but logged once):
+  SDL_BASE_URL           -> SDL_XDR_URL  (former canonical)
+  S1_API_TOKEN           -> S1_CONSOLE_API_TOKEN  (former canonical)
+  SDL_CONSOLE_API_TOKEN  -> S1_CONSOLE_API_TOKEN  (legacy duplicate, same JWT)
 
 Usage:
     from sdl_client import SDLClient
@@ -59,14 +73,89 @@ import requests
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = SKILL_DIR / "config.json"
+# Legacy terminal fallback; kept for backward compat.
 HOME_CREDS_PATH = Path.home() / ".config" / "sentinelone" / "credentials.json"
-# ~/.claude/sentinelone/credentials.json — persistent Mac path, editable from
-# outside the sandbox without knowing CLAUDE_CONFIG_DIR.
+# Recommended persistent Mac path; aligns with $CLAUDE_CONFIG_DIR conventions
+# and is editable from outside the sandbox without knowing CLAUDE_CONFIG_DIR.
 DOTCLAUDE_CREDS_PATH = Path.home() / ".claude" / "sentinelone" / "credentials.json"
-# Shared plugin credentials — set by Cowork at session start.
+# Cowork session creds (shared across plugins) when CLAUDE_CONFIG_DIR is set.
 _CLAUDE_CONFIG_DIR = os.environ.get("CLAUDE_CONFIG_DIR", "")
 PLUGIN_CREDS_PATH = (Path(_CLAUDE_CONFIG_DIR) / "sentinelone" / "credentials.json"
                      if _CLAUDE_CONFIG_DIR else None)
+
+
+# Workspace creds layout: prefer .sentinelone/credentials.json. The legacy
+# .claude/sentinelone/credentials.json layout is also accepted so existing
+# setups keep working.
+_WORKSPACE_CREDS_RELS = (
+    Path(".sentinelone") / "credentials.json",
+    Path(".claude") / "sentinelone" / "credentials.json",
+)
+# Mount points under $HOME/mnt that are not user workspaces.
+_MNT_SKIP = frozenset({".claude", ".auto-memory", ".remote-plugins", "outputs", "uploads"})
+
+
+def _walk_up_for_workspace_creds() -> Optional[Path]:
+    """Find workspace-scoped credentials inside a Cowork-accessible folder.
+
+    Three-pass search (in priority order):
+
+      1. $COWORK_WORKSPACE env var. If set, look for
+         $COWORK_WORKSPACE/.sentinelone/credentials.json (the recommended
+         explicit convention). Falls through if not found.
+
+      2. Walk up from cwd looking for .sentinelone/credentials.json
+         (or the legacy .claude/sentinelone/credentials.json).
+
+      3. Scan $HOME/mnt/<folder>/ for any Cowork-accessible folder that
+         contains .sentinelone/credentials.json. This is the simple
+         "drop the file in any folder Cowork can see" backup: in a
+         sandbox, the user's project folder is mounted at
+         ~/mnt/<projectname>/ but cwd is often /outputs.
+    """
+    # Pass 1: explicit $COWORK_WORKSPACE override.
+    explicit = os.environ.get("COWORK_WORKSPACE", "").strip()
+    if explicit:
+        explicit_path = Path(explicit)
+        for rel in _WORKSPACE_CREDS_RELS:
+            candidate = explicit_path / rel
+            if candidate.is_file():
+                return candidate
+
+    # Pass 2: cwd walk-up.
+    try:
+        cwd = Path.cwd().resolve()
+    except (OSError, RuntimeError):
+        cwd = None
+    if cwd is not None:
+        for i, parent in enumerate([cwd, *cwd.parents]):
+            if i >= 20:
+                break
+            for rel in _WORKSPACE_CREDS_RELS:
+                candidate = parent / rel
+                if candidate.is_file():
+                    return candidate
+
+    # Pass 3: scan $HOME/mnt for any Cowork-accessible folder.
+    home_mnt = Path.home() / "mnt"
+    if home_mnt.is_dir():
+        try:
+            entries = sorted(home_mnt.iterdir())
+        except OSError:
+            entries = []
+        for entry in entries:
+            if not entry.is_dir() or entry.name in _MNT_SKIP:
+                continue
+            for rel in _WORKSPACE_CREDS_RELS:
+                candidate = entry / rel
+                if candidate.is_file():
+                    return candidate
+    return None
+
+
+# One-time deprecation warning flags.
+_warned_legacy_token = False
+_warned_legacy_url = False
 
 
 class SDLAPIError(RuntimeError):
@@ -76,61 +165,117 @@ class SDLAPIError(RuntimeError):
         self.body = body
 
 
-def _load_config() -> Dict[str, Any]:
-    _env_map = {
-        "SDL_BASE_URL": "base_url",
+def _apply_sdl_keys(creds: Dict[str, Any], cfg: Dict[str, Any], source: str) -> None:
+    """Populate cfg from a creds dict, accepting canonical and legacy keys.
+
+    Token canonical: S1_CONSOLE_API_TOKEN drives console_api_token (same JWT
+    as mgmt console). Aliases: S1_API_TOKEN (former canonical),
+    SDL_CONSOLE_API_TOKEN (legacy duplicate).
+
+    URL canonical: SDL_XDR_URL drives base_url. Alias: SDL_BASE_URL
+    (former canonical).
+    """
+    global _warned_legacy_token, _warned_legacy_url
+    # SDL XDR URL: canonical SDL_XDR_URL; alias SDL_BASE_URL.
+    xdr_url = creds.get("SDL_XDR_URL") or creds.get("SDL_BASE_URL")
+    if xdr_url:
+        cfg["base_url"] = xdr_url
+        if not creds.get("SDL_XDR_URL") and creds.get("SDL_BASE_URL") and not _warned_legacy_url:
+            import warnings as _w
+            _w.warn(
+                f"{source}: SDL_BASE_URL is deprecated, rename to SDL_XDR_URL",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            _warned_legacy_url = True
+    direct_map = {
         "SDL_LOG_WRITE_KEY": "log_write_key",
         "SDL_LOG_READ_KEY": "log_read_key",
         "SDL_CONFIG_READ_KEY": "config_read_key",
         "SDL_CONFIG_WRITE_KEY": "config_write_key",
-        "SDL_CONSOLE_API_TOKEN": "console_api_token",
         "SDL_S1_SCOPE": "s1_scope",
     }
+    for env, field in direct_map.items():
+        if creds.get(env):
+            cfg[field] = creds[env]
+    # Console token: canonical S1_CONSOLE_API_TOKEN; aliases: S1_API_TOKEN
+    # (former canonical), SDL_CONSOLE_API_TOKEN (legacy duplicate of the
+    # same JWT). All three name the same token.
+    token = (
+        creds.get("S1_CONSOLE_API_TOKEN")
+        or creds.get("S1_API_TOKEN")
+        or creds.get("SDL_CONSOLE_API_TOKEN")
+    )
+    if token:
+        cfg["console_api_token"] = token
+        if not creds.get("S1_CONSOLE_API_TOKEN") and not _warned_legacy_token:
+            legacy_name = "S1_API_TOKEN" if creds.get("S1_API_TOKEN") else "SDL_CONSOLE_API_TOKEN"
+            import warnings as _w
+            _w.warn(
+                f"{source}: {legacy_name} is deprecated, rename to S1_CONSOLE_API_TOKEN",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            _warned_legacy_token = True
 
-    # Layer 1: plugin-local config.json (lowest priority, not recommended)
+
+def _load_config() -> Dict[str, Any]:
+    """Resolve credentials across all configured layers.
+
+    Priority (highest wins): env vars > workspace .sentinelone (resolved
+    via $COWORK_WORKSPACE, cwd walk-up, or ~/mnt/* scan; legacy
+    .claude/sentinelone/ accepted) > $CLAUDE_CONFIG_DIR > ~/.claude
+    > ~/.config > skill config.json.
+    """
     cfg: Dict[str, Any] = {}
+
+    # Layer 1: skill-local config.json (last resort).
     if CONFIG_PATH.exists():
         try:
             cfg = json.loads(CONFIG_PATH.read_text())
         except json.JSONDecodeError as e:
             raise RuntimeError(f"config.json is not valid JSON: {e}")
 
-    # Layer 2: ~/.config/sentinelone/credentials.json (terminal fallback)
+    # Layered file lookup, applied lowest-to-highest priority.
+    file_layers: List = []
     if HOME_CREDS_PATH.exists():
-        try:
-            home_creds = json.loads(HOME_CREDS_PATH.read_text())
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"{HOME_CREDS_PATH} is not valid JSON: {e}")
-        for env, field in _env_map.items():
-            if home_creds.get(env):
-                cfg[field] = home_creds[env]
-
-    # Layer 3: ~/.claude/sentinelone/credentials.json
-    # Persistent Mac path — edit directly without knowing CLAUDE_CONFIG_DIR.
+        file_layers.append((HOME_CREDS_PATH, "~/.config/sentinelone/credentials.json"))
     if DOTCLAUDE_CREDS_PATH.exists():
-        try:
-            dotclaude_creds = json.loads(DOTCLAUDE_CREDS_PATH.read_text())
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"{DOTCLAUDE_CREDS_PATH} is not valid JSON: {e}")
-        for env, field in _env_map.items():
-            if dotclaude_creds.get(env):
-                cfg[field] = dotclaude_creds[env]
-
-    # Layer 4: $CLAUDE_CONFIG_DIR/sentinelone/credentials.json (Cowork session)
-    # Overrides all file layers; env vars still win in Layer 5.
+        file_layers.append((DOTCLAUDE_CREDS_PATH, "~/.claude/sentinelone/credentials.json"))
     if PLUGIN_CREDS_PATH and PLUGIN_CREDS_PATH.exists():
-        try:
-            plugin_creds = json.loads(PLUGIN_CREDS_PATH.read_text())
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"{PLUGIN_CREDS_PATH} is not valid JSON: {e}")
-        for env, field in _env_map.items():
-            if plugin_creds.get(env):
-                cfg[field] = plugin_creds[env]
+        file_layers.append((PLUGIN_CREDS_PATH, "$CLAUDE_CONFIG_DIR/sentinelone/credentials.json"))
+    workspace_creds = _walk_up_for_workspace_creds()
+    if workspace_creds is not None:
+        file_layers.append((workspace_creds, str(workspace_creds)))
 
-    # Layer 3: environment variables (highest priority)
-    for env, field in _env_map.items():
+    for path, label in file_layers:
+        try:
+            creds = json.loads(path.read_text())
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"{path} is not valid JSON: {e}")
+        _apply_sdl_keys(creds, cfg, label)
+
+    # Highest priority: environment variables.
+    env_xdr_url = os.environ.get("SDL_XDR_URL") or os.environ.get("SDL_BASE_URL")
+    if env_xdr_url:
+        cfg["base_url"] = env_xdr_url
+    direct_env = {
+        "SDL_LOG_WRITE_KEY": "log_write_key",
+        "SDL_LOG_READ_KEY": "log_read_key",
+        "SDL_CONFIG_READ_KEY": "config_read_key",
+        "SDL_CONFIG_WRITE_KEY": "config_write_key",
+        "SDL_S1_SCOPE": "s1_scope",
+    }
+    for env, field in direct_env.items():
         if os.environ.get(env):
             cfg[field] = os.environ[env]
+    env_token = (
+        os.environ.get("S1_CONSOLE_API_TOKEN")
+        or os.environ.get("S1_API_TOKEN")
+        or os.environ.get("SDL_CONSOLE_API_TOKEN")
+    )
+    if env_token:
+        cfg["console_api_token"] = env_token
     if os.environ.get("SDL_VERIFY_TLS"):
         cfg["verify_tls"] = os.environ["SDL_VERIFY_TLS"].lower() not in ("0", "false", "no")
     return cfg
@@ -167,7 +312,9 @@ class SDLClient:
         self.base_url = (base_url or cfg.get("base_url") or "").rstrip("/")
         if not self.base_url or "REPLACE-ME" in self.base_url:
             raise RuntimeError(
-                "SDL base_url is not set. Add SDL_BASE_URL to ~/.claude/sentinelone/credentials.json or export SDL_BASE_URL."
+                "SDL base_url is not set. Add SDL_XDR_URL to "
+                "$COWORK_WORKSPACE/.sentinelone/credentials.json (or any "
+                "folder Cowork can access) or export SDL_XDR_URL."
             )
 
         self.keys = {
@@ -193,7 +340,8 @@ class SDLClient:
                 return self.keys[field]
         raise RuntimeError(
             f"No API key configured for chain '{chain_name}'. Tried {chain}. "
-            "Check ~/.claude/sentinelone/credentials.json."
+            "Check $COWORK_WORKSPACE/.sentinelone/credentials.json (or any "
+            "folder Cowork can access)."
         )
 
     def _auth_headers(self, chain_name: str, content_type: str = "application/json") -> Dict[str, str]:

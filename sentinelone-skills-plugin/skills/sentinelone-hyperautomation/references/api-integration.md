@@ -6,27 +6,27 @@ Two environment variables drive all API interactions with the console:
 
 | Variable | Contains |
 |----------|----------|
-| `S1_BASE_URL` | Full console base URL, e.g. `https://usea1-acme.sentinelone.net` |
-| `S1_API_TOKEN` | Console User (personal) API token (generated in Settings → Users → API Token) |
+| `S1_CONSOLE_URL` | Full console base URL, e.g. `https://usea1-acme.sentinelone.net` |
+| `S1_CONSOLE_API_TOKEN` | Console User (personal) API token (generated in Settings → Users → API Token) |
 
 **Always validate these before use.** Run the two-step check below — if either step fails,
 stop and tell the user what went wrong before proceeding with any workflow operation.
 
-### Step 1 — Validate `S1_BASE_URL` (no auth required)
+### Step 1 — Validate `S1_CONSOLE_URL` (no auth required)
 
 ```
-GET {S1_BASE_URL}/web/api/v2.1/system
+GET {S1_CONSOLE_URL}/web/api/v2.1/system
 ```
 
 This endpoint requires no authentication and always returns `200` with `{"data": {"health": "ok"}}`
-when the console is reachable. A non-200 response or a network error means `S1_BASE_URL` is wrong
+when the console is reachable. A non-200 response or a network error means `S1_CONSOLE_URL` is wrong
 or the console is unreachable.
 
-### Step 2 — Validate `S1_API_TOKEN` (auth + permission check)
+### Step 2 — Validate `S1_CONSOLE_API_TOKEN` (auth + permission check)
 
 ```
-GET {S1_BASE_URL}/web/api/v2.1/hyper-automate/api/public/workflows?limit=1
-Authorization: ApiToken {S1_API_TOKEN}
+GET {S1_CONSOLE_URL}/web/api/v2.1/hyper-automate/api/public/workflows?limit=1
+Authorization: ApiToken {S1_CONSOLE_API_TOKEN}
 ```
 
 A `200` response confirms the token is valid and has `Hyper Automate.view` permission.
@@ -39,7 +39,7 @@ Failure responses:
 async function validateCredentials(apiUrl, apiToken) {
   // Step 1: URL check
   const sysRes = await fetch(`${apiUrl}/web/api/v2.1/system`);
-  if (!sysRes.ok) throw new Error(`Console unreachable (${sysRes.status}). Check S1_BASE_URL.`);
+  if (!sysRes.ok) throw new Error(`Console unreachable (${sysRes.status}). Check S1_CONSOLE_URL.`);
   const { data: { health } } = await sysRes.json();
   if (health !== 'ok') throw new Error(`Console health: ${health}`);
 
@@ -48,8 +48,8 @@ async function validateCredentials(apiUrl, apiToken) {
     `${apiUrl}/web/api/v2.1/hyper-automate/api/public/workflows?limit=1`,
     { headers: { "Authorization": `ApiToken ${apiToken}` } }
   );
-  if (authRes.status === 401) throw new Error('S1_API_TOKEN is invalid or expired.');
-  if (authRes.status === 403) throw new Error('S1_API_TOKEN lacks Hyper Automate.view permission.');
+  if (authRes.status === 401) throw new Error('S1_CONSOLE_API_TOKEN is invalid or expired.');
+  if (authRes.status === 403) throw new Error('S1_CONSOLE_API_TOKEN lacks Hyper Automate.view permission.');
   if (!authRes.ok) throw new Error(`Token check failed (${authRes.status})`);
 }
 ```
@@ -379,12 +379,12 @@ Same body as Evaluate Expression. Returns a parsed breakdown of expression compo
 
 ### Deploy a new workflow end-to-end
 
-Uses the `S1_BASE_URL` and `S1_API_TOKEN` environment variables. Always call `validateCredentials()`
+Uses the `S1_CONSOLE_URL` and `S1_CONSOLE_API_TOKEN` environment variables. Always call `validateCredentials()`
 (defined above) before any workflow operation.
 
 ```javascript
-const apiUrl   = process.env.S1_BASE_URL;    // e.g. https://usea1-acme.sentinelone.net
-const apiToken = process.env.S1_API_TOKEN;  // Service User API token
+const apiUrl   = process.env.S1_CONSOLE_URL;    // e.g. https://usea1-acme.sentinelone.net
+const apiToken = process.env.S1_CONSOLE_API_TOKEN;  // Service User API token
 const siteId   = process.env.SITE_ID;    // optional — scope to a specific site
 
 const base = `${apiUrl}/web/api/v2.1/hyper-automate/api/public`;

@@ -131,8 +131,10 @@ echo "Building plugin: $PLUGIN_FILENAME"
 TMP_PLUGIN="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIST" "$TMP_PLUGIN"' EXIT
 
-# Copy the plugin metadata and plugin-only skills
+# Copy the plugin metadata, hooks (e.g., SessionStart credential bootstrap),
+# and plugin-only skills.
 cp -r "$PLUGIN_DIR/.claude-plugin" "$TMP_PLUGIN/"
+[ -d "$PLUGIN_DIR/hooks" ] && cp -r "$PLUGIN_DIR/hooks" "$TMP_PLUGIN/"
 mkdir -p "$TMP_PLUGIN/skills"
 for skill_name in "${PLUGIN_ONLY_SKILLS[@]}"; do
     cp -r "$PLUGIN_DIR/skills/$skill_name" "$TMP_PLUGIN/skills/"

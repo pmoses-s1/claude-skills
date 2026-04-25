@@ -2,11 +2,34 @@
 SentinelOne Management Console API client.
 
 Loads credentials (in priority order, highest wins):
-  1. Environment variables: S1_BASE_URL, S1_API_TOKEN
-  2. $CLAUDE_CONFIG_DIR/sentinelone/credentials.json  (Cowork session)
-  3. ~/.claude/sentinelone/credentials.json           (persistent Mac path)
-  4. ~/.config/sentinelone/credentials.json           (terminal fallback)
-  5. <skill>/config.json                              (last resort, not recommended)
+  1. Environment variables: S1_CONSOLE_URL, S1_CONSOLE_API_TOKEN
+     (S1_BASE_URL, S1_API_TOKEN, and SDL_CONSOLE_API_TOKEN accepted as
+     deprecated aliases.)
+  2. $COWORK_WORKSPACE/.sentinelone/credentials.json   (recommended for Cowork:
+     set $COWORK_WORKSPACE to your project folder, drop credentials.json there)
+  3. Auto-discovered <workspace>/.sentinelone/credentials.json
+     (cwd walk-up, then scan ~/mnt/* for any Cowork-accessible folder
+     containing .sentinelone/credentials.json. The legacy
+     .claude/sentinelone/credentials.json layout is also accepted.)
+  4. $CLAUDE_CONFIG_DIR/sentinelone/credentials.json  (Cowork session)
+  5. ~/.claude/sentinelone/credentials.json           (persistent host path)
+  6. ~/.config/sentinelone/credentials.json           (legacy terminal fallback)
+  7. <skill>/config.json                              (last resort, not recommended)
+
+Canonical keys in credentials.json:
+  S1_CONSOLE_URL                       tenant console URL (e.g. https://usea1-purple.sentinelone.net)
+  S1_CONSOLE_API_TOKEN                 management-console API token (Service Users)
+  S1_CONSOLE_API_TOKEN_SINGLE_SCOPE    optional single-scope token for endpoints that
+                                       reject multi-scope tokens (e.g. /threat-intelligence/iocs)
+  S1_HEC_INGEST_URL                    HEC ingest host (logs + alerts/indicators)
+
+Deprecated aliases (still read but logged once):
+  S1_BASE_URL                  -> S1_CONSOLE_URL
+  S1_API_TOKEN                 -> S1_CONSOLE_API_TOKEN  (former canonical)
+  SDL_CONSOLE_API_TOKEN        -> S1_CONSOLE_API_TOKEN  (it's the same JWT)
+  S1_API_TOKEN_SINGLE_SCOPE    -> S1_CONSOLE_API_TOKEN_SINGLE_SCOPE
+  S1_UAM_ALERT_INTERFACE_URL   -> S1_HEC_INGEST_URL  (former canonical)
+  uam_alert_interface_url      -> S1_HEC_INGEST_URL  (legacy snake_case)
 
 Usage:
     from s1_client import S1Client
@@ -57,14 +80,157 @@ from requests.adapters import HTTPAdapter
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = SKILL_DIR / "config.json"
+# Legacy terminal fallback; kept for backward compat.
 HOME_CREDS_PATH = Path.home() / ".config" / "sentinelone" / "credentials.json"
-# ~/.claude/sentinelone/credentials.json — persistent Mac path, editable from
-# outside the sandbox without knowing CLAUDE_CONFIG_DIR.
+# Recommended persistent Mac path; aligns with $CLAUDE_CONFIG_DIR conventions
+# and is editable from outside the sandbox without knowing CLAUDE_CONFIG_DIR.
 DOTCLAUDE_CREDS_PATH = Path.home() / ".claude" / "sentinelone" / "credentials.json"
-# Shared plugin credentials — set by Cowork at session start.
+# Cowork session creds (shared across plugins) when CLAUDE_CONFIG_DIR is set.
 _CLAUDE_CONFIG_DIR = os.environ.get("CLAUDE_CONFIG_DIR", "")
 PLUGIN_CREDS_PATH = (Path(_CLAUDE_CONFIG_DIR) / "sentinelone" / "credentials.json"
                      if _CLAUDE_CONFIG_DIR else None)
+
+
+# Workspace creds layout: prefer .sentinelone/credentials.json. The legacy
+# .claude/sentinelone/credentials.json layout is also accepted so existing
+# setups keep working.
+_WORKSPACE_CREDS_RELS = (
+    Path(".sentinelone") / "credentials.json",
+    Path(".claude") / "sentinelone" / "credentials.json",
+)
+# Mount points under $HOME/mnt that are not user workspaces.
+_MNT_SKIP = frozenset({".claude", ".auto-memory", ".remote-plugins", "outputs", "uploads"})
+
+
+def _walk_up_for_workspace_creds() -> Optional[Path]:
+    """Find workspace-scoped credentials inside a Cowork-accessible folder.
+
+    Three-pass search (in priority order):
+
+      1. $COWORK_WORKSPACE env var. If set, look for
+         $COWORK_WORKSPACE/.sentinelone/credentials.json (the recommended
+         explicit convention). Falls through to walk-up if not found,
+         rather than failing — defensive against typos.
+
+      2. Walk up from cwd looking for .sentinelone/credentials.json
+         (or the legacy .claude/sentinelone/credentials.json). Catches
+         the common case where the user has cd'd into their project,
+         or a script lives there.
+
+      3. Scan $HOME/mnt/<folder>/ for any Cowork-accessible folder that
+         contains .sentinelone/credentials.json (or the legacy
+         .claude/sentinelone/credentials.json). This is the "drop the
+         file in any folder Cowork can see" backup: in a sandbox, the
+         user's project folder is mounted at ~/mnt/<projectname>/ but
+         cwd is often /outputs, so walk-up alone misses it.
+
+    Stops at filesystem root or after 20 levels of cwd walk-up
+    (defensive against unusual mount layouts).
+    """
+    # Pass 1: explicit $COWORK_WORKSPACE override.
+    explicit = os.environ.get("COWORK_WORKSPACE", "").strip()
+    if explicit:
+        explicit_path = Path(explicit)
+        for rel in _WORKSPACE_CREDS_RELS:
+            candidate = explicit_path / rel
+            if candidate.is_file():
+                return candidate
+
+    # Pass 2: cwd walk-up.
+    try:
+        cwd = Path.cwd().resolve()
+    except (OSError, RuntimeError):
+        cwd = None
+    if cwd is not None:
+        for i, parent in enumerate([cwd, *cwd.parents]):
+            if i >= 20:
+                break
+            for rel in _WORKSPACE_CREDS_RELS:
+                candidate = parent / rel
+                if candidate.is_file():
+                    return candidate
+
+    # Pass 3: scan $HOME/mnt for any Cowork-accessible folder.
+    home_mnt = Path.home() / "mnt"
+    if home_mnt.is_dir():
+        try:
+            entries = sorted(home_mnt.iterdir())
+        except OSError:
+            entries = []
+        for entry in entries:
+            if not entry.is_dir() or entry.name in _MNT_SKIP:
+                continue
+            for rel in _WORKSPACE_CREDS_RELS:
+                candidate = entry / rel
+                if candidate.is_file():
+                    return candidate
+    return None
+
+
+# One-time deprecation warning flags so we don't spam the log on every load.
+_warned_legacy_url = False
+_warned_legacy_token = False
+
+
+def _apply_s1_keys(creds: Dict[str, Any], cfg: Dict[str, Any], source: str) -> None:
+    """Populate cfg[base_url]/cfg[api_token] from a creds dict.
+
+    Accepts canonical keys (S1_CONSOLE_URL, S1_CONSOLE_API_TOKEN) and the
+    deprecated aliases (S1_BASE_URL, SDL_CONSOLE_API_TOKEN). Emits a
+    one-time deprecation warning when only the legacy key is present.
+    """
+    global _warned_legacy_url, _warned_legacy_token
+    url = creds.get("S1_CONSOLE_URL") or creds.get("S1_BASE_URL")
+    if url:
+        cfg["base_url"] = url
+        if (not creds.get("S1_CONSOLE_URL")) and creds.get("S1_BASE_URL") and not _warned_legacy_url:
+            import warnings as _w
+            _w.warn(
+                f"{source}: S1_BASE_URL is deprecated, rename to S1_CONSOLE_URL",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            _warned_legacy_url = True
+    # Token: canonical S1_CONSOLE_API_TOKEN; aliases: S1_API_TOKEN (former
+    # canonical), SDL_CONSOLE_API_TOKEN (legacy duplicate of the same JWT).
+    token = (
+        creds.get("S1_CONSOLE_API_TOKEN")
+        or creds.get("S1_API_TOKEN")
+        or creds.get("SDL_CONSOLE_API_TOKEN")
+    )
+    if token:
+        cfg["api_token"] = token
+        if not creds.get("S1_CONSOLE_API_TOKEN") and not _warned_legacy_token:
+            legacy_name = "S1_API_TOKEN" if creds.get("S1_API_TOKEN") else "SDL_CONSOLE_API_TOKEN"
+            import warnings as _w
+            _w.warn(
+                f"{source}: {legacy_name} is deprecated, rename to S1_CONSOLE_API_TOKEN",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            _warned_legacy_token = True
+    # Single-scope token: canonical S1_CONSOLE_API_TOKEN_SINGLE_SCOPE,
+    # legacy alias S1_API_TOKEN_SINGLE_SCOPE.
+    sscope = (
+        creds.get("S1_CONSOLE_API_TOKEN_SINGLE_SCOPE")
+        or creds.get("S1_API_TOKEN_SINGLE_SCOPE")
+    )
+    if sscope:
+        cfg["api_token_single_scope"] = sscope
+    # HEC ingest URL (used for both log ingest and OCSF alert/indicator ingest).
+    # Canonical: S1_HEC_INGEST_URL. Aliases (read in priority order):
+    # S1_UAM_ALERT_INTERFACE_URL (former canonical), uam_alert_interface_url
+    # (legacy snake_case).
+    hec_url = (
+        creds.get("S1_HEC_INGEST_URL")
+        or creds.get("S1_UAM_ALERT_INTERFACE_URL")
+        or creds.get("uam_alert_interface_url")
+    )
+    if hec_url:
+        cfg["hec_ingest_url"] = hec_url
+        # Keep the legacy field name populated too so downstream callers
+        # that still read cfg["uam_alert_interface_url"] keep working.
+        cfg["uam_alert_interface_url"] = hec_url
 
 # Endpoints where caching is safe — they change rarely during a session.
 # Prefix match, base_url stripped.
@@ -90,57 +256,81 @@ class S1APIError(RuntimeError):
 
 
 def _load_config() -> Dict[str, Any]:
-    # Layer 1: plugin-local config.json (lowest priority, not recommended)
+    """Resolve credentials across all configured layers.
+
+    Priority order (highest wins, applied last):
+      7. environment variables
+      6. workspace .sentinelone/credentials.json — resolved by
+         _walk_up_for_workspace_creds() in this order:
+           a. $COWORK_WORKSPACE/.sentinelone/credentials.json (recommended)
+           b. cwd walk-up for .sentinelone/credentials.json
+           c. ~/mnt/*/.sentinelone/credentials.json (any Cowork-accessible
+              folder; this is the simple "drop the file in your workspace"
+              backup)
+         Legacy .claude/sentinelone/credentials.json is accepted at each
+         step for back-compat.
+      5. $CLAUDE_CONFIG_DIR/sentinelone/credentials.json (Cowork session)
+      4. ~/.claude/sentinelone/credentials.json (persistent host path)
+      3. ~/.config/sentinelone/credentials.json (legacy terminal fallback)
+      2. <skill>/config.json (last resort)
+      1. (none)
+
+    Each file layer is applied in turn so a higher layer overrides a
+    lower one only for the keys it actually defines. Missing keys at a
+    higher layer fall back to the lower layer's value.
+    """
     cfg: Dict[str, Any] = {}
+
+    # Layer 1: skill-local config.json (last resort; not recommended).
     if CONFIG_PATH.exists():
         try:
             cfg = json.loads(CONFIG_PATH.read_text())
         except json.JSONDecodeError as e:
             raise RuntimeError(f"config.json is not valid JSON: {e}")
 
-    # Layer 2: ~/.config/sentinelone/credentials.json (terminal fallback)
-    # Works for CLI users; lowest-priority file source.
+    # Layered file lookup, applied lowest-to-highest priority.
+    file_layers: List[Tuple[Path, str]] = []
     if HOME_CREDS_PATH.exists():
-        try:
-            home_creds = json.loads(HOME_CREDS_PATH.read_text())
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"{HOME_CREDS_PATH} is not valid JSON: {e}")
-        if home_creds.get("S1_BASE_URL"):
-            cfg["base_url"] = home_creds["S1_BASE_URL"]
-        if home_creds.get("S1_API_TOKEN"):
-            cfg["api_token"] = home_creds["S1_API_TOKEN"]
-
-    # Layer 3: ~/.claude/sentinelone/credentials.json
-    # Persistent Mac path — edit directly without knowing CLAUDE_CONFIG_DIR.
-    # Overrides ~/.config so the canonical file always wins.
+        file_layers.append((HOME_CREDS_PATH, "~/.config/sentinelone/credentials.json"))
     if DOTCLAUDE_CREDS_PATH.exists():
-        try:
-            dotclaude_creds = json.loads(DOTCLAUDE_CREDS_PATH.read_text())
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"{DOTCLAUDE_CREDS_PATH} is not valid JSON: {e}")
-        if dotclaude_creds.get("S1_BASE_URL"):
-            cfg["base_url"] = dotclaude_creds["S1_BASE_URL"]
-        if dotclaude_creds.get("S1_API_TOKEN"):
-            cfg["api_token"] = dotclaude_creds["S1_API_TOKEN"]
-
-    # Layer 4: $CLAUDE_CONFIG_DIR/sentinelone/credentials.json (Cowork session)
-    # Set automatically by Cowork. Overrides all file layers so the active
-    # session config always takes precedence, but env vars still win in Layer 5.
+        file_layers.append((DOTCLAUDE_CREDS_PATH, "~/.claude/sentinelone/credentials.json"))
     if PLUGIN_CREDS_PATH and PLUGIN_CREDS_PATH.exists():
-        try:
-            plugin_creds = json.loads(PLUGIN_CREDS_PATH.read_text())
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"{PLUGIN_CREDS_PATH} is not valid JSON: {e}")
-        if plugin_creds.get("S1_BASE_URL"):
-            cfg["base_url"] = plugin_creds["S1_BASE_URL"]
-        if plugin_creds.get("S1_API_TOKEN"):
-            cfg["api_token"] = plugin_creds["S1_API_TOKEN"]
+        file_layers.append((PLUGIN_CREDS_PATH, "$CLAUDE_CONFIG_DIR/sentinelone/credentials.json"))
+    workspace_creds = _walk_up_for_workspace_creds()
+    if workspace_creds is not None:
+        file_layers.append((workspace_creds, str(workspace_creds)))
 
-    # Layer 3: environment variables (highest priority)
-    if os.environ.get("S1_BASE_URL"):
-        cfg["base_url"] = os.environ["S1_BASE_URL"]
-    if os.environ.get("S1_API_TOKEN"):
-        cfg["api_token"] = os.environ["S1_API_TOKEN"]
+    for path, label in file_layers:
+        try:
+            creds = json.loads(path.read_text())
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"{path} is not valid JSON: {e}")
+        _apply_s1_keys(creds, cfg, label)
+
+    # Highest priority: environment variables.
+    env_url = os.environ.get("S1_CONSOLE_URL") or os.environ.get("S1_BASE_URL")
+    if env_url:
+        cfg["base_url"] = env_url
+    env_token = (
+        os.environ.get("S1_CONSOLE_API_TOKEN")
+        or os.environ.get("S1_API_TOKEN")
+        or os.environ.get("SDL_CONSOLE_API_TOKEN")
+    )
+    if env_token:
+        cfg["api_token"] = env_token
+    env_sscope = (
+        os.environ.get("S1_CONSOLE_API_TOKEN_SINGLE_SCOPE")
+        or os.environ.get("S1_API_TOKEN_SINGLE_SCOPE")
+    )
+    if env_sscope:
+        cfg["api_token_single_scope"] = env_sscope
+    env_hec_url = (
+        os.environ.get("S1_HEC_INGEST_URL")
+        or os.environ.get("S1_UAM_ALERT_INTERFACE_URL")
+    )
+    if env_hec_url:
+        cfg["hec_ingest_url"] = env_hec_url
+        cfg["uam_alert_interface_url"] = env_hec_url
     if os.environ.get("S1_VERIFY_TLS"):
         cfg["verify_tls"] = os.environ["S1_VERIFY_TLS"].lower() not in ("0", "false", "no")
     if os.environ.get("S1_CACHE_TTL"):
@@ -163,8 +353,8 @@ class S1Client:
         token_kind: str = "default",
     ):
         """
-        token_kind selects which token to read from $CLAUDE_CONFIG_DIR/sentinelone/credentials.json when no
-        explicit `api_token` argument or S1_API_TOKEN env var is supplied.
+        token_kind selects which token to read from credentials.json when no
+        explicit `api_token` argument or S1_CONSOLE_API_TOKEN env var is supplied.
 
           - "default"       → `api_token` (typically multi-scope).
                               Falls back to `api_token_single_scope` if
@@ -178,7 +368,7 @@ class S1Client:
                               resulting `self.token_kind_effective`.
 
         Both tokens are optional in credentials.json: the skill works with
-        either one alone, or both. Explicit `api_token=` or S1_API_TOKEN
+        either one alone, or both. Explicit `api_token=` or S1_CONSOLE_API_TOKEN
         always wins over the config selection.
         """
         cfg = _load_config()
@@ -207,11 +397,15 @@ class S1Client:
 
         if not self.base_url or "REPLACE-ME" in self.base_url:
             raise RuntimeError(
-                "S1 base_url is not set. Add S1_BASE_URL to ~/.claude/sentinelone/credentials.json or export S1_BASE_URL."
+                "S1 console URL is not set. Add S1_CONSOLE_URL to "
+                "$COWORK_WORKSPACE/.sentinelone/credentials.json (or any "
+                "folder Cowork can access) or export S1_CONSOLE_URL."
             )
         if not self.api_token or "REPLACE" in self.api_token:
             raise RuntimeError(
-                "S1 api_token is not set. Add S1_API_TOKEN to ~/.claude/sentinelone/credentials.json or export S1_API_TOKEN."
+                "S1 api_token is not set. Add S1_CONSOLE_API_TOKEN to "
+                "$COWORK_WORKSPACE/.sentinelone/credentials.json (or any "
+                "folder Cowork can access) or export S1_CONSOLE_API_TOKEN."
             )
 
         # Session with pooled connection adapter — allows many parallel GETs

@@ -6,9 +6,9 @@ SentinelOne skills for Claude. Install the plugin to get everything; no individu
 
 1. Download the latest `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/)
 2. In Cowork, go to **Capabilities → Skills → Customise → Plugins → Personal plugins** and click **Upload plugin**, then select the `.plugin` file
-3. Create `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` with your tenant credentials (see [Configuration](#configuration) below)
+3. Drop a `credentials.json` into a folder Cowork can access. Recommended path: `$COWORK_WORKSPACE/.sentinelone/credentials.json` (or any folder Cowork has access to under `.sentinelone/credentials.json`). See [Configuration](#configuration) below for the keys.
 
-That's it. All six skills are active immediately.
+That's it. The plugin's SessionStart hook auto-copies the file to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of every session, so all six skills find it without any further setup.
 
 ## What's included
 
@@ -238,49 +238,57 @@ These are real questions you can ask. Claude will pick the right skill automatic
 
 ## Configuration
 
-All skills read credentials from a single JSON file. The recommended path that works everywhere, both inside Cowork and from your terminal, is:
+All skills read credentials from a single JSON file. **Recommended path:**
 
 ```
-~/.claude/sentinelone/credentials.json
+$COWORK_WORKSPACE/.sentinelone/credentials.json
 ```
 
-> **Why this path?** `~/.claude/` is your home-level Claude config directory. It's always accessible from your terminal without needing to know `CLAUDE_CONFIG_DIR`, and Cowork picks it up automatically too.
+Or, if you don't want to set `$COWORK_WORKSPACE`, drop the file at `<any-folder-Cowork-has-access-to>/.sentinelone/credentials.json`. The plugin's SessionStart hook auto-discovers it and copies it to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of every session, so every script and CLI in the plugin finds it with zero preflight.
 
 Full credential resolution order (highest priority wins):
-1. Environment variables (`S1_BASE_URL`, `S1_API_TOKEN`, `SDL_*`)
-2. `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` (Cowork session config, set automatically)
-3. `~/.claude/sentinelone/credentials.json` (**recommended persistent path**)
-4. `~/.config/sentinelone/credentials.json` (legacy terminal fallback)
+1. Environment variables (`S1_CONSOLE_URL`, `S1_CONSOLE_API_TOKEN`, `SDL_*`)
+2. `$COWORK_WORKSPACE/.sentinelone/credentials.json` (recommended for Cowork)
+3. Auto-discovered `<workspace>/.sentinelone/credentials.json` (cwd walk-up, then any folder under `~/mnt/`; legacy `.claude/sentinelone/credentials.json` layout also accepted)
+4. `$HOME/.claude/sentinelone/credentials.json` (sandbox-local copy maintained by the SessionStart hook)
+5. `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` (Cowork session config, when set)
+6. `~/.config/sentinelone/credentials.json` (legacy terminal fallback)
 
-**macOS / Linux:**
+**macOS / Linux (recommended Cowork path):**
 
 ```bash
-mkdir -p ~/.claude/sentinelone
-cat > ~/.claude/sentinelone/credentials.json << 'EOF'
+# 1. Pick a folder Cowork has access to (your project folder works).
+#    Optionally export it as $COWORK_WORKSPACE so the explicit path is used:
+export COWORK_WORKSPACE=~/Documents/Claude/Projects/MyProject
+
+# 2. Drop the credentials there.
+mkdir -p "$COWORK_WORKSPACE/.sentinelone"
+cat > "$COWORK_WORKSPACE/.sentinelone/credentials.json" << 'EOF'
 {
-  "S1_BASE_URL": "https://usea1-acme.sentinelone.net",
-  "S1_API_TOKEN": "eyJ...your-management-console-api-token...",
-  "SDL_BASE_URL": "https://xdr.us1.sentinelone.net",
-  "SDL_CONSOLE_API_TOKEN": "eyJ...your-sdl-console-api-token...",
+  "S1_CONSOLE_URL": "https://usea1-acme.sentinelone.net",
+  "S1_CONSOLE_API_TOKEN": "eyJ...your-management-console-api-token...",
+  "S1_HEC_INGEST_URL": "https://ingest.us1.sentinelone.net",
+  "SDL_XDR_URL": "https://xdr.us1.sentinelone.net",
   "SDL_LOG_WRITE_KEY": "0Z1Fy0...your-log-write-key...",
   "SDL_CONFIG_WRITE_KEY": "0mXas6PD...your-config-write-key..."
 }
 EOF
+chmod 600 "$COWORK_WORKSPACE/.sentinelone/credentials.json"
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-# In Cowork: use $CLAUDE_CONFIG_DIR/sentinelone/credentials.json (set automatically)
-# In terminal, use:
-$dir = "$env:USERPROFILE\.config\sentinelone"
+# Drop credentials in any folder Cowork has access to.
+$workspace = "$env:USERPROFILE\Documents\Claude\Projects\MyProject"
+$dir = "$workspace\.sentinelone"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 @'
 {
-  "S1_BASE_URL": "https://usea1-acme.sentinelone.net",
-  "S1_API_TOKEN": "eyJ...your-management-console-api-token...",
-  "SDL_BASE_URL": "https://xdr.us1.sentinelone.net",
-  "SDL_CONSOLE_API_TOKEN": "eyJ...your-sdl-console-api-token...",
+  "S1_CONSOLE_URL": "https://usea1-acme.sentinelone.net",
+  "S1_CONSOLE_API_TOKEN": "eyJ...your-management-console-api-token...",
+  "S1_HEC_INGEST_URL": "https://ingest.us1.sentinelone.net",
+  "SDL_XDR_URL": "https://xdr.us1.sentinelone.net",
   "SDL_LOG_WRITE_KEY": "0Z1Fy0...your-log-write-key...",
   "SDL_CONFIG_WRITE_KEY": "0mXas6PD...your-config-write-key..."
 }
@@ -291,10 +299,10 @@ A fully annotated example with all optional keys is in [`credentials.example.jso
 
 | Credential key | Required for | How to get it |
 |---|---|---|
-| `S1_BASE_URL` | All management console skills | Your console URL, e.g. `https://usea1-acme.sentinelone.net` |
-| `S1_API_TOKEN` | `sentinelone-mgmt-console-api`, `sentinelone-powerquery` | Settings → Users → Service Users → Create New Service User → copy the API token. See [Creating service users](https://community.sentinelone.com/s/article/000005291) |
-| `SDL_BASE_URL` | `sentinelone-sdl-api`, `sentinelone-sdl-dashboard`, `sentinelone-sdl-log-parser` | Your SDL tenant URL, e.g. `https://xdr.us1.sentinelone.net` |
-| `SDL_CONSOLE_API_TOKEN` | SDL query and config methods (not `uploadLogs`) | Same token as `S1_API_TOKEN`. Console tokens support the SDL API from Management version Z SP5+. See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+| `S1_CONSOLE_URL` | All management console skills | Your console URL, e.g. `https://usea1-acme.sentinelone.net` |
+| `S1_CONSOLE_API_TOKEN` | `sentinelone-mgmt-console-api`, `sentinelone-powerquery`, plus SDL query and config methods (not `uploadLogs`) | Settings → Users → Service Users → Create New Service User → copy the API token. The same JWT works for the SDL API from Management version Z SP5+. See [Creating service users](https://community.sentinelone.com/s/article/000005291) and [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+| `S1_HEC_INGEST_URL` | UAM alert/indicator ingest and log ingest via HEC (used by `sentinelone-mgmt-console-api` UAM Alert Interface) | The SentinelOne HEC ingest host for your region, e.g. `https://ingest.us1.sentinelone.net`. Look up your region's URL in [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
+| `SDL_XDR_URL` | `sentinelone-sdl-api`, `sentinelone-sdl-dashboard`, `sentinelone-sdl-log-parser` | Your SDL tenant URL, e.g. `https://xdr.us1.sentinelone.net`. Region-specific; see [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
 | `SDL_LOG_WRITE_KEY` | `uploadLogs` only | In Singularity Data Lake → menu next to username → API Keys → Log Access Keys → New Key (Log Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
 | `SDL_CONFIG_WRITE_KEY` | Deploying parsers/dashboards via `putFile` | In Singularity Data Lake → menu next to username → API Keys → Configuration Access Keys → New Key (Configuration Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
 

@@ -26,7 +26,8 @@ Wire contract
 Auth token
 ----------
 The interface accepts the same service-user JWT used for the Mgmt
-Console API (loaded from $CLAUDE_CONFIG_DIR/sentinelone/credentials.json via S1Client.api_token).
+Console API (loaded from credentials.json via S1Client.api_token —
+canonical key `S1_CONSOLE_API_TOKEN`).
 `ApiToken <token>` is rejected with HTTP 401
 `{"details":"Unsupported auth type: ApiToken"}`, so callers MUST switch
 to the `Bearer` scheme when talking to this endpoint family.
@@ -100,10 +101,16 @@ from typing import Any, Dict, Iterable, List, Optional
 
 _DEFAULT_PROD_HOST = "https://ingest.us1.sentinelone.net"
 
-# Optional override key in $CLAUDE_CONFIG_DIR/sentinelone/credentials.json or config.json.
+# Optional override key in credentials.json or config.json.
 # If not present the helper falls back to _DEFAULT_PROD_HOST.
-_CONFIG_KEY = "uam_alert_interface_url"
-_LEGACY_CONFIG_KEYS = ("ingestion_gateway_url",)   # previous name
+# Canonical key is S1_HEC_INGEST_URL: the host serves both log ingest
+# and OCSF alert/indicator ingest, so the variable name reflects that.
+# Aliases are read for backward compatibility.
+_CONFIG_KEY = "S1_HEC_INGEST_URL"
+_LEGACY_CONFIG_KEYS = (
+    "S1_UAM_ALERT_INTERFACE_URL",  # former canonical
+    "uam_alert_interface_url",     # legacy snake_case
+)
 
 
 # ---- OCSF observable.type_id values (from OCSF Observable Type ID enum)
@@ -153,16 +160,55 @@ def _enrich_observable_for_alert(obs: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _walk_up_for_workspace_creds() -> Optional[Path]:
+    """Find a workspace-scoped .claude/sentinelone/credentials.json.
+
+    Two-pass search: cwd walk-up first, then scan $HOME/mnt/ * for
+    Cowork-mounted workspace folders (skips system mounts).
+    """
+    try:
+        cwd = Path.cwd().resolve()
+    except (OSError, RuntimeError):
+        cwd = None
+    if cwd is not None:
+        for i, parent in enumerate([cwd, *cwd.parents]):
+            if i >= 20:
+                break
+            candidate = parent / ".claude" / "sentinelone" / "credentials.json"
+            if candidate.is_file():
+                return candidate
+    home_mnt = Path.home() / "mnt"
+    if home_mnt.is_dir():
+        skip = {".claude", ".auto-memory", ".remote-plugins", "outputs", "uploads"}
+        try:
+            entries = sorted(home_mnt.iterdir())
+        except OSError:
+            entries = []
+        for entry in entries:
+            if not entry.is_dir() or entry.name in skip:
+                continue
+            candidate = entry / ".claude" / "sentinelone" / "credentials.json"
+            if candidate.is_file():
+                return candidate
+    return None
+
+
 def _load_config_url() -> Optional[str]:
-    # Priority: $CLAUDE_CONFIG_DIR (Cowork session) > ~/.claude (persistent Mac)
-    # > ~/.config (terminal fallback) > local config.json.
+    """Resolve the UAM Alert Interface URL across all credential layers.
+
+    Priority (highest wins): workspace .claude > $CLAUDE_CONFIG_DIR
+    > ~/.claude > ~/.config > skill config.json. The first non-empty
+    value wins; iteration is highest-to-lowest so we can short-circuit.
+    """
     _claude_config_dir = os.environ.get("CLAUDE_CONFIG_DIR", "")
     _plugin_creds = (Path(_claude_config_dir) / "sentinelone" / "credentials.json"
                      if _claude_config_dir else None)
     _dotclaude_creds = Path.home() / ".claude" / "sentinelone" / "credentials.json"
     _home_creds = Path.home() / ".config" / "sentinelone" / "credentials.json"
     _local_config = Path(__file__).resolve().parent.parent / "config.json"
-    candidates = [p for p in [_plugin_creds, _dotclaude_creds, _home_creds, _local_config] if p]
+    _workspace_creds = _walk_up_for_workspace_creds()
+    # Highest priority first.
+    candidates = [p for p in [_workspace_creds, _plugin_creds, _dotclaude_creds, _home_creds, _local_config] if p]
     for cfg_path in candidates:
         if not cfg_path.is_file():
             continue
@@ -208,10 +254,12 @@ class UAMAlertInterfaceClient:
                 "(typically the same JWT as S1Client.api_token)."
             )
         self.bearer_token = bearer_token
+        # Resolution priority: explicit base_url arg > S1_HEC_INGEST_URL env >
+        # legacy S1_UAM_ALERT_INTERFACE_URL env > credentials.json > default.
         self.base_url = (
             (base_url
+             or os.environ.get("S1_HEC_INGEST_URL")
              or os.environ.get("S1_UAM_ALERT_INTERFACE_URL")
-             or os.environ.get("S1_IGW_URL")    # legacy env name
              or _load_config_url()
              or _DEFAULT_PROD_HOST)
             .rstrip("/")

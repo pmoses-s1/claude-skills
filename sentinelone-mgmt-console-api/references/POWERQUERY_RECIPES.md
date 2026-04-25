@@ -156,7 +156,7 @@ All four recipes run against the `powerQuery` SDL endpoint. With the
 
 ```python
 from sdl_client import SDLClient
-c = SDLClient()  # picks up SDL_LOG_READ_TOKEN from env
+c = SDLClient()  # picks up SDL_LOG_READ_KEY (or S1_CONSOLE_API_TOKEN) from credentials.json
 r = c.powerQuery(
     query="src.process.name contains 'powershell' dst.ip.address = * "
           "| let is_private = net_rfc1918(dst.ip.address) "

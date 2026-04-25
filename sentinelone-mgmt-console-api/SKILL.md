@@ -10,20 +10,27 @@ Wraps the SentinelOne Management Console API (Swagger 2.0, spec version 2.1, 781
 
 ## Setup — configure credentials first
 
-Credentials are loaded from `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`. The two required fields are:
+Drop a file at `$COWORK_WORKSPACE/.sentinelone/credentials.json` (or any folder Cowork has access to under `.sentinelone/credentials.json`) with the required fields:
 
 ```json
 {
-  "S1_BASE_URL": "https://usea1-acme.sentinelone.net",
-  "S1_API_TOKEN": "eyJ...your-api-token..."
+  "S1_CONSOLE_URL": "https://usea1-acme.sentinelone.net",
+  "S1_CONSOLE_API_TOKEN": "eyJ...your-api-token...",
+  "S1_HEC_INGEST_URL": "https://ingest.us1.sentinelone.net"
 }
 ```
 
-`S1_BASE_URL` is the tenant console URL (no trailing slash, no `/web/api/v2.1`). `S1_API_TOKEN` is an API User token from Settings → Users → Service Users in the S1 console.
+`S1_CONSOLE_URL` is the tenant console URL (no trailing slash, no `/web/api/v2.1`). `S1_CONSOLE_API_TOKEN` is an API User token from Settings → Users → Service Users in the S1 console. `S1_HEC_INGEST_URL` is the SentinelOne HEC ingest host (region-specific, look up yours in [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961)) and is only required if you push alerts/indicators into UAM via the UAM Alert Interface.
 
-Environment variables (`S1_BASE_URL`, `S1_API_TOKEN`, `S1_VERIFY_TLS`) override the credentials file if set.
+The plugin's SessionStart hook auto-copies the file to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of every session, so all S1 scripts and CLIs find it without any preflight. To trigger a manual refresh:
 
-Before running anything, confirm credentials are configured. If not, stop and ask the user to create `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`.
+```bash
+bash scripts/bootstrap_creds.sh   # idempotent, returns the destination path
+```
+
+Environment variables (`S1_CONSOLE_URL`, `S1_CONSOLE_API_TOKEN`, `S1_HEC_INGEST_URL`, `S1_VERIFY_TLS`) still override the credentials file if set. Legacy paths (`~/.config/sentinelone/credentials.json`, `~/.claude/sentinelone/credentials.json`, `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`) are read as fallbacks.
+
+Before running anything, confirm credentials resolved. If not, stop and ask the user to drop `credentials.json` into a folder Cowork can access.
 
 ## Workflow
 
@@ -50,7 +57,8 @@ It enumerates every GET plus a curated allow-list of read-only query POSTs, reco
 
 ## Files in this skill
 
-- `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` — credentials (set `S1_BASE_URL` and `S1_API_TOKEN`; see Setup above).
+- `$COWORK_WORKSPACE/.sentinelone/credentials.json` — credentials (set `S1_CONSOLE_URL` and `S1_CONSOLE_API_TOKEN`; see Setup above). Auto-copied to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox by the plugin's SessionStart hook.
+- `scripts/bootstrap_creds.sh` — idempotent helper that copies workspace creds into the sandbox-local path. Wired to the plugin's SessionStart hook; safe to re-run manually.
 - `scripts/s1_client.py` — importable Python client. Handles auth, pooled HTTP connections, retries on 429/5xx, pagination, parallel fan-out via `get_many()`, and optional short-TTL response caching for rarely-changing reads (accounts, sites, groups, system/info, etc.).
 - `scripts/call_endpoint.py` — CLI for one-shot calls: `python scripts/call_endpoint.py GET /web/api/v2.1/agents --param limit=5`.
 - `scripts/search_endpoints.py` — ranked keyword search over the endpoint index, with synonym expansion and an `--only-works` filter that restricts to endpoints confirmed reachable on this tenant.
@@ -73,7 +81,7 @@ It enumerates every GET plus a curated allow-list of read-only query POSTs, reco
 - `tests/test_alerts_dual_api.py` — dual-API round-trip for alerts: GraphQL list/detail/addNote/notes/deleteNote plus a parallel REST `/cloud-detection/alerts` read. Demonstrates that UAM GraphQL is the PRIMARY alert surface and REST is SECONDARY, with the note mutation cleaned up before exit (handles the `mgmt_note_id` propagation delay).
 - `scripts/pq.py` — foolproof PowerQuery runner over the LRQ API. Wraps launch/poll/cancel, auth flip to `Bearer`, `X-Dataset-Query-Forward-Tag` capture, exponential backoff on 5xx/429/connection errors, and a best-effort cancel. One call: `run_pq(client, "<query>", hours=24)` returns `{row_count, columns, rows, matchCount, ...}`. Also exposes `list_data_sources(client, hours=24)` for the first-response "does this data source actually exist on this tenant?" check. Use this any time a user says "query logs", "run a PQ", "search for events" via the mgmt console API.
 - `scripts/inspect_source.py` — source-agnostic schema discovery. For any `dataSource.name`, samples raw events via the LRQ `LOG` queryType (or sync `/sdl/api/query` when available) and classifies every attribute the parser emits into `principal_user` / `principal_host` / `principal_ip` / `action` / `temporal` / `network` / `file` / `process` / `grouping_candidate` / `other`. Picks `prim_key` + `action_key` from whatever the source actually carries, so downstream code never hardcodes field names. Exports `discover_schema(client, source, hours, sample, extra_filter, backend, escalate)` and `pick_keys(schema)`; CLI: `python scripts/inspect_source.py --source "<name>" --window 24h`. See "Data source + schema discovery" below.
-- `scripts/uam_alert_interface.py` — UAM (Unified Alert Management) Alert Interface client for pushing OCSF indicators + alerts INTO UAM via `POST /v1/indicators` and `POST /v1/alerts` on `ingest.us1.sentinelone.net`. Handles the gzip-compressed concatenated-JSON body, `Bearer` auth (the endpoint rejects `ApiToken`), and the `S1-Scope` header. Exposes `UAMAlertInterfaceClient`, plus `build_file_indicator()`, `build_process_indicator()`, `build_network_indicator()`, and `build_alert_referencing()` payload helpers. URL defaults to `https://ingest.us1.sentinelone.net`; legacy key `ingestion_gateway_url` is still honored as a fallback.
+- `scripts/uam_alert_interface.py` — UAM (Unified Alert Management) Alert Interface client for pushing OCSF indicators + alerts INTO UAM via `POST /v1/indicators` and `POST /v1/alerts` on the SentinelOne HEC ingest host (e.g. `ingest.us1.sentinelone.net`, the same host used for log ingest). Handles the gzip-compressed concatenated-JSON body, `Bearer` auth (the endpoint rejects `ApiToken`), and the `S1-Scope` header. Exposes `UAMAlertInterfaceClient`, plus `build_file_indicator()`, `build_process_indicator()`, `build_network_indicator()`, and `build_alert_referencing()` payload helpers. URL defaults to `https://ingest.us1.sentinelone.net`; override via the `S1_HEC_INGEST_URL` env var or credentials.json key (former canonical `S1_UAM_ALERT_INTERFACE_URL` and legacy snake_case `uam_alert_interface_url` still honored).
 - `tests/test_uam_alert_interface_single.py` — minimum-viable reversible write-side round-trip: POST one OCSF FileSystem-Activity indicator + one SecurityAlert referencing it, poll UAM GraphQL until the alert surfaces, verify the indicator is stitched in, then close the alert via bulk-ops (status=RESOLVED, analystVerdict=TRUE_POSITIVE_BENIGN). Covers the single-indicator happy path into UAM.
 - `tests/test_uam_alert_interface_batch.py` — comprehensive reversible round-trip: batched POST of 3 indicators (OCSF classes 1001 FileSystem Activity, 1007 Process Activity, 4001 Network Activity) each carrying 3+ observables, referenced by a single SecurityAlert via `finding_info.related_events[]`. Verifies all 3 metadata.uids and their observable names surface in `alert.rawIndicators`, then closes the alert. Covers batching, multi-observable, and multi-indicator linkage.
 - `scripts/ingestion_gateway.py` + `tests/test_ingestion_gateway_alert_with_indicator.py` — deprecated back-compat shims. The helper re-exports from `uam_alert_interface`; the test prints a pointer to the renamed file and exits non-zero.
@@ -388,8 +396,8 @@ Everything else in this skill talks to `<tenant>.sentinelone.net/web/api/v2.1/..
 
 **Host and wire contract:**
 
-- Prod (US1): `https://ingest.us1.sentinelone.net`. Override via `uam_alert_interface_url` in `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` or the `--uam-url` flag / `S1_UAM_ALERT_INTERFACE_URL` env var. The legacy config key `ingestion_gateway_url` and env var `S1_IGW_URL` are still honored as fallbacks.
-- Auth: `Authorization: Bearer <JWT>`. NOT `ApiToken`. The mgmt-console JWT from `S1_API_TOKEN` works; the endpoint rejects `ApiToken ...` with HTTP 401 `"Unsupported auth type"`.
+- Prod (US1): `https://ingest.us1.sentinelone.net`. This is the SentinelOne HEC (HTTP Event Collector) ingest host, shared between log ingest and OCSF alert/indicator ingest. Configure via the `S1_HEC_INGEST_URL` env var, the `--uam-url` flag, or the `S1_HEC_INGEST_URL` key in `credentials.json`. The former canonical `S1_UAM_ALERT_INTERFACE_URL` and legacy snake_case `uam_alert_interface_url` are still honored as fallbacks.
+- Auth: `Authorization: Bearer <JWT>`. NOT `ApiToken`. The mgmt-console JWT from `S1_CONSOLE_API_TOKEN` works; the endpoint rejects `ApiToken ...` with HTTP 401 `"Unsupported auth type"`.
 - Body: concatenated JSON (one or more objects back-to-back, optionally newline-separated), gzip-compressed. `Content-Encoding: gzip` is mandatory. zstd also accepted.
 - Scope: `S1-Scope: <accountId>` or `<accountId>:<siteId>[:<groupId>]` is mandatory.
 - Success shape: `202 Accepted` with `{"details":"Success","status":202}`.

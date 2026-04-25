@@ -21,88 +21,95 @@ Set these environment variables once and all skills pick them up automatically.
 
 | Variable | Value | How to get it |
 |----------|-------|---------------|
-| `S1_BASE_URL` | Your console URL, e.g. `https://usea1-acme.sentinelone.net` | |
-| `S1_API_TOKEN` | Management Console API token | Settings → Users → Service Users → Create New Service User → copy the API token. See [Creating service users](https://community.sentinelone.com/s/article/000005291) |
+| `S1_CONSOLE_URL` | Your console URL, e.g. `https://usea1-acme.sentinelone.net` | Region-specific; look it up in [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
+| `S1_CONSOLE_API_TOKEN` | Management Console API token | Settings → Users → Service Users → Create New Service User → copy the API token. See [Creating service users](https://community.sentinelone.com/s/article/000005291) |
+| `S1_HEC_INGEST_URL` | HEC ingest host, used for both log ingest and OCSF alert/indicator ingest, e.g. `https://ingest.us1.sentinelone.net` | Region-specific; see [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
 
 ### Singularity Data Lake (required for sentinelone-sdl-api, sentinelone-sdl-dashboard, and sentinelone-sdl-log-parser)
 
 | Variable | Value | How to get it |
 |----------|-------|---------------|
-| `SDL_BASE_URL` | Your SDL tenant URL, e.g. `https://xdr.us1.sentinelone.net` | |
-| `SDL_CONSOLE_API_TOKEN` | Console token for SDL queries and config (not `uploadLogs`) | Same token as `S1_API_TOKEN` — console tokens support the SDL API from Management version Z SP5+. See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
-| `SDL_LOG_WRITE_KEY` | Log Write key — only needed for `uploadLogs` | In Singularity Data Lake → menu next to username → API Keys → Log Access Keys → New Key (Log Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
-| `SDL_CONFIG_WRITE_KEY` | Config Write key — only needed for `putFile` (parser/dashboard deploy) | In Singularity Data Lake → menu next to username → API Keys → Configuration Access Keys → New Key (Configuration Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+| `SDL_XDR_URL` | Your SDL tenant URL, e.g. `https://xdr.us1.sentinelone.net` | Region-specific; see [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
+| `SDL_LOG_WRITE_KEY` | Log Write key, only needed for `uploadLogs` | In Singularity Data Lake → menu next to username → API Keys → Log Access Keys → New Key (Log Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+| `SDL_CONFIG_WRITE_KEY` | Config Write key, only needed for `putFile` (parser/dashboard deploy) | In Singularity Data Lake → menu next to username → API Keys → Configuration Access Keys → New Key (Configuration Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
 
-`SDL_CONSOLE_API_TOKEN` alone is enough for most SDL workflows.
+`S1_CONSOLE_API_TOKEN` alone is enough for SDL query and config-read workflows. Console tokens support the SDL API from Management version Z SP5+; the same JWT covers both. (The legacy `SDL_CONSOLE_API_TOKEN` key is still recognised as a deprecated alias and emits a one-time deprecation warning.)
 
 ---
 
 ## How to set credentials
 
-Create a single JSON file with your credentials. The skills check this file at startup —
-no environment variables or shell config needed.
+Drop a single JSON file into a folder Cowork has access to. The plugin's SessionStart hook discovers it and copies it to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of every session, so every script and CLI in the plugin finds it with no preflight or env vars.
 
-| OS | Credentials file location |
-|----|--------------------------|
-| macOS / Linux | `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` |
-| Windows | `%USERPROFILE%\.config\sentinelone\credentials.json` |
+Recommended path:
 
-The file format is the same on all platforms. A fully annotated example is included in this repo at [`credentials.example.json`](credentials.example.json):
+```
+$COWORK_WORKSPACE/.sentinelone/credentials.json
+```
+
+Or any folder Cowork has access to under `.sentinelone/credentials.json`. The hook auto-discovers the workspace by scanning `$HOME/mnt/` if `$COWORK_WORKSPACE` isn't set.
+
+| Where | Path | When |
+|---|---|---|
+| Workspace (recommended for Cowork) | `$COWORK_WORKSPACE/.sentinelone/credentials.json` | Cowork sandbox copies it to `$HOME/.claude/sentinelone/` automatically on session start |
+| Any mounted folder | `<any-Cowork-accessible-folder>/.sentinelone/credentials.json` | Auto-discovered via `~/mnt/*` scan; same auto-copy |
+| Cowork session | `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` | Read as fallback when set |
+| Legacy paths | `~/.claude/sentinelone/credentials.json`, `~/.config/sentinelone/credentials.json` | Older paths, still honoured |
+
+The file format is the same in every location. A fully annotated example is included in this repo at [`credentials.example.json`](credentials.example.json):
 
 ```json
 {
-  "S1_BASE_URL": "https://usea1-acme.sentinelone.net",
-  "S1_API_TOKEN": "eyJ...your-token...",
-  "SDL_BASE_URL": "https://xdr.us1.sentinelone.net",
-  "SDL_CONSOLE_API_TOKEN": "eyJ...your-token...",
+  "S1_CONSOLE_URL": "https://usea1-acme.sentinelone.net",
+  "S1_CONSOLE_API_TOKEN": "eyJ...your-token...",
+  "S1_HEC_INGEST_URL": "https://ingest.us1.sentinelone.net",
+  "SDL_XDR_URL": "https://xdr.us1.sentinelone.net",
   "SDL_LOG_WRITE_KEY": "0Z1Fy0...your-log-write-key...",
   "SDL_CONFIG_WRITE_KEY": "0mXas6PD...your-config-write-key..."
 }
 ```
 
-Only include the keys you need. `S1_BASE_URL` + `S1_API_TOKEN` covers most skills.
-Add `SDL_*` keys only if you use the SDL API or log parser skills.
+Only include the keys you need. `S1_CONSOLE_URL` + `S1_CONSOLE_API_TOKEN` covers most skills (including SDL query and config methods).
+Add `SDL_*` keys only if you need `uploadLogs` (`SDL_LOG_WRITE_KEY`) or parser/dashboard deploy (`SDL_CONFIG_WRITE_KEY`).
 
 ### Create the file
 
 **macOS / Linux** — paste into Terminal:
 ```bash
-# Cowork (recommended):
-mkdir -p "$CLAUDE_CONFIG_DIR/sentinelone"
-cat > "$CLAUDE_CONFIG_DIR/sentinelone/credentials.json" << 'EOF'
-
-# Terminal fallback:
-# mkdir -p ~/.config/sentinelone
-# cat > $CLAUDE_CONFIG_DIR/sentinelone/credentials.json << 'EOF'
+# Pick a folder Cowork has access to. Optionally export it as $COWORK_WORKSPACE.
+export COWORK_WORKSPACE=~/Documents/Claude/Projects/MyProject
+mkdir -p "$COWORK_WORKSPACE/.sentinelone"
+cat > "$COWORK_WORKSPACE/.sentinelone/credentials.json" << 'EOF'
 {
-  "S1_BASE_URL": "https://usea1-acme.sentinelone.net",
-  "S1_API_TOKEN": "eyJ...your-token...",
-  "SDL_BASE_URL": "https://xdr.us1.sentinelone.net",
-  "SDL_CONSOLE_API_TOKEN": "eyJ...your-token...",
+  "S1_CONSOLE_URL": "https://usea1-acme.sentinelone.net",
+  "S1_CONSOLE_API_TOKEN": "eyJ...your-token...",
+  "S1_HEC_INGEST_URL": "https://ingest.us1.sentinelone.net",
+  "SDL_XDR_URL": "https://xdr.us1.sentinelone.net",
   "SDL_LOG_WRITE_KEY": "0Z1Fy0...your-log-write-key...",
   "SDL_CONFIG_WRITE_KEY": "0mXas6PD...your-config-write-key..."
 }
 EOF
+chmod 600 "$COWORK_WORKSPACE/.sentinelone/credentials.json"
 ```
 
 **Windows** — paste into PowerShell:
 ```powershell
-# In Cowork use $CLAUDE_CONFIG_DIR/sentinelone/credentials.json instead
-$dir = "$env:USERPROFILE\.config\sentinelone"
+$workspace = "$env:USERPROFILE\Documents\Claude\Projects\MyProject"
+$dir = "$workspace\.sentinelone"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 @'
 {
-  "S1_BASE_URL": "https://usea1-acme.sentinelone.net",
-  "S1_API_TOKEN": "eyJ...your-token...",
-  "SDL_BASE_URL": "https://xdr.us1.sentinelone.net",
-  "SDL_CONSOLE_API_TOKEN": "eyJ...your-token...",
+  "S1_CONSOLE_URL": "https://usea1-acme.sentinelone.net",
+  "S1_CONSOLE_API_TOKEN": "eyJ...your-token...",
+  "S1_HEC_INGEST_URL": "https://ingest.us1.sentinelone.net",
+  "SDL_XDR_URL": "https://xdr.us1.sentinelone.net",
   "SDL_LOG_WRITE_KEY": "0Z1Fy0...your-log-write-key...",
   "SDL_CONFIG_WRITE_KEY": "0mXas6PD...your-config-write-key..."
 }
 '@ | Set-Content "$dir\credentials.json" -Encoding UTF8
 ```
 
-Restart Claude after creating the file.
+Start a new Claude session after creating the file. The SessionStart hook copies it into the sandbox automatically.
 
 ---
 
