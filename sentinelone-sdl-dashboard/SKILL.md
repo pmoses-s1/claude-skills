@@ -245,13 +245,36 @@ Shows frequency distribution of a numeric field (X = value range, Y = count). Us
 
 Accepts GitHub-flavored Markdown. Good for section headers, links, or explanations.
 
+> **CRITICAL:** the body field is `markdown`, **not** `content`. A panel with
+> `"content": "..."` is created successfully and renders as a **blank tile with
+> no error** — the API accepts it, the UI just has nothing to display. Always
+> use `"markdown": "..."`.
+
 ```json
 {
   "title": "About this dashboard",
   "graphStyle": "markdown",
-  "content": "## SOC Overview\nThis dashboard tracks **threat activity** across all managed endpoints.\n\n[Open Event Search](/logs)"
+  "markdown": "## SOC Overview\nThis dashboard tracks **threat activity** across all managed endpoints.\n\n[Open Event Search](/logs)"
 }
 ```
+
+---
+
+## Common rendering pitfalls
+
+These are silent failures — the API accepts the JSON, the panel mounts, but
+either nothing draws or the panel hangs on the spinner. Apply the fix
+preemptively when authoring panels of these shapes.
+
+| Symptom | Root cause | Fix |
+|---|---|---|
+| Markdown panel renders blank, no error | Wrong body field | Use `markdown:` (NOT `content:`) — see Markdown panel section above |
+| `area` chart with `query` field shows an indefinite spinner; no error in UI | `graphStyle: "area"` is built around the `plots: [...]` pattern. A query-driven multi-series chart that ends in `transpose` does not render under `area`. | Switch to `graphStyle: "stacked_bar"` (or `"line"`) with `xAxis: "time"`. The query body stays the same. |
+| `Couldn't load content` — `"transpose" can only be used as the last command in a query` | `transpose` is the terminal command in the PQ pipeline; nothing can follow it | Remove any `\| limit N` / `\| sort` / `\| filter` placed AFTER `transpose`. If you need a limit, apply it pre-transpose via a subquery or a column-list filter |
+| `Couldn't load content` — `Identifier "x-y" is ambiguous. To subtract, add spaces: "x - y". Otherwise, add backslashes: "x\-y"` | The PQ parser reads hyphenated text as a single identifier, not as subtraction | Add spaces around `-` in arithmetic: `total - min`, `max - min`, `(a - b) / (c - d)`. Same applies to all PQ panels and rule bodies. |
+| Dashboard panel times out, indefinite spinner | A subquery inside the main query forces the engine to scan-and-aggregate twice. Dashboards rerun panels on every load, so the cost compounds. | Don't gate a panel query on a subquery if you can avoid it. Hardcode top-N values via inline OR clauses, or accept the full cardinality (often small after the initial filter). If a subquery is unavoidable, prefer a `lookup` against a precomputed datatable. |
+| Number panel slow on a busy index | Engine keeps scanning after the answer is computed | Always terminate number panels with `\| limit 1` after the `\| group` that reduces to one row |
+| Wide range + fine `timebucket` = thousands of points per series | E.g. `timebucket("10m")` over 7d = 1,008 points × N series | Match bucket to duration: 1d → `10m`, 7d → `1h` (minimum), 30d → `1 day` minimum |
 
 ---
 

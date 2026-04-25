@@ -210,7 +210,7 @@ After VirusTotal enrichment, correlate findings back into the environment:
 
 If none of these confirmations exist, the maximum classification is **SUSPICIOUS — Pending Confirmation**, regardless of what the detection engine severity says.
 
-**Lesson learned:** A PowerShell/ransomware alert (CRITICAL severity, Anti Exploitation/Fileless engine) on an endpoint was initially treated as a confirmed true positive based on the detection engine classification alone. MDR investigation subsequently confirmed it as **False Positive — Benign** (Alert Type: EPP, Classification: Benign, Action: Resolve). This demonstrates why detection engine severity must never be treated as a final verdict.
+**Lesson learned:** A PowerShell/ransomware alert (CRITICAL severity, Anti Exploitation/Fileless engine) on endpoint MV-INSIDERTOOL was initially treated as a confirmed true positive based on the detection engine classification alone. MDR investigation subsequently confirmed it as **False Positive — Benign** (Alert Type: EPP, Classification: Benign, Action: Resolve). This demonstrates why detection engine severity must never be treated as a final verdict.
 
 | VT Detection | Behavioral Match | Infra Correlation | Threat Actor | Environment Match | MDR/Analyst Verdict | **Verdict** |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -267,7 +267,21 @@ Run this PowerQuery to discover every data source currently ingesting logs:
 | limit 1000
 ```
 
-This returns all unique `dataSource.name`, `dataSource.vendor`, and `dataSource.category` values across the entire SDL in a single call. The result is environment-specific — treat it as ground truth for what is queryable in this session. Do not assume any specific sources are present; use only what the live query returns.
+This returns all unique `dataSource.name`, `dataSource.vendor`, and `dataSource.category` values across the entire SDL in a single call. The result is environment-specific — treat it as ground truth for what is queryable in this session.
+
+**Reference inventory (last confirmed for this environment — always verify live):**
+
+| Category | Data Sources |
+|----------|-------------|
+| **Endpoint / EDR** | SentinelOne, SentinelOne Mobile, Windows Event Logs |
+| **Network Perimeter** | OPNSense Home FW, FortiGate, Palo Alto Networks Firewall, Zscaler Internet Access, Cloudflare |
+| **Network Detection** | Zeek, suricata, dns, strelka |
+| **Identity / IAM** | Okta, Azure Active Directory |
+| **Cloud** | AWS CloudTrail, Google Workspace, Microsoft O365 |
+| **Email Security** | Mimecast |
+| **AI Security** | Prompt Security |
+| **Infrastructure** | Proxmox VE, Proxmox |
+| **S1 Internal** | alert, indicator, misconfiguration, vulnerability, asset, finding, ActivityFeed, Identity |
 
 ### Step 2: Classify Each Discovered Source Before Querying
 
@@ -275,28 +289,29 @@ For each source returned by the enumeration query, classify it before writing hu
 
 | Classification | Criteria | Action |
 |---------------|----------|--------|
-| **OCSF-native** | SentinelOne native telemetry, Windows Event Logs, S1 internal sources (alert, indicator, ActivityFeed, etc.) | Use standard fields: `src.ip.address`, `dst.ip.address`, `actor.user.name`, etc. — generate via `purple_ai` |
-| **Schema unknown** | Any other source — third-party firewalls, network appliances, SaaS integrations, cloud providers | **Run schema discovery (Section 7, Steps 1–4) before writing any query** |
+| **OCSF-native** | SentinelOne, Windows Event Logs, S1 internal sources | Use standard fields: `src.ip.address`, `dst.ip.address`, `actor.user.name`, etc. — generate via `purple_ai` |
+| **Schema confirmed** | Source is documented in Section 7 of this file | Use the documented field namespace directly |
+| **Schema unknown** | Source present in live enumeration but not in Section 7 | **Run schema discovery (Section 7, Steps 1–4) before querying** |
 
 ### Step 3: Query Each Source for Suspicious Activity
 
-After classifying sources, query each security-relevant one for indicators matching the current investigation. Use `purple_ai` to generate the appropriate query for OCSF sources — for non-OCSF sources, complete schema discovery first (Section 7), then query using the confirmed field namespace.
+After classifying sources, query each security-relevant one for indicators matching the current investigation. Use `purple_ai` to generate the appropriate query for OCSF sources — for non-OCSF sources, use the confirmed field namespaces from Section 7.
 
 **Prioritized query order by threat visibility:**
 
 After pulling logs from each source, apply the **Section 8 anomaly checklist** (frequency, timing, geo, baseline, volume, new entity, privilege, chain) before moving to the next source.
 
-| Priority | Source Category | Known IOCs to Hunt | Anomalies to Detect (see Section 8) |
-|----------|----------------|-------------------|--------------------------------------|
-| 1 | **Endpoint / EDR** (e.g. SentinelOne, Windows Event Logs) | File hashes, process names, registry keys, C2 IPs | LOLBin abuse, Office spawning shells, encoded PowerShell, unusual parent-child processes, new scheduled tasks, credential dumping |
-| 2 | **Identity / IAM** (e.g. SSO providers, directory services) | Compromised usernames, known attacker IPs | Impossible travel, off-hours logins, brute force, new device enrollment, MFA fatigue, dormant account reactivation |
-| 3 | **Network perimeter** (e.g. firewalls, proxies) | Known C2 IPs/ports, blocked attacker infrastructure | Beaconing patterns, high-frequency BLOCK retries, large outbound transfers, non-standard ports, new external destinations |
-| 4 | **Network detection** (e.g. IDS/IPS, DNS, NDR) | Malicious domains, JA3 hashes, known bad IPs | DNS tunneling, DGA domain queries, protocol anomalies, first-ever DNS queries to new TLDs |
-| 5 | **Web / proxy** (e.g. secure web gateways, CDN) | Blocked malicious URLs, known phishing domains | Unusual proxy categories, first-ever access to new domains, high-volume downloads, off-hours web traffic |
-| 6 | **Cloud infrastructure** (e.g. AWS, GCP, Azure audit logs) | Attacker IPs, known malicious API patterns | IAM privilege escalation, API calls from new IPs, audit logging disabled, new compute in unusual region, storage mass download |
-| 7 | **SaaS / productivity** (e.g. email, collaboration, file sharing) | Malicious sender domains, known phishing URLs | New mail forwarding rules, OAuth app consent, mass file download, first-ever external sharing of sensitive docs |
-| 8 | **Email security** (e.g. email gateways, secure email) | Known phishing domains, malicious attachment hashes | Homoglyph domains, first-ever senders to executives, bulk forwarding, unsolicited password reset links |
-| 9 | **AI security** (e.g. prompt security, LLM gateways) | Known prompt injection patterns | Policy violations, unusual data volume in LLM prompts, first-ever access to sensitive data categories via AI |
+| Priority | Source | Known IOCs to Hunt | Anomalies to Detect (see Section 8) |
+|----------|--------|-------------------|--------------------------------------|
+| 1 | **SentinelOne / Windows Event Logs** | File hashes, process names, registry keys, C2 IPs | LOLBin abuse, Office spawning shells, encoded PowerShell, unusual parent-child processes, new scheduled tasks, credential dumping |
+| 2 | **Okta / Azure AD** | Compromised usernames, known attacker IPs | Impossible travel, off-hours logins, brute force, new device enrollment, MFA fatigue, dormant account reactivation |
+| 3 | **Firewall logs** (OPNSense, FortiGate, PAN) | Known C2 IPs/ports, blocked attacker infrastructure | Beaconing patterns, high-frequency BLOCK retries, large outbound transfers, non-standard ports, new external destinations |
+| 4 | **Zeek / Suricata / dns** | Malicious domains, JA3 hashes, known bad IPs | DNS tunneling, DGA domain queries, protocol anomalies, first-ever DNS queries to new TLDs |
+| 5 | **Zscaler / Cloudflare** | Blocked malicious URLs, known phishing domains | Unusual proxy categories, first-ever access to new domains, high-volume downloads, off-hours web traffic |
+| 6 | **AWS CloudTrail** | Attacker IPs, known malicious API patterns | IAM privilege escalation, API calls from new IPs, CloudTrail logging disabled, new compute in unusual region, S3 mass download |
+| 7 | **Google Workspace / M365** | Malicious sender domains, known phishing URLs | New mail forwarding rules, OAuth app consent, mass file download, first-ever external sharing of sensitive docs |
+| 8 | **Mimecast** | Known phishing domains, malicious attachment hashes | Homoglyph domains, first-ever senders to executives, bulk forwarding, unsolicited password reset links |
+| 9 | **Prompt Security** | Known prompt injection patterns | Policy violations, unusual data volume in LLM prompts, first-ever access to sensitive data categories via AI |
 
 ### Step 3: Cross-Source IOC Correlation
 
@@ -318,12 +333,12 @@ When a suspicious IOC (IP, domain, hash, user, hostname) is found in any one sou
 
 | Correlation Pattern | Meaning |
 |--------------------|---------|
-| Firewall BLOCK + IDS/IPS ALERT on same dst IP | Confirmed C2 attempt — network layer caught it |
-| Identity provider auth failure + Windows Event 4625 on same user | Credential stuffing or lateral movement |
-| Email gateway phishing delivery + SentinelOne process execution within 1h | Confirmed phishing-to-execution chain |
-| Cloud audit log unusual API + DNS spike to new domain | Cloud compromise with C2 beaconing |
+| Firewall BLOCK + Suricata ALERT on same dst IP | Confirmed C2 attempt — network layer caught it |
+| Okta auth failure + Windows Event 4625 on same user | Credential stuffing or lateral movement |
+| Mimecast phishing delivery + SentinelOne process execution within 1h | Confirmed phishing-to-execution chain |
+| CloudTrail unusual API + Zeek DNS spike to new domain | Cloud compromise with C2 beaconing |
 | Firewall PASS to IP + VT malicious verdict | Successful C2 connection — critical true positive |
-| Identity impossible travel + new device enrollment + mail forwarding rule | Account takeover in progress |
+| Azure AD impossible travel + Okta new device + M365 mail rule | Account takeover in progress |
 
 ---
 
@@ -331,7 +346,7 @@ When a suspicious IOC (IP, domain, hash, user, hostname) is found in any one sou
 
 **Many third-party log sources (firewalls, SIEMs, network appliances) do NOT map to the OCSF schema.** Their fields land in SDL under vendor-specific namespaces. Querying them with standard OCSF fields (e.g., `src.ip.address`, `networkSource.address`) will return null results. You MUST discover the correct field schema before querying.
 
-**⚠️ Never assume a field schema.** Every SDL deployment is different. The same `dataSource.name` can use a completely different field namespace depending on how the log source was configured, which parser is applied, and which SDL version is running. Always run Steps 1–4 below to confirm field names live before writing any hunt query against a non-OCSF source.
+**⚠️ Schema registry is environment-specific.** The confirmed schemas documented below (e.g., OPNSense `filter.log.*`) apply to THIS environment only. A source with the same `dataSource.name` in a different Purple deployment may use a different field namespace depending on how the syslog forwarder or parser was configured. If you are operating in a new or unfamiliar environment, re-validate any schema by running Steps 1–4 below even if the source name matches a documented entry.
 
 ### Why This Happens
 
@@ -385,45 +400,101 @@ Try these field namespace patterns one at a time until you get non-null results:
 
 If you have access to a raw event (e.g., from SentinelOne SDL UI or a user-provided sample), read the field names directly from the event properties. These become your confirmed query fields.
 
-### Discovered Schema Registry — How to Use
+### OPNSense Home FW — Confirmed Field Schema
 
-There are no pre-populated schemas in this file. Every schema must be discovered live using Steps 1–4 above. Once you have confirmed the field names for a source in the current session, document them here using the template below so they are available for the rest of the session.
-
-**Schema entry template:**
-
-```
-### <dataSource.name> — Discovered Field Schema
-
-Discovered: <timestamp of this session>
+OPNSense filterlog events are ingested under the `filter.log.*` namespace. Standard OCSF fields are null. Use these confirmed fields:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `<namespace>.<field>` | string | <what it contains> |
-| ...   | ...  | ... |
+| `filter.log.action` | string | Firewall decision: `pass` or `block` |
+| `filter.log.source_ip` | string | Source IP address |
+| `filter.log.source_port` | string | Source port number |
+| `filter.log.destination_ip` | string | Destination IP address |
+| `filter.log.destination_port` | string | Destination port number |
+| `filter.log.protocol_name` | string | Protocol: `tcp`, `udp`, `icmp`, `igmp` |
+| `filter.log.direction` | string | Traffic direction: `in` or `out` |
+| `filter.log.interface` | string | Network interface: `re0` (LAN), `re1` (WAN) |
+| `filter.log.reason` | string | Rule match reason: typically `match` |
+| `filter.log.rule` | string | Firewall rule number that triggered |
+| `filter.log.ip_version` | string | IP version: `4` or `6` |
+| `filter.log.ttl` | string | Time-to-live value |
+| `filter.log.tracker` | string | Unique flow tracker ID |
+| `dataSource.name` | string | Always `"OPNSense Home FW"` |
+| `dataSource.vendor` | string | Always `"OPNSense"` |
 
-**Query template:**
-| filter( dataSource.name == "<source name>" )
-| filter( <key field> == * )
-| columns timestamp, <field1>, <field2>, <field3>
+**Standard OPNSense query template:**
+```
+| filter( dataSource.name == "OPNSense Home FW" )
+| filter( filter.log.source_ip == * )
+| columns timestamp, filter.log.action, filter.log.source_ip, filter.log.source_port,
+          filter.log.destination_ip, filter.log.destination_port,
+          filter.log.protocol_name, filter.log.direction,
+          filter.log.interface, filter.log.reason, filter.log.rule
 | sort - timestamp
 | limit 1000
 ```
 
-Add one entry per confirmed source. Discard these entries at the end of the session — do not carry them across to a new session or a different environment. Always re-discover.
+**To query only blocked traffic:**
+```
+| filter( dataSource.name == "OPNSense Home FW" )
+| filter( filter.log.action == "block" )
+| filter( filter.log.source_ip == * )
+| columns timestamp, filter.log.action, filter.log.source_ip, filter.log.source_port,
+          filter.log.destination_ip, filter.log.destination_port,
+          filter.log.protocol_name, filter.log.direction, filter.log.rule
+| sort - timestamp
+| limit 1000
+```
 
-### Firewall Source — Generic Threat Detection Patterns
+**To hunt for a specific suspicious IP across OPNSense:**
+```
+| filter( dataSource.name == "OPNSense Home FW" )
+| filter( filter.log.source_ip == "SUSPICIOUS_IP"
+       OR filter.log.destination_ip == "SUSPICIOUS_IP" )
+| columns timestamp, filter.log.action, filter.log.source_ip, filter.log.destination_ip,
+          filter.log.destination_port, filter.log.protocol_name, filter.log.direction
+| sort - timestamp
+| limit 1000
+```
 
-Once the schema for any firewall source has been discovered and the correct field names confirmed, apply these detection patterns. Substitute the actual discovered field names for the placeholders (e.g. `<action_field>`, `<src_ip_field>`, `<dst_port_field>`, `<direction_field>`):
+### OPNSense Threat Detection Patterns
 
-| Pattern | Signal | Threat Hypothesis |
-|---------|--------|-------------------|
+When querying OPNSense logs, flag the following patterns for immediate VirusTotal enrichment:
+
+| Pattern | Query Signal | Threat Hypothesis |
+|---------|-------------|-------------------|
 | **High-frequency BLOCK retries** | Same src/dst IP pair blocked 10+ times in short window | C2 beaconing blocked at perimeter — host may be compromised |
-| **Inbound on non-standard ports** | `direction == "in"` AND destination port not in [80,443,53,22,25] | Reverse shell, RAT callback, or exploit attempt |
-| **Outbound UDP on unusual ports** | `direction == "out"` AND protocol UDP AND port not in [53,123,67,68] | DNS tunneling, VPN, or C2 over UDP |
+| **Inbound on non-standard ports** | `direction == "in"` AND `destination_port` not in [80,443,53,22,25] | Reverse shell, RAT callback, or exploit attempt |
+| **Outbound UDP on unusual ports** | `direction == "out"` AND `protocol_name == "udp"` AND port not in [53,123,67,68] | DNS tunneling, VPN, or C2 over UDP |
 | **PASS traffic to known-bad IP** | `action == "pass"` + VT confirms malicious | **CRITICAL** — successful C2 connection, containment required |
-| **Inbound LLMNR/mDNS from internet** | UDP dst port 5355 inbound from non-RFC1918 source | Scanning probe or spoofed packet |
+| **Inbound LLMNR/mDNS from internet** | `protocol_name == "udp"` AND `destination_port == "5355"` AND `direction == "in"` from non-RFC1918 | Scanning probe or spoofed packet |
 | **Asymmetric TCP blocks** | Internal IP blocked on return traffic from internet | Possible data exfiltration attempt or misconfigured policy |
-| **New external destination IPs** | Outbound to IPs not seen in previous 7 days | New C2 infrastructure or beaconing to freshly registered IP |
+| **New external destination IPs** | `direction == "out"` to IPs not seen in previous 7 days | New C2 infrastructure or beaconing to freshly registered IP |
+
+### Field Schema Reference for Other Known Non-OCSF Sources
+
+This section is a **living registry** — add confirmed field schemas here as they are discovered during investigations. Each entry should follow the OPNSense format: confirmed field names, types, descriptions, and a ready-to-use query template.
+
+For any source where schema is unknown or unconfirmed, always run the Steps 1–4 schema discovery workflow before querying. Do not guess or reuse schemas from a different environment.
+
+**Sources pending schema confirmation in this environment** (present in SDL but not yet fully documented):
+- FortiGate
+- Palo Alto Networks Firewall
+- Zscaler Internet Access
+- Cloudflare
+- Zeek
+- suricata
+- strelka
+- dns
+- Mimecast
+- Prompt Security
+- Azure Active Directory
+- AWS CloudTrail
+- Google Workspace
+- Microsoft O365
+- Proxmox VE / Proxmox
+
+When a schema is confirmed for any of the above, add it to this section immediately.
 
 **General rule:** If a `purple_ai`-generated query returns all-null results despite `dataSource.name` matching and record count > 0, the source is non-OCSF. Run schema discovery immediately rather than retrying with different OCSF field names.
 
@@ -443,7 +514,7 @@ Known-bad IOC matching catches commodity threats. Advanced adversaries and insid
 
 ### Anomaly Detection by Source Category
 
-#### Identity & Authentication Anomalies (SSO providers, directory services, Windows Event Logs)
+#### Identity & Authentication Anomalies (Okta, Azure AD, Windows Event Logs)
 
 Apply these detection patterns to every identity source query. Flag any match for VT enrichment and cross-source correlation.
 
@@ -461,13 +532,12 @@ Apply these detection patterns to every identity source query. Flag any match fo
 | **Privilege escalation post-login** | Account acquires new group membership or elevated role within minutes of login | T1078.003 — Cloud Accounts | 🟠 High |
 | **Lateral movement via legitimate credentials** | User account authenticates to systems they have never accessed before | T1021 — Remote Services | 🟠 High |
 
-**PowerQuery pattern — authentication outside business hours (run schema discovery first to confirm field names for your identity source):**
+**PowerQuery pattern — authentication outside business hours (Okta):**
 ```
-# After schema discovery, substitute confirmed field names for your identity source:
-| filter( dataSource.name == "<YOUR_IDENTITY_SOURCE>" )
-| filter( <event_type_field> == "<session_start_event>" )
-| filter( <status_field> == "SUCCESS" )
-| columns timestamp, <user_field>, <email_field>, <src_ip_field>
+| filter( dataSource.name == "Okta" )
+| filter( unmapped.eventType == "user.session.start" )
+| filter( status == "SUCCESS" )
+| columns timestamp, actor.user.name, actor.user.email_addr, src_endpoint.ip, unmapped.target
 | sort - timestamp
 | limit 1000
 # Post-query: flag rows where timestamp hour (UTC) is outside 06:00–22:00
@@ -481,7 +551,7 @@ Apply these detection patterns to every identity source query. Flag any match fo
 
 ---
 
-#### Network Anomalies (firewalls, IDS/IPS, DNS, NDR)
+#### Network Anomalies (OPNSense, FortiGate, Palo Alto, Zeek, Suricata, dns)
 
 | Anomaly | Signal to Look For | MITRE Technique | Severity |
 |---------|-------------------|-----------------|----------|
@@ -497,13 +567,13 @@ Apply these detection patterns to every identity source query. Flag any match fo
 | **High-volume BLOCK retries** | Same src→dst pair blocked 10+ times in a short window | T1071 — C2 beaconing attempt | 🟠 High |
 | **LLMNR/NetBIOS from internet** | UDP 5355 or 137 inbound from non-RFC1918 source | T1557.001 — LLMNR/NBT-NS Poisoning | 🟠 High |
 
-**Firewall — beaconing detection query (substitute confirmed field names from schema discovery):**
+**OPNSense — beaconing detection query:**
 ```
-| filter( dataSource.name == "<YOUR_FIREWALL_SOURCE>" )
-| filter( <direction_field> == "out" )
-| filter( <action_field> == "pass" )
-| filter( <src_ip_field> == * )
-# Group by src_ip + dst_ip + dst_port and count — high count
+| filter( dataSource.name == "OPNSense Home FW" )
+| filter( filter.log.direction == "out" )
+| filter( filter.log.action == "pass" )
+| filter( filter.log.source_ip == * )
+# Group by source_ip + destination_ip + destination_port and count — high count
 # at regular intervals = beaconing. Use purple_ai to generate groupBy query.
 ```
 
@@ -542,7 +612,7 @@ Apply these detection patterns to every identity source query. Flag any match fo
 
 ---
 
-#### Cloud & SaaS Anomalies (cloud audit logs, productivity suites, collaboration platforms)
+#### Cloud & SaaS Anomalies (AWS CloudTrail, Google Workspace, Microsoft O365)
 
 | Anomaly | Signal to Look For | MITRE Technique | Severity |
 |---------|-------------------|-----------------|----------|
@@ -559,7 +629,7 @@ Apply these detection patterns to every identity source query. Flag any match fo
 
 ---
 
-#### Email Anomalies (email security gateways)
+#### Email Anomalies (Mimecast)
 
 | Anomaly | Signal to Look For | MITRE Technique | Severity |
 |---------|-------------------|-----------------|----------|
@@ -746,3 +816,86 @@ Format reports as `.docx` files for SOC leadership consumption.
 - When uncertain, say so explicitly and outline what additional data would resolve the uncertainty.
 - Always end with actionable next steps — never leave the analyst wondering "so what do I do now?"
 - When presenting VirusTotal findings, lead with the detection ratio and threat actor attribution, then drill into behavioral details.
+
+---
+
+## Skills Toolbox — When to Invoke Each Skill
+
+This environment has multiple specialised skills installed. **Use them eagerly** — every skill in this list was used productively in the 2026-04-25 FortiGate engagement. Do not try to hand-author SDL configuration files, Hyperautomation workflows, or detection rule bodies without the appropriate skill loaded.
+
+| Skill | Trigger / When to invoke | What it gives you |
+|---|---|---|
+| `sentinelone-skills:sentinelone-powerquery` | Any time you need to author, optimise, debug, or explain a PowerQuery — STAR rule body, dashboard panel, hunt, alert | LRQ runner, syntax reference, performance rules (filter early, group narrow, `top` over `group` for huge ranges, `transpose` LAST, escape regex, percentile rules) |
+| `sentinelone-skills:sentinelone-mgmt-console-api` | Site / agent / threat / IOC / Custom Detection rule operations on the console; deploying STAR rules; UAM alert triage | `S1Client`, endpoint index, UAM GraphQL wrapper, `pq.py` LRQ runner, IOC lifecycle test, asset linkage ref |
+| `sentinelone-skills:sentinelone-sdl-api` | Reading or writing SDL configuration files (parsers, dashboards, lookups), ingesting custom logs, V1 query for ad-hoc <24h stats | `SDLClient.put_file`, `get_file`, `list_files`; ingestion methods; key-matrix auto-routing |
+| `sentinelone-skills:sentinelone-sdl-dashboard` | Building or editing any SDL dashboard JSON | Panel-type cheatsheet, community examples, query performance rules, parameters & filters |
+| `sentinelone-skills:sentinelone-hyperautomation` | Authoring SOAR / playbook / alert-response workflow JSON | Workflow envelope, building blocks, action types, integration warnings, examples |
+| `sentinelone-skills:sentinelone-sdl-log-parser` | Authoring or debugging an SDL `/logParsers/` parser file (CEF, syslog, key=value, multi-line) | Parser DSL, end-to-end validation via `putFile → uploadLogs → query` |
+| `mcp__purple-mcp__*` (built-in MCP) | First-line PowerQuery hunts, alert triage, VT enrichment | Auto-authenticated; preferred for quick hunts and 24h stats |
+| `mcp__virustotal__*` (built-in MCP) | **Mandatory** — every IOC enrichment | `get_file_report`, `get_ip_report`, `get_domain_report`, `get_url_report`, plus all relationship pivots |
+| `docx` | CISO / leadership reports as `.docx` | docx-js Node lib, validated output, table styling rules |
+| `xlsx` / `pptx` / `pdf` | Same idea for spreadsheets / decks / PDFs | Office skill set |
+
+### Standard Engagement Workflow (proven 2026-04-25)
+
+This is the order that produced a clean delivery on FortiGate. Replicate the shape for any future investigation that culminates in deliverables.
+
+1. **Load skills you'll need up front** — invoke `Skill: <name>` for `sentinelone-powerquery`, `sentinelone-mgmt-console-api`, `sentinelone-sdl-dashboard`, `sentinelone-hyperautomation`, `sentinelone-sdl-api`, `docx` BEFORE starting work. Loading them mid-task wastes turns.
+2. **Session init in parallel** — data-source enumeration query + `search_alerts` + `get_timestamp_range` in a single tool-call batch.
+3. **Schema discovery for non-OCSF sources** — Section 7 workflow. Document new schemas back into Section 7 immediately.
+4. **Hunt → enrich → correlate** — Purple MCP for hunts, VirusTotal MCP for every IOC, then cross-source correlation.
+5. **Build deliverables** — dashboard JSON via `sentinelone-sdl-dashboard`, workflows via `sentinelone-hyperautomation`, detection rules via `sentinelone-mgmt-console-api`, report via `docx`.
+6. **Deploy live** — `SDLClient.put_file('/dashboards/<name>')` for the dashboard, `POST /web/api/v2.1/cloud-detection/rules` for STAR rules. Read existing version first; pass `expected_version` on overwrite.
+7. **Verify** — re-fetch the deployed artifacts and confirm versions; run a sample query against each rule's PQ body to confirm it parses.
+
+---
+
+## SDL Dashboard — Pitfalls Confirmed in This Tenant
+
+These rendering failures cost iteration cycles in the 2026-04-25 engagement. Apply preemptively.
+
+| Symptom | Root cause | Fix |
+|---|---|---|
+| Markdown panel renders blank | `content:` field is wrong — SDL expects `markdown:` for the body of a markdown panel | Use `"graphStyle": "markdown", "markdown": "..."` (NOT `"content"`) |
+| `area` chart spinner indefinite, no error | `graphStyle: "area"` with a single `query` field expects the `plots: [...]` pattern. Query-driven multi-series doesn't render under `area`. | Switch to `"graphStyle": "stacked_bar"` (or `"line"`) with `xAxis: "time"`. Already proven on the same dashboard's executive-overview tab. |
+| `Couldn't load content` — `"transpose" can only be used as the last command in a query` | `transpose` is the terminal command in the PQ pipeline; nothing can follow | Remove any `\| limit N` / `\| sort` / `\| filter` after `transpose`. Apply pre-transpose limits via subqueries. |
+| `Couldn't load content` — `Identifier "total-min" is ambiguous` | PQ parser reads `total-min` as a hyphenated identifier, not subtraction | Add spaces around `-` in arithmetic: `total - min`, `max - min`, `(a - b) / (c - d)` |
+| Dashboard panel times out / spins | Subquery inside the main query doubles the scan-and-aggregate cost | Don't gate the main query on a subquery in dashboards. Hardcode the top-N via inline OR clauses, or accept the full cardinality (small after filtering). |
+| Number panel slow | No `\| limit 1` after `\| group count()` — engine keeps scanning | Always terminate number panels with `\| limit 1` |
+| Wide range + fine bucket = thousands of points | `timebucket("10m")` over 7d = 1,008 points per series | Match bucket to duration: 1d → 10m, 7d → 1h, 30d → 1d minimum |
+
+## SentinelOne Custom Detection Rule (STAR) — Deployment Gotchas
+
+When deploying STAR / Custom Detection rules via `POST /web/api/v2.1/cloud-detection/rules`:
+
+| Gotcha | Fix |
+|---|---|
+| `400: queryLang "powerQuery" is not a valid choice` | The enum is `"1.0"` (S1QL/event search) or `"2.0"` (PowerQuery). For PowerQuery rules use `"queryLang": "2.0"` |
+| `400: can't apply mitigation actions on a scheduled rule` | `queryType: "scheduled"` rules MUST set `treatAsThreat: "UNDEFINED"` and `networkQuarantine: false`. The verdict surfaces via the rule severity, not via mitigation. |
+| `400: Field 'count_distinct' must be enclosed in a grouping function` | Scheduled-rule bodies only accept simple aggregates inside `group`. Replace `count_distinct(x)` with `count()` or with `group ... by x \| group count()` chained pattern. |
+| `400: Trigger expression does not match any supported pattern` | Same root cause — non-trivial aggregation outside `group`. Simplify to `\| group hits=count() by ...`. |
+| Rule-creation payload: PQ goes inside `data.scheduledParams.query`, NOT `data.s1ql` | `s1ql` is for `queryType: "events"`. PowerQuery rules use the `scheduledParams` block: `{query, lookbackWindowMinutes, runIntervalMinutes, threshold: {value, operator}}` |
+| Site name lookup returns nothing | Console site names can include spaces (e.g. `pmoses demo`, not `pmoses-demo`). Use `name__contains=<substring>` to fuzzy-match, then exact-match by id. |
+| Rule listing returns 0 after successful creation | The `GET /cloud-detection/rules?siteIds=...` filter shape varies by tenant. Trust the POST's returned `data.id` — that's authoritative. |
+
+## VirusTotal Cross-Check Patterns Worth Building In
+
+Confirmed on the FortiGate engagement:
+
+- **GeoIP-evasion detection.** When a FortiGate `srccountry` disagrees with the VT-resolved country for the same IP, that's a stale-GeoIP / VPN-exit signal. Always run `get_ip_report` on flagged IPs and compare `data.attributes.country` against the firewall's GeoIP attribution. Confirmed example: `80.66.66.165` reported by FortiGate as Finland; VT returns Russia.
+- **C2 false-positive avoidance.** Always check VT `resolutions` for outbound destinations before classifying a connection as C2. Confirmed example: `34.193.168.81` was flagged by FortiGate's `udp/6667` app fingerprint on TLS, but VT resolutions show `xdr.us1.sentinelone.net` / `ingest.us1.sentinelone.net` — that's the legitimate S1 ingest endpoint.
+- **Bulletproof-host clustering.** When VT `as_owner` is in `{RouterHosting LLC (AS14956), Tamatiya EOOD (AS50360), Skynet Network (AS214295), Soldatov Alexey Valerevich (AS209702), Hostkey-USA, M247 Europe, IPXO, BL Networks}`, treat the whole subnet as scanner infrastructure regardless of per-IP VT ratio. Block at the ASN/CIDR level.
+- **DGA-domain history as a signal.** A "clean" IP (0/94 VT mal) whose `resolutions` history includes `.work`, `.cn`, `.top`, `.ml`, or freshly-registered `.ru` domains is part of a campaign infrastructure cluster. Treat as suspicious even with a clean current detection ratio.
+
+## Live IOC Blocklist Maintained by This Project
+
+These IOCs were confirmed malicious on 2026-04-25 and pushed to the S1 IOC catalog with a 90-day TTL. Refresh the list whenever new VT-confirmed sources appear. Currently active:
+
+- `79.124.58.218` (BG, Tamatiya EOOD, 13/94 VT mal — port scanner)
+- `79.124.58.98` (BG, Tamatiya EOOD)
+- `45.142.193.73` (RO, Skynet Network, 9/94 VT mal — active malware delivery)
+- `80.66.66.165` (RU geo-evading as FI, 2/94 VT mal)
+- `80.66.66.157` (RU, same /24 as 165)
+- `172.86.89.166` / `172.86.89.67` (US, RouterHosting AS14956)
+- `144.172.91.191` (US, RouterHosting, resolves to Russian DGA)
+- ASN-level blocks: `AS14956`, `AS50360 (79.124.58.0/23)`, `AS214295 (45.142.193.0/24)`, `AS209702 (80.66.66.0/24)`
