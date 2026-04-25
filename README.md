@@ -159,7 +159,7 @@ These are real questions you can ask. Claude will pick the right skill automatic
 
 - *"List all open threats created in the last 24 hours, sorted by confidence"*
 - *"Show me unresolved UAM alerts with severity High or Critical from today"*
-- *"Add a note to threat ID `abc123` saying it was reviewed and is a false positive"*
+- *"Add a note to alert ID `abc123` saying it was reviewed and is a false positive"*
 - *"Isolate endpoint `DESKTOP-XYZ` and create an IOC for its SHA1 hash `aabbcc...`"*
 - *"How many threats were mitigated vs unresolved this week, broken down by site?"*
 - *"Get me the details for alert ID `xyz` including any associated agent and threat info"*
