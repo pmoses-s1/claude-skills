@@ -46,7 +46,17 @@ The plugin bundles every skill in this repo — installing the plugin is suffici
 
 ### Setting up the PrincipalSOCAnalyst project in Cowork
 
-**Prerequisites:** `sentinelone-skills` plugin installed · credentials configured (see [Configuration](#configuration))
+**Prerequisites**
+
+The full investigation workflow requires three components to be installed and connected. All three are needed — the skills handle SDL and Management Console operations, Purple MCP provides the live investigation and hunting interface, and the threat intel MCP provides the external validation that makes true positive classification reliable.
+
+| Component | Purpose | Install |
+|-----------|---------|---------|
+| `sentinelone-skills` plugin | SDL queries, Management Console API, dashboards, parsers, Hyperautomation | See [Installing](#installing) below |
+| **Purple MCP** | Live alert triage, Purple AI hunting, Deep Visibility, UAM, asset and vulnerability context | [github.com/Sentinel-One/purple-mcp](https://github.com/Sentinel-One/purple-mcp) |
+| **Threat intel MCP** (e.g. VirusTotal) | External IOC enrichment — mandatory for true positive classification; no finding is classified CRITICAL without independent TI confirmation | Install via your MCP marketplace or connect directly |
+
+> **Why all three?** The CLAUDE.md operating instructions enforce a rule: no alert may be classified CRITICAL or TRUE POSITIVE based on a SentinelOne detection alone. Purple MCP provides the investigation surface; the threat intel MCP provides the independent confirmation that makes verdicts trustworthy.
 
 **Step 1 — Create the project**
 
@@ -55,9 +65,12 @@ The plugin bundles every skill in this repo — installing the plugin is suffici
 3. Click **Select Folder** and choose this `claude-skills` folder (which contains `CLAUDE.md`)
 4. Click **Create**
 
-**Step 2 — Verify the plugin is active**
+**Step 2 — Verify all components are active**
 
-Go to **Settings → Capabilities → Plugin** and confirm `sentinelone-skills` is listed. If not, upload the `.plugin` file from `sentinelone-skills-plugin/dist/`.
+Go to **Settings → Capabilities** and confirm:
+- `sentinelone-skills` plugin is listed under Plugins
+- Purple MCP is connected under MCP Servers
+- Your threat intel MCP (e.g. VirusTotal) is connected under MCP Servers
 
 **Step 3 — Start a session**
 
