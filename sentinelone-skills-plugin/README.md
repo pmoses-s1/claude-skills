@@ -19,19 +19,19 @@ Set these environment variables once and all skills pick them up automatically.
 
 ### Management Console (required for most skills)
 
-| Variable | Value |
-|----------|-------|
-| `S1_BASE_URL` | Your console URL, e.g. `https://usea1-acme.sentinelone.net` |
-| `S1_API_TOKEN` | API token from Settings > Users > Service Users > Generate API Token |
+| Variable | Value | How to get it |
+|----------|-------|---------------|
+| `S1_BASE_URL` | Your console URL, e.g. `https://usea1-acme.sentinelone.net` | |
+| `S1_API_TOKEN` | Management Console API token | Settings → Users → Service Users → Create New Service User → copy the API token. See [Creating service users](https://community.sentinelone.com/s/article/000005291) |
 
-### Singularity Data Lake (required for sentinelone-sdl-api and sentinelone-sdl-log-parser)
+### Singularity Data Lake (required for sentinelone-sdl-api, sentinelone-sdl-dashboard, and sentinelone-sdl-log-parser)
 
-| Variable | Value |
-|----------|-------|
-| `SDL_BASE_URL` | Your SDL tenant URL, e.g. `https://xdr.us1.sentinelone.net` |
-| `SDL_CONSOLE_API_TOKEN` | Console user API token (covers all methods except raw log upload) |
-| `SDL_LOG_WRITE_KEY` | Log Write access key (only needed for uploadLogs) |
-| `SDL_CONFIG_WRITE_KEY` | Config Write key (only needed for putFile / parser deployment) |
+| Variable | Value | How to get it |
+|----------|-------|---------------|
+| `SDL_BASE_URL` | Your SDL tenant URL, e.g. `https://xdr.us1.sentinelone.net` | |
+| `SDL_CONSOLE_API_TOKEN` | Console token for SDL queries and config (not `uploadLogs`) | Same token as `S1_API_TOKEN` — console tokens support the SDL API from Management version Z SP5+. See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+| `SDL_LOG_WRITE_KEY` | Log Write key — only needed for `uploadLogs` | In Singularity Data Lake → menu next to username → API Keys → Log Access Keys → New Key (Log Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+| `SDL_CONFIG_WRITE_KEY` | Config Write key — only needed for `putFile` (parser/dashboard deploy) | In Singularity Data Lake → menu next to username → API Keys → Configuration Access Keys → New Key (Configuration Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
 
 `SDL_CONSOLE_API_TOKEN` alone is enough for most SDL workflows.
 

@@ -82,14 +82,14 @@ New-Item -ItemType Directory -Force -Path $dir | Out-Null
 
 A fully annotated example with all optional keys is in [`credentials.example.json`](./credentials.example.json).
 
-| Credential key | Required for |
-|---|---|
-| `S1_BASE_URL` | All management console skills |
-| `S1_API_TOKEN` | `sentinelone-mgmt-console-api`, `sentinelone-powerquery` |
-| `SDL_BASE_URL` | `sentinelone-sdl-api`, `sentinelone-sdl-dashboard`, `sentinelone-sdl-log-parser` |
-| `SDL_CONSOLE_API_TOKEN` | SDL query and config methods (not `uploadLogs`) |
-| `SDL_LOG_WRITE_KEY` | `uploadLogs` only |
-| `SDL_CONFIG_WRITE_KEY` | Deploying parsers/dashboards via `putFile` |
+| Credential key | Required for | How to get it |
+|---|---|---|
+| `S1_BASE_URL` | All management console skills | Your console URL, e.g. `https://usea1-acme.sentinelone.net` |
+| `S1_API_TOKEN` | `sentinelone-mgmt-console-api`, `sentinelone-powerquery` | Settings → Users → Service Users → Create New Service User → copy the API token. See [Creating service users](https://community.sentinelone.com/s/article/000005291) |
+| `SDL_BASE_URL` | `sentinelone-sdl-api`, `sentinelone-sdl-dashboard`, `sentinelone-sdl-log-parser` | Your SDL tenant URL, e.g. `https://xdr.us1.sentinelone.net` |
+| `SDL_CONSOLE_API_TOKEN` | SDL query and config methods (not `uploadLogs`) | Same token as `S1_API_TOKEN` — console tokens support the SDL API from Management version Z SP5+. See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+| `SDL_LOG_WRITE_KEY` | `uploadLogs` only | In Singularity Data Lake → menu next to username → API Keys → Log Access Keys → New Key (Log Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+| `SDL_CONFIG_WRITE_KEY` | Deploying parsers/dashboards via `putFile` | In Singularity Data Lake → menu next to username → API Keys → Configuration Access Keys → New Key (Configuration Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
 
 Environment variables override the credentials file if set.
 
