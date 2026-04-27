@@ -16,8 +16,8 @@ The plugin bundles every skill in this repo; installing the plugin is sufficient
 
 | Skill | What it does |
 |-------|-------------|
-| sentinelone-mgmt-console-api | Query and act on the Management Console: threats, alerts, agents, sites, RemoteOps, Deep Visibility, Hyperautomation, Purple AI, UAM |
-| sentinelone-powerquery | Write, debug, and run PowerQuery for threat hunting, STAR detection rules, and SDL dashboards |
+| sentinelone-mgmt-console-api | Query and act on the Management Console: threats, alerts, agents, sites, RemoteOps, Deep Visibility, Hyperautomation, Purple AI, UAM. Includes the source-agnostic behavioral baselining + anomaly detection pipeline (`baseline_anomaly.py`) |
+| sentinelone-powerquery | Write, debug, and run PowerQuery for threat hunting, STAR detection rules, SDL dashboards, and statistical baseline / anomaly detection rule bodies |
 | sentinelone-sdl-api | Ingest events, run queries, and manage configuration files (parsers, dashboards, lookups) via the Singularity Data Lake API |
 | sentinelone-sdl-dashboard | Design, author, and deploy SDL dashboards: panels, tabs, parameters, and full dashboard JSON |
 | sentinelone-sdl-log-parser | Author and validate SDL log parsers for any log format, with OCSF field mapping by default |
@@ -153,6 +153,86 @@ These skills turn Claude into a hands-on SentinelOne analyst and engineer. Once 
 
 **Data lake operations**: ingest custom telemetry, list and manage configuration files, deploy or update parsers and dashboards, and run arbitrary queries through the SDL API.
 
+**Behavioral baselining and anomaly detection**: build per-(principal, action) statistical baselines on any data source — Okta, FortiGate, CloudTrail, SentinelOne, Mimecast, Zeek, anything ingested into SDL — and surface deviations automatically. The skill auto-discovers the right principal field (user, host, IP, role) and action field (event.type, activity_name, action) per source so you don't hardcode field names. See [Behavioral baselining + anomaly detection](#behavioral-baselining--anomaly-detection) below.
+
+---
+
+## Behavioral baselining + anomaly detection
+
+A source-agnostic pipeline for building behavioral baselines and surfacing statistical anomalies on any log source ingested into SDL. Lives in `sentinelone-mgmt-console-api/scripts/baseline_anomaly.py`; documented PQ building blocks are in `sentinelone-powerquery/examples/behavioral-baselines.md`.
+
+### What it does
+
+For any `dataSource.name`, the pipeline:
+
+1. **Auto-discovers the schema** via `inspect_source.discover_schema()` and picks `principal_field` (user / host / IP / role) and `action_field` (event.type / activity_name / action) from what the source actually carries — no per-source hardcoding.
+2. **Slices the baseline window into N daily LRQ queries** (default 30 days), running 3 in parallel under the per-user 3 rps cap. Each slice produces (action, principal, count) rows for that day. Daily slicing avoids the LRQ per-call deadline that single 7d/30d aggregates routinely exceed.
+3. **Runs one 24h live slice** in the same shape.
+4. **Merges client-side** with one of two strategies:
+   - **`pooled`** — all daily samples in one bucket per (action, principal). Simple, but flags weekend silence as anomalous.
+   - **`dow`** — separate bucket per (action, principal, day-of-week). Eliminates the weekday/weekend false-positive cleanly and is the production tier.
+5. **Surfaces three anomaly classes** on every run:
+   - **Matched z-score deviations** — pair active in both windows but live count differs from baseline avg by more than `Z_THRESHOLD * stddev` (SPIKE or DROP).
+   - **Silent pairs** — pair active in baseline but with zero live events (`live_count = 0` and `baseline_avg/stddev >= Z_THRESHOLD`). Catches "user X went dark on a day they're normally active."
+   - **New-behavior pairs** — pair seen live but with no baseline at all. Could be a new user, a fresh role being audited, recon activity, or attacker noise — routes to a separate triage queue.
+
+### Why this matters
+
+Three production failure modes Method 1 (basic moving-avg + stddev from a Confluence-style baseline doc) misses, and this pipeline catches:
+
+- **Silent pairs are dropped by the basic two-side join.** A critical user account that was active every weekday and is silent today never enters the join output. The pipeline walks the baseline keys explicitly to surface them.
+- **Pooled baselines flag every weekend.** A 30-day pooled baseline with 22 weekday + 8 weekend samples produces a high stddev — but on a Sunday, every weekday-only pair looks anomalous. Day-of-week stratification makes the comparison apples-to-apples.
+- **One-size-fits-all principal field doesn't work.** Okta uses `actor.user.email_addr`. CloudTrail uses `actor.user.name` (role). FortiGate uses `device.name` or `src.ip.address`. SentinelOne uses `src.process.user`. The schema-discovery step picks the right one per source.
+
+### How to use it
+
+**One-shot CLI:**
+
+```bash
+# Auto-discover principal/action, 30-day DoW-stratified baseline, default Z=2.0
+python sentinelone-mgmt-console-api/scripts/baseline_anomaly.py --source "Okta"
+
+# Network source — auto-discover picks device.name + event.type
+python sentinelone-mgmt-console-api/scripts/baseline_anomaly.py --source "FortiGate" --days 14
+
+# Override fields if you know better
+python sentinelone-mgmt-console-api/scripts/baseline_anomaly.py --source "Zscaler Internet Access" \
+    --principal src.ip.address --action unmapped.action
+
+# Pooled (no DoW stratification) and a tighter threshold
+python sentinelone-mgmt-console-api/scripts/baseline_anomaly.py --source "CloudTrail" \
+    --stratify pooled --z 3.0
+```
+
+State is checkpointed to `<plugin>/baselines/baseline_anomaly_<slug>_state.json` so the script is fully resumable across short shell budgets — re-invoke until it reports `all phases complete`. Final results land in `baseline_anomaly_<slug>_result.json`.
+
+**In a Cowork chat session:**
+
+Just ask. The PowerQuery skill knows to delegate to the mgmt-console-api skill for these requests.
+
+```
+Build a 30-day behavioral baseline for Okta and show me anomalies for today.
+```
+```
+Find users behaving differently from their typical pattern across all SaaS sources.
+```
+```
+Run anomaly detection on FortiGate — which devices have unusual traffic today vs the last two weeks?
+```
+```
+Which CloudTrail roles are silent today that were active every day last week?
+```
+
+### Productionising as a STAR / PowerQuery Alert rule
+
+For a recurring detection (rather than ad-hoc), the production pattern persists the baseline and reads it at detection time:
+
+1. Schedule a Hyperautomation workflow nightly to run the daily slices and write the DoW-stratified baseline to a config-managed lookup table via `| savelookup '<source>_baseline_dow', 'merge'`.
+2. Author a PowerQuery Alert rule body that runs the live query, joins the baseline table via `| lookup`, and filters on `(live_count - avg) / sd >= 3.0 OR <= -3.0`.
+3. Tier the threshold: `|z| >= 3.0` for auto-page, `|z| >= 2.0` for analyst review queue, separate path for silent pairs and new-behavior pairs.
+
+Full PQ building blocks and the rule-body shape are in `sentinelone-powerquery/examples/behavioral-baselines.md`.
+
 ---
 
 ## Example questions
@@ -167,6 +247,16 @@ These are real questions you can ask. Claude will pick the right skill automatic
 - *"Find PowerShell scripts that encoded a Base64 command, group by endpoint"*
 - *"Show me the top 20 destination IPs for outbound connections from Windows servers this week"*
 - *"Write a STAR detection rule that fires when a script interpreter spawns a network tool"*
+
+### Behavioral baselining and anomaly detection
+
+- *"Build a 30-day behavioral baseline for Okta and show me anomalies for today"*
+- *"Run a day-of-week-stratified baseline on FortiGate and surface devices with unusual traffic patterns"*
+- *"Which CloudTrail roles are silent today that were active every day last week?"*
+- *"Find users in Google Workspace whose activity volume today is more than 3 standard deviations from their typical day"*
+- *"Detect anomalies across all my SaaS sources and rank them by composite z-score"*
+- *"Establish a baseline for SentinelOne process activity per endpoint and find spikes since this morning"*
+- *"Build me a STAR rule body that uses a stored baseline lookup table to detect login spikes"*
 
 ### Alert and threat management
 

@@ -117,6 +117,30 @@ Fix: spaces around the `:`.
 cond ? x : y
 ```
 
+### `(field = *) ? a : b` inside `let` returns 500
+
+PQ has no `coalesce()`. The intuitive way to fall back across multiple
+fields breaks because `field = *` is a filter operator, not a boolean
+expression usable in a computed column.
+
+```
+| let user_id = (actor.user.email_addr = *) ? actor.user.email_addr
+                                            : actor.user.name        ← HTTP 500
+```
+
+Fix — bare-field truthy test (the field's null-or-truthy value drives the
+ternary directly):
+
+```
+| let user_id = actor.user.email_addr
+              ? actor.user.email_addr
+              : (actor.user.name ? actor.user.name : src.process.user)
+```
+
+This is the working coalesce idiom. Chain ternaries to fall back across
+N fields. Use the same pattern any time you'd reach for `coalesce` /
+`ifnull` / `nvl` in SQL.
+
 ### `sum(if(...))` for conditional counts — use `count(predicate)` instead
 
 ```
@@ -179,6 +203,59 @@ severity_id >= 4
 | group count() by timestamp = timebucket('1h'), severity_id
 | transpose severity_id on timestamp               ← columns are 4, 5
 ```
+
+### Numeric counters indexed as string — column-type lock — wrap in `number()` as a failsafe
+
+SDL/Scalyr indexes columns at first-write and locks the type. Once a numeric
+field has been written as string (because a parser declared `type: "string"` or
+the source data has been ingested untyped), the column stays string forever.
+Subsequent writes — even from a parser declaring `type: "long"` — get coerced
+back to string at index time. Numeric aggregation then breaks silently:
+
+```
+dataSource.name='FortiGate' unmapped.action='close'
+| group sessions=count(), bytes_out=sum(traffic.bytes_out)         ← NaN, even though values are populated
+| limit 1
+```
+
+The values ARE there (you can see them in Event Search), but `sum()` /
+`avg()` / `max()` / `>=` predicates can't operate on a string-typed column.
+
+**Failsafe pattern — cast at query time with `number()`:**
+
+```
+dataSource.name='FortiGate' unmapped.action='close'
+| let bytes_out_n = number(traffic.bytes_out)
+| let bytes_in_n  = number(traffic.bytes_in)
+| group sessions=count(),
+        bytes_out=sum(bytes_out_n),
+        bytes_in=sum(bytes_in_n),
+        max_session_bytes_out=max(bytes_out_n) | limit 1
+```
+
+`number(x)` returns 0 for null/missing and NaN for unparseable strings, so the
+defensive cast is cheap and never breaks already-numeric data. Apply it
+preemptively to:
+
+| Field family | Why |
+|---|---|
+| `severity_id`, `status_id`, `class_uid`, `type_uid`, `category_uid` | OCSF numerics, but column-type can drift between tenants |
+| `traffic.bytes_in`, `traffic.bytes_out`, `traffic.packets_in`, `traffic.packets_out`, `unmapped.duration` | FortiGate marketplace parser declared these as `string` for many tenant generations — string column lock is widespread |
+| Any vendor field carrying counts or sizes | If a parser ever wrote a non-numeric token (`"-"`, `"unknown"`, blank), the column is locked string |
+
+Same trick works for arithmetic comparisons and sorts:
+
+```
+| let sev = number(severity_id)
+| filter sev >= 4
+| group n=count() by sev
+| sort sev
+```
+
+The previous tenant-specific workaround using `parse "$x{regex=\\d+}$"` still
+works and is slightly more robust against fields like `"42 KB"` (where you
+want the digits, not a NaN), but `number()` is shorter and is the
+recommended default for OCSF counter fields.
 
 ### Bracket array indexing in `columns` returns HTTP 500
 

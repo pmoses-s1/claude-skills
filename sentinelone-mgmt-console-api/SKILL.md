@@ -267,9 +267,17 @@ The helper does ALL of this for you, so there is nothing to remember:
 
 For ranges past 2-3 days with `event.type=*`-scale aggregates, slice the window and run slices in parallel. Full reference, measured perf (30d 574M-event aggregate lands in ~29s with two service-user JWTs), and the two-JWT runner recipe are in the `sentinelone-powerquery` skill at `references/lrq-api.md`. `run_pq` is the single-slice primitive underneath.
 
-### Step 3a — timeseries: DO NOT use `timebucket(...)`
+### Step 3a — timeseries: prefer client-side day slicing over `timebucket(...)`
 
-The PQ engine does not expose a `timebucket` function. Any pipeline of the form `| group n=count() by timebucket('1d'), action` fails with HTTP 500 `"undefined field 'timebucket'"`. The fix is client-side day slicing:
+`timebucket(...)` works in PQ when used as a NAMED grouping output inside `group ... by`:
+
+```
+| group n = count() by day = timebucket('1d'), action     ← works
+```
+
+The bare positional form (no alias) and references inside `let` / `filter` are unreliable across tenant versions and have historically returned HTTP 500 `"undefined field 'timebucket'"`. Even when `timebucket` does work, a single 7d / 30d aggregate against a busy source frequently exceeds the LRQ per-call deadline (~38s observed) — a 7d aggregate that finishes in 60s on the older `/api/powerQuery` endpoint will time out on LRQ.
+
+**Default to client-side day slicing for any window > 24h.** It's faster, avoids the deadline budget, respects the per-user 3 rps cap cleanly, and produces the same end result. The named-form `day = timebucket('1d')` is fine inside a single 24h-or-less slice when you really do need per-hour or per-15-min buckets:
 
 ```python
 from datetime import datetime, timedelta, timezone
@@ -623,6 +631,30 @@ elif prim_key:
 ```
 
 `build_source_report.py` is the reference consumer of this pattern. Read it before writing a new pipeline that needs the same keys.
+
+## Source-agnostic baseline + anomaly detection
+
+`scripts/baseline_anomaly.py` is the productionised end-to-end pipeline for behavioral baselining and z-score anomaly detection on ANY data source. It composes the schema-discovery + key-picker + LRQ runner already in this skill, so a caller never has to hand-pick principal/action fields per source.
+
+What it does:
+
+1. Calls `inspect_source.discover_schema()` for the named source and `pick_keys(schema)` to choose `prim_key` (principal — user / host / IP / role) and `action_key` (event.type / activity_name / action). Honors per-source overrides if the caller knows better.
+2. Runs N daily count slices (default 30) via `pq.run_pq()` over the baseline window. Daily slicing avoids the LRQ per-call deadline; `max_workers=3` respects the per-user 3 rps cap.
+3. Runs one 24h live slice.
+4. Merges slices client-side. Supports two baseline strategies: pooled (all daily samples in one bucket) and DoW-stratified (one bucket per day-of-week — eliminates weekday/weekend false-positives).
+5. Surfaces three anomaly classes on every run: matched-pair z-score deviations (SPIKE/DROP), silent pairs (baseline → live=0), and new-behavior pairs (live with no baseline).
+
+Usage:
+
+```bash
+python scripts/baseline_anomaly.py --source "<name>" --days 30 --stratify dow
+python scripts/baseline_anomaly.py --source "Okta" --days 7
+python scripts/baseline_anomaly.py --source "FortiGate" --days 30 --stratify dow --principal src.ip.address --action unmapped.action
+```
+
+State is checkpointed to disk per source (`baseline_anomaly_<slug>_state.json`) so the script is resumable across runs — use this when working in environments with short shell budgets.
+
+PQ building blocks the script wraps live in the `sentinelone-powerquery` skill at `examples/behavioral-baselines.md`. Read that file when authoring the equivalent as a STAR / PowerQuery Alert detection rule body — the rule-body shape uses `lookup` against a pre-computed baseline table (from `savelookup`) instead of the script's two-window LRQ pattern.
 
 ### When to re-run discovery
 

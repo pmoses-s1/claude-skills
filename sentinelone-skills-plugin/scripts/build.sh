@@ -104,6 +104,17 @@ zip_skill() {
     local tmp_skill
     tmp_skill="$(mktemp -d)"
     cp -r "$skill_path" "$tmp_skill/$skill_name"
+    # Strip non-distributable artifacts: runtime state, byte-compiled caches,
+    # editor cruft. ``baselines/`` holds tenant-specific output from the
+    # source-agnostic baseliner (`baseline_anomaly.py`) and MUST NOT ship.
+    find "$tmp_skill/$skill_name" \
+        \( -type d -name baselines -o \
+           -type d -name __pycache__ -o \
+           -type d -name reports -o \
+           -type d -name charts \) -prune -exec rm -rf {} + 2>/dev/null || true
+    find "$tmp_skill/$skill_name" \
+        \( -name '*.pyc' -o -name '.DS_Store' -o -name '*.tmp' -o -name '*.log' \) \
+        -delete 2>/dev/null || true
     (cd "$tmp_skill" && zip -qr "$out_file" "$skill_name/")
     rm -rf "$tmp_skill"
 }
@@ -145,6 +156,18 @@ for skill_name in "${SOURCE_SKILLS[@]}"; do
     cp -r "$REPO_ROOT/$skill_name" "$TMP_PLUGIN/skills/"
 done
 
+# Strip non-distributable artifacts from the staged plugin tree before zipping.
+# Same set as zip_skill above — baselines/ holds tenant data from the
+# baseline_anomaly.py runner, reports/ + charts/ hold per-source CTO outputs.
+find "$TMP_PLUGIN" \
+    \( -type d -name baselines -o \
+       -type d -name __pycache__ -o \
+       -type d -name reports -o \
+       -type d -name charts \) -prune -exec rm -rf {} + 2>/dev/null || true
+find "$TMP_PLUGIN" \
+    \( -name '*.pyc' -o -name '.DS_Store' -o -name '*.tmp' -o -name '*.log' \) \
+    -delete 2>/dev/null || true
+
 # Copy credentials example if present
 [ -f "$REPO_ROOT/credentials.example.json" ] && cp "$REPO_ROOT/credentials.example.json" "$TMP_PLUGIN/"
 
@@ -153,7 +176,10 @@ done
     --exclude "*.orig" \
     --exclude ".DS_Store" \
     --exclude "*/__pycache__/*" \
-    --exclude "*.pyc")
+    --exclude "*.pyc" \
+    --exclude "*/baselines/*" \
+    --exclude "*/reports/*" \
+    --exclude "*/charts/*")
 
 # ---------------------------------------------------------------------------
 # 3. Copy artifacts to dist/

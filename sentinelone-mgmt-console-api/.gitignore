@@ -3,6 +3,7 @@ config.json
 __pycache__/
 reports/
 charts/
+baselines/
 *.tmp
 *.log
 *.jpg

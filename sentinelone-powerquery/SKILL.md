@@ -83,6 +83,35 @@ These are where queries go wrong. Internalize them before writing.
 12. **Aggregates to prefer: `min_by` / `max_by` over `first` / `last`.** `first(x)` and `last(x)` are sometimes listed as aggregates but fail on many tenants. Use `min_by(x, timestamp)` and `max_by(x, timestamp)` — they're explicit about ordering and always work.
 13. **Percentiles: use `p50`/`p95`/`p99`, not `percentile(x, N)`.** The latter isn't a real function and returns 500.
 14. **Null-filter at the wrong stage: `filter x = null` before `x` is computed returns 500.** Use `filter !(x = *)` for is-null until after a `let`/`join`/`lookup` has produced `x`.
+15. **Coalesce-style fallback uses bare-field truthy test, NOT `(field = *) ? a : b`.** PQ has no `coalesce()` / `ifnull()` / `nvl()`. To pick the first non-null of several fields inside a `let`, chain bare-field ternaries — they evaluate the field's truthiness directly:
+
+    ```
+    | let user_id = actor.user.email_addr
+                  ? actor.user.email_addr
+                  : (actor.user.name ? actor.user.name : src.process.user)
+    ```
+
+    The `(field = *) ? a : b` form (i.e. wrapping the field-presence test in parens before the ternary) **returns HTTP 500 inside `let`** on this engine — `field = *` is a filter operator, not a boolean expression usable in computed columns. Bare-field truthy is the only working coalesce idiom in PQ.
+16. **`if(...)` is not a function in aggregates.** `sum(if(cond, 1, 0))` returns 500. Use `count(<predicate>)` instead — `count(severity_id == 5)` evaluates the predicate per row and sums the truthy ones. Same for any "count where X" semantic.
+17. **Statistical baselining is two queries plus a client-side merge, not one inline join.** Subqueries inside a single `| join` share the parent query's time range. To compare a 24h live window against a 7d/30d baseline, run them as separate LRQs (or as separate `savelookup`+`lookup` rounds) and merge — there is no single-pass form. Pattern in `examples/behavioral-baselines.md`.
+
+## When to delegate baselining + anomaly detection to the mgmt-console-api skill
+
+If the user asks for any of the following, you need MORE than this skill — load `sentinelone-skills:sentinelone-mgmt-console-api` alongside, because the runner, the schema discovery, and the source-agnostic key picker live there:
+
+- "Baseline behavior on `<source>`" / "establish a baseline" / "build a 7d / 30d baseline"
+- "Detect anomalies" / "find users / hosts / IPs behaving differently than usual"
+- "Spot statistical outliers" / "find spikes vs typical" / "find pairs that went silent"
+- Porting any moving-average + stddev / z-score / Prophet / Isolation Forest pattern
+- "Run this for all sources" / source-agnostic anomaly detection
+
+What `sentinelone-mgmt-console-api` adds:
+
+- `scripts/inspect_source.py` — auto-discovers field schema for any `dataSource.name` and classifies fields into `principal_user` / `principal_host` / `principal_ip` / `action` etc. via `pick_keys(schema)` → returns `(prim_key, action_key)`. This means you don't hand-hardcode `actor.user.email_addr` for every source — the right principal field is picked from whatever the source actually carries (Okta uses email, FortiGate uses IP, SentinelOne uses process user, etc.).
+- `scripts/pq.py` — `run_pq()` LRQ runner that handles auth, forward-tag, polling, slicing.
+- `scripts/baseline_anomaly.py` — source-agnostic 30-day-DoW-stratified baseliner that takes a `dataSource.name`, discovers the schema, and produces anomalies. Read its source for the canonical end-to-end pattern.
+
+Use `examples/behavioral-baselines.md` in THIS skill for the PQ building blocks (per-day slice, live slice, z-score math, silent-pair detector). Use the mgmt-console-api skill for the runner, schema discovery, and the productionised baseliner script. Don't reinvent the schema-discovery or the daily-slice runner — both already exist there.
 
 ## Running queries (LRQ API by default)
 
@@ -164,6 +193,7 @@ Don't read these upfront. Read the one you need.
 
 - `examples/investigations.md` — ready-to-run investigation queries (PowerShell outbound, suspicious cmdline patterns, lateral movement, LOLBins, credential access, defense evasion, user-activity baselines, endpoint heartbeat, indicator prevalence). Each example includes a brief "what this finds" note and the full PQ.
 - `examples/detection-library.md` — PQ bodies ready to paste into a STAR / Custom Detection / PowerQuery Alert, sized to stay within the 1,000-row/1 MB alert budget. Each entry names the MITRE technique and gives a `threshold` suggestion.
+- `examples/behavioral-baselines.md` — statistical baselining recipes for any data source: per-day count slices, moving-average + stddev, z-score detection, silent-pair detection, day-of-week stratification. Read when the user asks to "baseline X behavior", "detect anomalies in Y", "find users / hosts / IPs behaving differently than usual", or any equivalent. Source-agnostic — works on EDR, identity, network, cloud, email, or any custom log source.
 
 ## When to reach for join vs union vs subquery
 

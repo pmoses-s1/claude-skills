@@ -522,6 +522,35 @@ dataSource.category = 'security'
 
 `nolimit` raises the row cap to 3 GB and blocks concurrent queries. It is never appropriate in a dashboard panel — always use an explicit `| limit N` instead.
 
+### 9. Wrap string-prone numeric fields with `number()` before arithmetic
+
+SDL/Scalyr column types are locked at first ingest. A field that *should* be numeric — `severity_id`, `traffic.bytes_in/out`, `traffic.packets_in/out`, `unmapped.duration` — can be string-typed at the index level (because a parser declared `type: "string"` for many tenant generations, or the field was first-written before the type was set). When that happens, `sum()` / `avg()` / `max()` / `>=` predicates return NaN or fail silently *even though the values are populated and visible in Event Search*.
+
+**Failsafe pattern for every dashboard panel that does numeric work:**
+
+```
+dataSource.name='alert' severity_id=*
+| let sev = number(severity_id)
+| filter sev >= 4
+| group hits=count() by sev
+| sort sev
+```
+
+```
+dataSource.name='FortiGate' unmapped.action='close'
+| let bytes_out_n = number(traffic.bytes_out)
+| let bytes_in_n  = number(traffic.bytes_in)
+| group sessions=count(),
+        bytes_out=sum(bytes_out_n),
+        bytes_in=sum(bytes_in_n),
+        max_session=max(bytes_out_n)
+| limit 1
+```
+
+`number(x)` returns 0 for null/missing and NaN for unparseable strings. Already-numeric data is unaffected. Cost is one `let` per panel; benefit is the dashboard keeps working when a parser pushes a string-typed write or a tenant column is locked. Apply this to every numeric counter / severity / port / duration field unless this session's schema discovery proved the column type with a successful unwrapped `sum()`.
+
+See `sentinelone-powerquery/references/pitfalls.md` for the full discussion of column-type lock and when the `parse "$x{regex=\\d+}$"` extraction is preferable to `number()`.
+
 ---
 
 ## Design tips
