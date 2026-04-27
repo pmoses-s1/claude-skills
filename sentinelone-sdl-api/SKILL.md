@@ -68,6 +68,71 @@ When the user asks for something involving the SDL API:
 3. **For ad-hoc shots, use the CLI.** `python scripts/sdl_cli.py <method> [args]`. The CLI mirrors the client.
 4. **Summarize for the user.** Don't dump raw JSON unless asked. For query results, prefer a concise table or CSV; for ingestion, confirm `bytesCharged` and the session ID; for config files, show path + version + (truncated) content.
 
+## Schema discovery — the right way
+
+Every SDL session must run live schema discovery for **every** data source it
+will query — including the S1 internal sources `alert`, `vulnerability`,
+`misconfiguration`, `asset`, `finding`, `ActivityFeed`, `Identity`, `indicator`
+and every third-party source. Documented schemas drift between sessions due to
+parser edits, reserved-field rewrites, and ingestion changes.
+
+**Why PowerQuery is the wrong tool for this:** PowerQuery's default projection
+returns `timestamp + message` only. Naive `dataSource.name='alert' | limit 1`
+hides the actual fields. `| columns *` returns HTTP 500. You can probe specific
+fields with `| columns f1, f2` but you have to already know what to ask for —
+which defeats the purpose of discovery.
+
+**Use the V1 `query` method instead.** It returns each match as the full event
+JSON with every populated attribute keyed in an `attributes` dict. That's the
+only built-in way to see what fields a source actually carries.
+
+**Auth caveat:** the V1 `query` method requires Log Read permission. The
+default credential chain is
+`log_read_key → config_read_key → config_write_key → console_api_token`. If
+your `credentials.json` has `SDL_CONFIG_WRITE_KEY` set but no
+`SDL_LOG_READ_KEY`, the chain picks the config write key first — which does
+NOT grant View Logs and returns
+`HTTP 403: authorization token does not grant View logs permission`.
+
+Force-clear the scoped keys so the chain falls through to the console JWT:
+
+```python
+from sdl_client import SDLClient
+c = SDLClient()
+c.keys["log_read_key"] = ""
+c.keys["config_read_key"] = ""
+c.keys["config_write_key"] = ""
+c.keys["log_write_key"] = ""
+
+schemas = {}
+for source in all_sources_from_step1_enumeration:
+    res = c.query(filter=f"dataSource.name=='{source}'", max_count=2, start_time="24h")
+    matches = res.get("matches") or []
+    if not matches:
+        continue
+    attrs = matches[0].get("attributes") or {}
+    schemas[source] = sorted(attrs.keys())
+
+import json, datetime
+out = f"outputs/sdl_schemas_{datetime.date.today().isoformat()}.json"
+json.dump(schemas, open(out, "w"), indent=2)
+```
+
+The `attributes` dict exposes nested arrays as flattened keys like
+`resources[0].name` and `vulnerabilities[0].cve.uid`. Those flattened keys are
+display-only — they are NOT valid PowerQuery `columns` paths. PowerQuery
+returns HTTP 500 on bracket-array indexing. For analytics over array fields,
+either stay on V1 query or use `array_get(arr, 0)` inside a PowerQuery `let`.
+
+**Trailing-underscore reserved-field rule:** Field names ending in `_`
+(`severity_`, `status_`, `classification_`) are SDL's auto-rename when source
+data carries a field colliding with an SDL reserved name. The underscored form
+IS the canonical, queryable field. Numeric OCSF variants (`severity_id` 0-5,
+`status_id`, `class_uid`) live alongside the underscored string fields.
+Prefer numeric OCSF for filters; the string `severity_` is case-mixed
+(`Critical` and `CRITICAL` co-exist) and will produce split columns in
+`transpose`.
+
 ## Files in this skill
 
 - `$COWORK_WORKSPACE/.sentinelone/credentials.json` — credentials (set `SDL_XDR_URL` and the keys you need; see Setup above). Auto-copied to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox by the plugin's SessionStart hook.

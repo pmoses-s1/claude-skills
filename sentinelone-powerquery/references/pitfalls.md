@@ -117,6 +117,93 @@ Fix: spaces around the `:`.
 cond ? x : y
 ```
 
+### `sum(if(...))` for conditional counts — use `count(predicate)` instead
+
+```
+| group critical = sum(if(severity_ in:anycase ('Critical'), 1, 0)) by host    ← invalid
+```
+
+PowerQuery does not accept `if(...)` as an aggregate body. The right idiom is
+to pass a predicate directly to `count()`:
+
+```
+| group critical = count(severity_id == 5),
+        high     = count(severity_id == 4),
+        medium   = count(severity_id == 3),
+        total    = count() by host
+```
+
+`count(<predicate>)` evaluates the predicate per row and sums the truthy ones.
+Works for any boolean expression, including `in:anycase`, `contains`,
+`matches`, and arithmetic comparisons.
+
+### `severity_` (and other trailing-underscore fields) — SDL reserved-field rewrite
+
+When a parser ingests source data carrying a field name that collides with an
+SDL reserved name (`severity`, `status`, `classification`, `category`, etc.),
+the field is automatically renamed by appending `_`. The underscored form
+`severity_` IS the canonical, queryable field — not a sparse alternate to
+`severity`.
+
+There is no non-underscored `severity` field on alert / vulnerability /
+misconfiguration / asset / Identity sources. Don't go looking for one. Same
+rule applies to `status_`, `classification_`, `category_`, and any other
+trailing-underscore field name encountered in raw events. The numeric OCSF
+variants (`severity_id` 0-5, `status_id`, `class_uid`) live alongside the
+underscored string fields and are usually the better choice for filters.
+
+### `severity_` carries mixed casing — `transpose` produces 8 columns instead of 4
+
+Same source pipeline, different upstream casing — values like `Critical`,
+`CRITICAL`, `High`, `HIGH`, `Medium`, `MEDIUM`, `Low`, `LOW` co-exist in the
+same `severity_` column.
+
+```
+| group count() by timestamp = timebucket('1h'), severity_
+| transpose severity_ on timestamp                 ← produces 8 columns
+```
+
+Fix — normalise before grouping:
+
+```
+| let sev = lowercase(severity_)
+| group count() by timestamp = timebucket('1h'), sev
+| transpose sev on timestamp                       ← 4 clean columns
+```
+
+Or skip the string field entirely and use the numeric OCSF `severity_id` for
+filters:
+
+```
+severity_id >= 4
+| group count() by timestamp = timebucket('1h'), severity_id
+| transpose severity_id on timestamp               ← columns are 4, 5
+```
+
+### Bracket array indexing in `columns` returns HTTP 500
+
+```
+dataSource.name='alert'
+| columns severity_id, resources[0].name, vulnerabilities[0].cve.uid     ← HTTP 500
+```
+
+PowerQuery does not accept `[N]` array indexing in `columns`. The V1 `query`
+API (used for schema discovery) flattens nested arrays into display keys like
+`resources[0].name` — those flattened keys are NOT valid PowerQuery field
+paths.
+
+Fix — for first-element access inside a query, use `array_get` in a `let`:
+
+```
+| let first_resource = array_get(resources, 0)
+| let first_resource_name = first_resource.name
+```
+
+For analytics over array fields, prefer top-level scalar fields
+(`severity_id`, `finding_info.title`, `metadata.product.name`, `class_name`),
+or step out of PowerQuery to the V1 query API which exposes the full event
+JSON.
+
 ## Escaping
 
 ### Regex backslashes eaten

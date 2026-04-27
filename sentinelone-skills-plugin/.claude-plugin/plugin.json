@@ -1,6 +1,6 @@
 {
   "name": "sentinelone-skills",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "SentinelOne SecOps skills for Claude: PowerQuery threat hunting, Management Console API, Singularity Data Lake API, SDL dashboard authoring, SDL log parsing, and Hyperautomation workflow generation.",
   "author": {
     "name": "Prithvi Moses",

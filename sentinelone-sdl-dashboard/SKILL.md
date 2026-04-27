@@ -275,6 +275,8 @@ preemptively when authoring panels of these shapes.
 | Dashboard panel times out, indefinite spinner | A subquery inside the main query forces the engine to scan-and-aggregate twice. Dashboards rerun panels on every load, so the cost compounds. | Don't gate a panel query on a subquery if you can avoid it. Hardcode top-N values via inline OR clauses, or accept the full cardinality (often small after the initial filter). If a subquery is unavoidable, prefer a `lookup` against a precomputed datatable. |
 | Number panel slow on a busy index | Engine keeps scanning after the answer is computed | Always terminate number panels with `\| limit 1` after the `\| group` that reduces to one row |
 | Wide range + fine `timebucket` = thousands of points per series | E.g. `timebucket("10m")` over 7d = 1,008 points × N series | Match bucket to duration: 1d → `10m`, 7d → `1h` (minimum), 30d → `1 day` minimum |
+| Two near-identical dashboards appear in *Configuration files* under `/dashboards/<name>` and `/dashboards/id/<dashboardId>/<name>` | The SDL UI's **Save** button writes to `/dashboards/id/<dashboardId>/<name>`. `put_file("/dashboards/<name>")` writes to the simpler path. Both render in the UI and both are visible to the file API; neither is access-controlled. | Pick one canonical path **before** the first deploy. Recommend the UI-native `/dashboards/id/<id>/<name>` if the dashboard already exists in the UI; otherwise `/dashboards/<name>`. Don't mix the two — each `put_file` to the alternate path creates a silent duplicate alongside the UI-saved copy. |
+| `columns resources[0].name` or `vulnerabilities[0].cve.uid` returns HTTP 500 | PowerQuery does not accept bracket-array indexing in `columns`. The V1 query API exposes nested arrays as flattened keys (`resources[0].name`) for display, but those flattened keys are NOT valid PowerQuery field paths. | Use top-level scalar fields only (`severity_id`, `finding_info.title`, `metadata.product.name`, `class_name`, `time`). For first-element access inside a query, use `array_get(resources, 0).name` only inside `let`. For richer drill-down, switch from PowerQuery to the V1 query API (returns full event JSON) — see `sentinelone-sdl-api` skill. |
 
 ---
 
@@ -317,24 +319,65 @@ Hide a parameter from the UI (use as a constant):
 
 ## Common SDL data sources and event patterns
 
-### EDR / XDR telemetry (endpoint events)
+> ⚠️ **Schemas drift between sessions and tenants.** The patterns below are
+> starting points, not a registry. **Run live schema discovery (V1 query via
+> `sentinelone-sdl-api` skill) on every source you'll query before authoring
+> panels.** PowerQuery's default projection is `timestamp + message` only — it
+> cannot discover schemas. Use the V1 `query` method which returns full event
+> JSON.
+
+### S1 internal SDL sources are OCSF-rich (NOT stubs)
+
+`dataSource.name` values `alert`, `vulnerability`, `misconfiguration`, `asset`,
+`Identity`, and `ActivityFeed` carry **rich OCSF events**, not metadata
+stubs. The fields that *look* like they should exist based on the source name
+(`alert.severity`, `alert.classification`, `vulnerability.kevAvailable`,
+`misconfiguration.severity`) frequently do NOT exist — the actual queryable
+fields are OCSF-namespaced.
+
+| Source | OCSF class_uid | Severity field | Endpoint linkage | Notes |
+|---|---|---|---|---|
+| `alert` | 99602001 (S1 Security Alert) | `severity_id` (numeric 0-5) | `resources[].name`, `resources[].s1_metadata.site_name` (NOTE: `resources[N]` only readable via V1 query, not PowerQuery `columns`) | `finding_info.title` = alert name. `metadata.product.name` ∈ {STAR, EDR, Identity, CWS, EPP}. `class_name` = "S1 Security Alert" |
+| `vulnerability` | 2002 (Vulnerability Finding) | `severity_id` + `severity_` (string, often empty) | `resource.s1_metadata.*`, `resource.uid` | `vulnerabilities[].cve.uid`, `vulnerabilities[].affected_packages[].{name,version,vendor_name}`. **No `kevAvailable` field in SDL** — KEV/EPSS metadata lives in the management console only |
+| `misconfiguration` | 2003 (Compliance Finding) | `severity_id` | `resources[].s1_metadata.*` | `compliance.standards[]` (CIS_AKS, CIS_KUBERNETES, etc.), `compliance.requirements[]`, `policy.{name,uid,desc}`, `cloud.provider`, `finding_info.title` |
+| `asset` | 3004 (Device Inventory) | `severity_id` (asset risk) | `device.agent.uuid`, `entity.uid` | `entity_result.data.console_metrics.is_connected` for online state. Does NOT have `agent.health.online` field. `operation` = OPERATION_UPSERT |
+| `ActivityFeed` | n/a (custom audit) | n/a | `data.scope_*`, `site_id` | `activity_type` (numeric ID, NOT string), `primary_description`, `secondary_description`. No `activityType` (camelCase) field |
+| `Identity` | 3002 (Authentication) | `severity_id`, `status_id` | `user.name`, `user.domain`, `src_endpoint.ip`, `dst_endpoint.hostname` | `auth_protocol` (Kerberos, NTLM), `ref_event_code` (Win Event ID like 4624), `unmapped.type` ("Logon Success"/"Logon Failure"), `type_name` ("Authentication: Logon") |
+| `finding` | n/a — **NOT security findings** | n/a | n/a | `dataSource.category='metrics'`, `tag='ingestionHealth'`, `processor='ocsf-findings'`. This source is OCSF processor latency/batch metrics, not findings |
+
+**OCSF severity_id mapping:** 0=Unknown, 1=Informational, 2=Low, 3=Medium,
+4=High, 5=Critical, 6=Fatal. Filter via `severity_id >= 4` for High+Critical.
+
+### Reserved-field rewrite (trailing underscore)
+
+Field names ending in `_` (e.g. `severity_`, `status_`, `classification_`) are
+SDL's auto-rename when source data carries a field name colliding with an SDL
+reserved name. The underscored form **IS** the canonical, queryable field —
+not a sparse alternate. The numeric OCSF variants (`severity_id`, `status_id`,
+`class_uid`) live alongside the underscored string fields. The `severity_`
+string can be case-mixed (`Critical` and `CRITICAL` both appear) — see
+`sentinelone-powerquery/references/pitfalls.md` for handling.
+
+### EDR / XDR telemetry (endpoint events from `dataSource.name='SentinelOne'`)
 ```
 dataSource.category = 'security'
 event.category in ('process', 'file', 'ip', 'dns', 'indicators', 'logins', 'url', 'registry')
 ```
 
-### Activity feed (console audit log)
-```
-dataSource.name='ActivityFeed'
-activity_type in ("17", "43", ...)    // use quoted strings for activity_type
-```
+`event.type='Behavioral Indicators'` carries `indicator.category`,
+`indicator.name`, `agent.uuid`, `endpoint.name`, `src.process.{user,cmdline,image.path}`.
 
 ### Third-party sources
 ```
 dataSource.vendor = 'Microsoft'        // O365, Azure AD
-dataSource.name = 'FortiGate'          // Fortinet
+dataSource.name = 'FortiGate'          // unmapped.action='deny', src_endpoint.ip, dst_endpoint.ip, app_name, category_name
+dataSource.name = 'Okta'               // unmapped.eventType='user.session.start', status='FAILURE'/'SUCCESS', actor.user.name, src_endpoint.ip, src_endpoint.location.country
+dataSource.name = 'Zscaler Internet Access'   // http_request.url.categories
 metadata.product.name = 'SharePoint'
 ```
+
+Re-validate every third-party source schema in Step 2b of session init —
+field namespaces vary by parser version and tenant.
 
 ### Common PowerQuery patterns for panels
 
