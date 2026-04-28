@@ -1,22 +1,21 @@
 {
   "summary": {
-    "generated_at": "2026-04-21T23:45:29+00:00",
-    "base_url": "https://your-tenant.sentinelone.net",
+    "generated_at": "2026-04-28T04:07:21+00:00",
+    "base_url": "https://usea1-purple.sentinelone.net",
     "total_planned": 367,
     "total_called": 299,
     "total_skipped": 68,
-    "elapsed_seconds": 143.25,
+    "elapsed_seconds": 62.34,
     "by_status": {
-      "ok": 163,
-      "forbidden": 16,
-      "bad_request": 86,
-      "timeout": 4,
+      "ok": 189,
+      "forbidden": 14,
+      "bad_request": 67,
+      "transport_error": 8,
       "http_502": 2,
-      "not_found": 3,
-      "http_500": 6,
-      "transport_error": 10,
+      "not_found": 4,
+      "http_500": 5,
       "http_429": 1,
-      "unauthorized": 6,
+      "unauthorized": 7,
       "http_501": 2
     },
     "by_tag": {
@@ -28,18 +27,19 @@
         "ok": 4
       },
       "Agents": {
-        "ok": 8,
-        "bad_request": 1,
-        "timeout": 2
+        "ok": 10,
+        "bad_request": 1
       },
       "Agents Repository (Beta)": {
         "bad_request": 1
       },
       "Application Management": {
-        "bad_request": 15
+        "ok": 7,
+        "transport_error": 1,
+        "bad_request": 7
       },
       "Application Management Settings": {
-        "bad_request": 1
+        "ok": 1
       },
       "Application Risk": {
         "bad_request": 1
@@ -100,15 +100,14 @@
         "no_id_available": 4
       },
       "Gateways": {
-        "bad_request": 1
+        "ok": 1
       },
       "Graph Query Builder": {
         "ok": 4,
         "bad_request": 3
       },
       "Graph Query Management": {
-        "forbidden": 1,
-        "ok": 2
+        "ok": 3
       },
       "Groups": {
         "ok": 3
@@ -244,8 +243,7 @@
         "no_id_available": 1
       },
       "Inventory Identity Filters": {
-        "transport_error": 1,
-        "ok": 1,
+        "ok": 2,
         "bad_request": 1
       },
       "Inventory Identity Surface": {
@@ -253,8 +251,7 @@
         "no_id_available": 1
       },
       "Inventory Identity Surface Filters": {
-        "transport_error": 1,
-        "ok": 1,
+        "ok": 2,
         "bad_request": 1
       },
       "Inventory Network": {
@@ -314,12 +311,11 @@
         "no_id_available": 1
       },
       "Mobile Integration": {
-        "bad_request": 4,
-        "ok": 2
+        "ok": 5,
+        "not_found": 1
       },
       "Network Discovery": {
-        "ok": 2,
-        "bad_request": 1,
+        "ok": 3,
         "no_id_available": 2
       },
       "Network Discovery Self Enablement": {
@@ -338,8 +334,7 @@
         "no_id_available": 1
       },
       "RBAC": {
-        "ok": 1,
-        "bad_request": 1,
+        "ok": 2,
         "no_id_available": 1
       },
       "Remote Ops MMS": {
@@ -356,8 +351,7 @@
       "RemoteOps Scripts": {
         "bad_request": 1,
         "ok": 2,
-        "http_500": 1,
-        "unauthorized": 2
+        "unauthorized": 3
       },
       "Saved Searches": {
         "http_500": 1
@@ -369,8 +363,7 @@
         "ok": 3
       },
       "Settings": {
-        "forbidden": 3,
-        "transport_error": 1,
+        "forbidden": 4,
         "unauthorized": 4,
         "http_501": 2,
         "no_id_available": 1
@@ -390,7 +383,7 @@
         "bad_request": 5
       },
       "Threat Intelligence": {
-        "forbidden": 2
+        "ok": 2
       },
       "Threat Notes": {
         "ok": 1
@@ -401,7 +394,7 @@
         "no_id_available": 3
       },
       "Unprotected Endpoints Discovery": {
-        "bad_request": 3
+        "ok": 3
       },
       "Updates": {
         "http_500": 1,
@@ -422,7 +415,7 @@
         "ok": 1
       },
       "marketplace": {
-        "timeout": 2,
+        "ok": 2,
         "no_id_available": 3
       },
       "safe_post": {
@@ -451,7 +444,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 2
+        "total_items": 1
       }
     },
     {
@@ -464,7 +457,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 591.5,
+      "elapsed_ms": 1319.2,
       "shape": {
         "keys": [
           "data"
@@ -499,7 +492,7 @@
       "ok": false,
       "status": 403,
       "error": "HTTP 403: Feature uninstall_password is not available for the scope",
-      "elapsed_ms": 1405.3,
+      "elapsed_ms": 1329.4,
       "shape": null
     },
     {
@@ -512,7 +505,7 @@
       "ok": false,
       "status": 403,
       "error": "HTTP 403: Feature uninstall_password is not available for the scope",
-      "elapsed_ms": 1742.3,
+      "elapsed_ms": 360.5,
       "shape": null
     },
     {
@@ -525,7 +518,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1886.2,
+      "elapsed_ms": 1368.9,
       "shape": {
         "keys": [
           "_raw"
@@ -542,7 +535,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2101.7,
+      "elapsed_ms": 1463.8,
       "shape": {
         "keys": [
           "data",
@@ -564,7 +557,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 5516.3,
+      "elapsed_ms": 1583.2,
       "shape": {
         "keys": [
           "data"
@@ -583,7 +576,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1434.2,
+      "elapsed_ms": 1440.8,
       "shape": {
         "keys": [
           "data",
@@ -606,7 +599,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2715.5,
+      "elapsed_ms": 1516.1,
       "shape": {
         "keys": [
           "_raw"
@@ -623,7 +616,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2756.0,
+      "elapsed_ms": 1404.7,
       "shape": {
         "keys": [
           "data",
@@ -632,7 +625,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 2050
+        "total_items": 2095
       }
     },
     {
@@ -645,7 +638,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 4251.5,
+      "elapsed_ms": 1317.3,
       "shape": {
         "keys": [
           "data"
@@ -666,7 +659,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 3130.9,
+      "elapsed_ms": 1443.7,
       "shape": {
         "keys": [
           "data",
@@ -675,20 +668,20 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 2050
+        "total_items": 2095
       }
     },
     {
       "method": "GET",
       "path_template": "/web/api/v2.1/agents/{agent_id}/uploads/{activity_id}",
-      "path_called": "/web/api/v2.1/agents/581655481605747172/uploads/2198234741212473246",
+      "path_called": "/web/api/v2.1/agents/581655481605747172/uploads/2202705730241483363",
       "tag": "Agents",
       "operationId": "_web_api_agents_{agent_id}_uploads_{activity_id}_get",
       "summary": "Export Agent Logs",
       "ok": false,
       "status": 400,
       "error": "HTTP 400: Incorrect activity",
-      "elapsed_ms": 1401.5,
+      "elapsed_ms": 1368.6,
       "shape": null
     },
     {
@@ -701,7 +694,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1384.5,
+      "elapsed_ms": 352.5,
       "shape": {
         "keys": [
           "data"
@@ -720,7 +713,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2455.4,
+      "elapsed_ms": 343.1,
       "shape": {
         "keys": [
           "data"
@@ -739,7 +732,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2926.2,
+      "elapsed_ms": 368.3,
       "shape": {
         "keys": [
           "data"
@@ -758,11 +751,15 @@
       "tag": "Agents",
       "operationId": "_web_api_export_agents_get",
       "summary": "Export Agents",
-      "ok": false,
-      "status": null,
-      "error": "Timeout: exceeded 45.0s batch deadline",
-      "elapsed_ms": 45000.0,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 2979.4,
+      "shape": {
+        "keys": [
+          "_raw"
+        ]
+      }
     },
     {
       "method": "GET",
@@ -771,11 +768,15 @@
       "tag": "Agents",
       "operationId": "_web_api_export_agents-light_get",
       "summary": "Export Agents - Light",
-      "ok": false,
-      "status": null,
-      "error": "Timeout: exceeded 45.0s batch deadline",
-      "elapsed_ms": 45000.0,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 3416.0,
+      "shape": {
+        "keys": [
+          "_raw"
+        ]
+      }
     },
     {
       "method": "GET",
@@ -787,7 +788,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1220.4,
+      "elapsed_ms": 476.1,
       "shape": {
         "keys": [
           "data",
@@ -809,7 +810,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 682.6,
+      "elapsed_ms": 363.5,
       "shape": {
         "keys": [
           "data"
@@ -828,7 +829,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: {\"error\":\"missing scope information: require scope_level and scope_id\"}",
-      "elapsed_ms": 993.9,
+      "elapsed_ms": 439.8,
       "shape": null
     },
     {
@@ -838,11 +839,20 @@
       "tag": "Application Management",
       "operationId": "_web_api_application-management_risks_get",
       "summary": "Get CVE data",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Must filter one scope or be a single scope user",
-      "elapsed_ms": 424.4,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 3332.9,
+      "shape": {
+        "keys": [
+          "data",
+          "pagination"
+        ],
+        "data_type": "list",
+        "data_len": 1,
+        "paginated": true,
+        "total_items": 294709
+      }
     },
     {
       "method": "GET",
@@ -852,9 +862,9 @@
       "operationId": "_web_api_application-management_risks_export_csv_get",
       "summary": "Risks Data Export",
       "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Must filter one scope or be a single scope user",
-      "elapsed_ms": 488.4,
+      "status": null,
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "elapsed_ms": 10002.1,
       "shape": null
     },
     {
@@ -864,11 +874,20 @@
       "tag": "Application Management",
       "operationId": "_web_api_application-management_inventory_get",
       "summary": "Get Application Inventory",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Must filter one scope or be a single scope user",
-      "elapsed_ms": 1276.5,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 587.0,
+      "shape": {
+        "keys": [
+          "data",
+          "pagination"
+        ],
+        "data_type": "list",
+        "data_len": 1,
+        "paginated": true,
+        "total_items": 18433
+      }
     },
     {
       "method": "GET",
@@ -877,11 +896,15 @@
       "tag": "Application Management",
       "operationId": "_web_api_application-management_inventory_export_csv_get",
       "summary": "Inventory Data Export",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Must filter one scope or be a single scope user",
-      "elapsed_ms": 362.1,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 2593.2,
+      "shape": {
+        "keys": [
+          "_raw"
+        ]
+      }
     },
     {
       "method": "GET",
@@ -893,7 +916,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: applicationName: Missing data for required field.",
-      "elapsed_ms": 2872.3,
+      "elapsed_ms": 397.6,
       "shape": null
     },
     {
@@ -906,7 +929,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: applicationName: Missing data for required field.",
-      "elapsed_ms": 336.3,
+      "elapsed_ms": 372.3,
       "shape": null
     },
     {
@@ -918,8 +941,8 @@
       "summary": "Get Application CVEs",
       "ok": false,
       "status": 400,
-      "error": "HTTP 400: Must filter one scope or be a single scope user",
-      "elapsed_ms": 697.2,
+      "error": "HTTP 400: Both applicationName and applicationVendor must be specified when not querying by applicationIds",
+      "elapsed_ms": 340.0,
       "shape": null
     },
     {
@@ -931,8 +954,8 @@
       "summary": "Application CVE Data Export",
       "ok": false,
       "status": 400,
-      "error": "HTTP 400: Must filter one scope or be a single scope user",
-      "elapsed_ms": 689.0,
+      "error": "HTTP 400: Both applicationName and applicationVendor must be specified when not querying by applicationIds",
+      "elapsed_ms": 406.2,
       "shape": null
     },
     {
@@ -942,11 +965,20 @@
       "tag": "Application Management",
       "operationId": "_web_api_application-management_risks_aggregated-applications_get",
       "summary": "Get Aggregated Applications With Risk",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Must filter one scope or be a single scope user",
-      "elapsed_ms": 777.5,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 896.1,
+      "shape": {
+        "keys": [
+          "data",
+          "pagination"
+        ],
+        "data_type": "list",
+        "data_len": 1,
+        "paginated": true,
+        "total_items": 1700
+      }
     },
     {
       "method": "GET",
@@ -955,11 +987,15 @@
       "tag": "Application Management",
       "operationId": "_web_api_application-management_risks_aggregated-applications_export_csv_get",
       "summary": "Aggregated Application Risk Data Export",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Must filter one scope or be a single scope user",
-      "elapsed_ms": 1550.9,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 5468.6,
+      "shape": {
+        "keys": [
+          "_raw"
+        ]
+      }
     },
     {
       "method": "GET",
@@ -968,11 +1004,20 @@
       "tag": "Application Management",
       "operationId": "_web_api_application-management_risks_applications_get",
       "summary": "Get Applications With Risk",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Must filter one scope or be a single scope user",
-      "elapsed_ms": 824.9,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 512.0,
+      "shape": {
+        "keys": [
+          "data",
+          "pagination"
+        ],
+        "data_type": "list",
+        "data_len": 10,
+        "paginated": true,
+        "total_items": 3168
+      }
     },
     {
       "method": "GET",
@@ -981,11 +1026,15 @@
       "tag": "Application Management",
       "operationId": "_web_api_application-management_risks_applications_export_csv_get",
       "summary": "Application Risk Data Export",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Must filter one scope or be a single scope user",
-      "elapsed_ms": 1400.0,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 2254.4,
+      "shape": {
+        "keys": [
+          "_raw"
+        ]
+      }
     },
     {
       "method": "GET",
@@ -996,8 +1045,8 @@
       "summary": "Get Endpoints For Vulnerable App",
       "ok": false,
       "status": 400,
-      "error": "HTTP 400: Must filter one scope or be a single scope user",
-      "elapsed_ms": 1054.0,
+      "error": "HTTP 400: Both applicationName and applicationVendor must be specified when not querying by applicationIds",
+      "elapsed_ms": 389.0,
       "shape": null
     },
     {
@@ -1009,8 +1058,8 @@
       "summary": "Risk Endpoint Data Export",
       "ok": false,
       "status": 400,
-      "error": "HTTP 400: Must filter one scope or be a single scope user",
-      "elapsed_ms": 3291.5,
+      "error": "HTTP 400: Both applicationName and applicationVendor must be specified when not querying by applicationIds",
+      "elapsed_ms": 368.5,
       "shape": null
     },
     {
@@ -1023,7 +1072,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: ids: Missing data for required field.",
-      "elapsed_ms": 1259.0,
+      "elapsed_ms": 336.4,
       "shape": null
     },
     {
@@ -1033,11 +1082,25 @@
       "tag": "Application Management Settings",
       "operationId": "_web_api_application-management_settings_get",
       "summary": "Get Application Management Settings",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Single scope should have only one value for account id",
-      "elapsed_ms": 1253.1,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 3600.0,
+      "shape": {
+        "keys": [
+          "data"
+        ],
+        "data_type": "object",
+        "data_keys": [
+          "extensiveLinuxScanEnabled",
+          "extensiveScanEnabled",
+          "hasBreakingInheritance",
+          "inheritedFrom",
+          "isDefaultPolicy",
+          "scanSchedule",
+          "vulnerabilitiesScanEnabled"
+        ]
+      }
     },
     {
       "method": "GET",
@@ -1049,7 +1112,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: Exporting more than 100000 items is not supported. Please narrow your search and try again.",
-      "elapsed_ms": 1357.8,
+      "elapsed_ms": 2062.8,
       "shape": null
     },
     {
@@ -1062,7 +1125,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 776.2,
+      "elapsed_ms": 535.8,
       "shape": {
         "keys": [
           "data",
@@ -1071,7 +1134,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 151014
+        "total_items": 157035
       }
     },
     {
@@ -1084,7 +1147,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 586.8,
+      "elapsed_ms": 610.5,
       "shape": {
         "keys": [
           "data",
@@ -1106,7 +1169,7 @@
       "ok": false,
       "status": 502,
       "error": "HTTP 502: Bad Gateway",
-      "elapsed_ms": 287.7,
+      "elapsed_ms": 382.4,
       "shape": null
     },
     {
@@ -1119,7 +1182,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: {\"errors\":[{\"code\":400,\"title\":\"ERROR #22P02 invalid input syntax for type bigint: \\\"\\\"\",\"detail\":\"\"}]}",
-      "elapsed_ms": 372.3,
+      "elapsed_ms": 364.4,
       "shape": null
     },
     {
@@ -1132,7 +1195,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: {\"errors\":[{\"code\":400,\"title\":\"scopeId field can't be empty when scopeLevel=site\",\"detail\":\"\"}]}",
-      "elapsed_ms": 720.4,
+      "elapsed_ms": 347.4,
       "shape": null
     },
     {
@@ -1145,7 +1208,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: {\"errors\":[{\"code\":400,\"title\":\"scopeId field can't be empty when scopeLevel=site\",\"detail\":\"\"}]}",
-      "elapsed_ms": 601.8,
+      "elapsed_ms": 344.5,
       "shape": null
     },
     {
@@ -1158,7 +1221,7 @@
       "ok": false,
       "status": 502,
       "error": "HTTP 502: Bad Gateway",
-      "elapsed_ms": 1173.0,
+      "elapsed_ms": 336.3,
       "shape": null
     },
     {
@@ -1171,7 +1234,7 @@
       "ok": false,
       "status": 403,
       "error": "HTTP 403: User scope level is account. Please provide a valid account ID or site ID.",
-      "elapsed_ms": 411.9,
+      "elapsed_ms": 358.4,
       "shape": null
     },
     {
@@ -1184,7 +1247,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: estimatorId: Missing data for required field.",
-      "elapsed_ms": 292.2,
+      "elapsed_ms": 395.6,
       "shape": null
     },
     {
@@ -1197,7 +1260,7 @@
       "ok": false,
       "status": 403,
       "error": "HTTP 403: User scope level is account. Please provide a valid account ID or site ID.",
-      "elapsed_ms": 517.2,
+      "elapsed_ms": 407.1,
       "shape": null
     },
     {
@@ -1210,7 +1273,7 @@
       "ok": false,
       "status": 404,
       "error": "HTTP 404: 404 page not found\n",
-      "elapsed_ms": 279.4,
+      "elapsed_ms": 1259.9,
       "shape": null
     },
     {
@@ -1223,7 +1286,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1570.9,
+      "elapsed_ms": 524.3,
       "shape": {
         "keys": [
           "data",
@@ -1245,7 +1308,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1571.0,
+      "elapsed_ms": 1156.1,
       "shape": {
         "keys": [
           "data",
@@ -1254,7 +1317,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 2182
+        "total_items": 2185
       }
     },
     {
@@ -1267,7 +1330,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: queryId: Missing data for required field.",
-      "elapsed_ms": 298.8,
+      "elapsed_ms": 365.1,
       "shape": null
     },
     {
@@ -1280,7 +1343,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: queryId: Missing data for required field.",
-      "elapsed_ms": 604.3,
+      "elapsed_ms": 361.9,
       "shape": null
     },
     {
@@ -1293,7 +1356,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 802.9,
+      "elapsed_ms": 362.1,
       "shape": {
         "keys": [
           "data"
@@ -1312,7 +1375,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1196.4,
+      "elapsed_ms": 674.3,
       "shape": {
         "keys": [
           "data",
@@ -1321,7 +1384,7 @@
         "data_type": "list",
         "data_len": 10,
         "paginated": true,
-        "total_items": 1557
+        "total_items": 1579
       }
     },
     {
@@ -1334,7 +1397,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1009.4,
+      "elapsed_ms": 467.0,
       "shape": {
         "keys": [
           "data",
@@ -1343,7 +1406,7 @@
         "data_type": "list",
         "data_len": 10,
         "paginated": true,
-        "total_items": 1568
+        "total_items": 1565
       }
     },
     {
@@ -1356,7 +1419,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 7110.0,
+      "elapsed_ms": 358.3,
       "shape": {
         "keys": [
           "data"
@@ -1377,7 +1440,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 415.6,
+      "elapsed_ms": 383.1,
       "shape": {
         "keys": [
           "data",
@@ -1399,7 +1462,7 @@
       "ok": false,
       "status": 403,
       "error": "HTTP 403: User does not have required permissions.",
-      "elapsed_ms": 619.5,
+      "elapsed_ms": 375.8,
       "shape": null
     },
     {
@@ -1412,7 +1475,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1085.7,
+      "elapsed_ms": 372.3,
       "shape": {
         "keys": [
           "data",
@@ -1421,7 +1484,7 @@
         "data_type": "list",
         "data_len": 10,
         "paginated": true,
-        "total_items": 8052
+        "total_items": 8742
       }
     },
     {
@@ -1434,7 +1497,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 791.6,
+      "elapsed_ms": 346.8,
       "shape": {
         "keys": [
           "data",
@@ -1456,7 +1519,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 828.2,
+      "elapsed_ms": 396.2,
       "shape": {
         "keys": [
           "data",
@@ -1478,7 +1541,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1214.7,
+      "elapsed_ms": 1587.5,
       "shape": {
         "keys": [
           "data",
@@ -1487,7 +1550,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 3
+        "total_items": 1
       }
     },
     {
@@ -1500,7 +1563,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 595.2,
+      "elapsed_ms": 396.6,
       "shape": {
         "keys": [
           "_raw"
@@ -1517,7 +1580,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1463.1,
+      "elapsed_ms": 1745.3,
       "shape": {
         "keys": [
           "_raw"
@@ -1534,7 +1597,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1480.0,
+      "elapsed_ms": 408.5,
       "shape": {
         "keys": [
           "data",
@@ -1556,7 +1619,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 894.3,
+      "elapsed_ms": 429.0,
       "shape": {
         "keys": [
           "data",
@@ -1579,7 +1642,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1112.1,
+      "elapsed_ms": 375.6,
       "shape": {
         "keys": [
           "data",
@@ -1601,7 +1664,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 760.4,
+      "elapsed_ms": 380.1,
       "shape": {
         "keys": [
           "alternative",
@@ -1627,7 +1690,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1107.9,
+      "elapsed_ms": 330.7,
       "shape": {
         "keys": [
           "data",
@@ -1649,7 +1712,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 696.0,
+      "elapsed_ms": 333.2,
       "shape": {
         "keys": [
           "data",
@@ -1671,7 +1734,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1799.5,
+      "elapsed_ms": 396.7,
       "shape": {
         "keys": [
           "data",
@@ -1693,7 +1756,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 846.9,
+      "elapsed_ms": 374.3,
       "shape": {
         "keys": [
           "data"
@@ -1720,7 +1783,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 765.4,
+      "elapsed_ms": 357.8,
       "shape": {
         "keys": [
           "data",
@@ -1739,11 +1802,20 @@
       "tag": "Gateways",
       "operationId": "_web_api_ranger_gateways_get",
       "summary": "Get Gateways",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Global user or multi account user must select a single account",
-      "elapsed_ms": 1695.4,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 688.8,
+      "shape": {
+        "keys": [
+          "data",
+          "pagination"
+        ],
+        "data_type": "list",
+        "data_len": 1,
+        "paginated": true,
+        "total_items": 742
+      }
     },
     {
       "method": "GET",
@@ -1755,7 +1827,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 6975.7,
+      "elapsed_ms": 801.6,
       "shape": {
         "keys": [
           "data"
@@ -1776,7 +1848,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2712.1,
+      "elapsed_ms": 661.7,
       "shape": {
         "keys": [
           "data"
@@ -1797,7 +1869,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: At least one input parameter should be present.",
-      "elapsed_ms": 1225.0,
+      "elapsed_ms": 1115.6,
       "shape": null
     },
     {
@@ -1810,7 +1882,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: At least one input parameter should be present.",
-      "elapsed_ms": 6024.9,
+      "elapsed_ms": 1382.2,
       "shape": null
     },
     {
@@ -1823,7 +1895,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: At least one input parameter should be present.",
-      "elapsed_ms": 1833.0,
+      "elapsed_ms": 1388.7,
       "shape": null
     },
     {
@@ -1836,7 +1908,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2034.9,
+      "elapsed_ms": 336.1,
       "shape": {
         "keys": [
           "data"
@@ -1857,7 +1929,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 653.8,
+      "elapsed_ms": 1484.5,
       "shape": {
         "keys": [
           "data"
@@ -1873,11 +1945,17 @@
       "tag": "Graph Query Management",
       "operationId": "_web_api_xdr_graph-explorer_query_management_recent-queries_get",
       "summary": "Get graph recent query list",
-      "ok": false,
-      "status": 403,
-      "error": "HTTP 403: Graph explorer operations can only have one scope",
-      "elapsed_ms": 347.0,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 1576.2,
+      "shape": {
+        "keys": [
+          "data"
+        ],
+        "data_type": "list",
+        "data_len": 0
+      }
     },
     {
       "method": "GET",
@@ -1889,7 +1967,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 658.4,
+      "elapsed_ms": 1268.2,
       "shape": {
         "keys": [
           "data",
@@ -1911,7 +1989,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2837.9,
+      "elapsed_ms": 469.5,
       "shape": {
         "keys": [
           "data",
@@ -1944,7 +2022,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 3434
+        "total_items": 3439
       }
     },
     {
@@ -1957,7 +2035,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 656.6,
+      "elapsed_ms": 426.6,
       "shape": {
         "keys": [
           "data"
@@ -1989,7 +2067,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1421.6,
+      "elapsed_ms": 395.5,
       "shape": {
         "keys": [
           "data"
@@ -2003,14 +2081,14 @@
     {
       "method": "GET",
       "path_template": "/web/api/v2.1/hashes/{hash}/verdict",
-      "path_called": "/web/api/v2.1/hashes/2198251286189910322/verdict",
+      "path_called": "/web/api/v2.1/hashes/2202773500983592514/verdict",
       "tag": "Hashes",
       "operationId": "_web_api_hashes_{hash}_verdict_get",
       "summary": "Hash Reputation verdict",
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 355.3,
+      "elapsed_ms": 357.4,
       "shape": {
         "keys": [
           "data"
@@ -2031,7 +2109,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 961.1,
+      "elapsed_ms": 613.0,
       "shape": {
         "keys": [
           "data",
@@ -2040,7 +2118,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 36860
+        "total_items": 40294
       }
     },
     {
@@ -2053,7 +2131,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1107.3,
+      "elapsed_ms": 569.4,
       "shape": {
         "keys": [
           "data",
@@ -2062,7 +2140,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 1045
+        "total_items": 1047
       }
     },
     {
@@ -2074,8 +2152,8 @@
       "summary": "Get Assessment Status",
       "ok": false,
       "status": 500,
-      "error": "HTTP 500: {\"timestamp\":\"2026-04-21T23:43:53.091+00:00\",\"status\":500,\"error\":\"Internal Server Error\",\"path\":\"/web/api/v2.1/ranger-ad/assessment-status\"}",
-      "elapsed_ms": 346.3,
+      "error": "HTTP 500: {\"timestamp\":\"2026-04-28T04:06:32.776+00:00\",\"status\":500,\"error\":\"Internal Server Error\",\"path\":\"/web/api/v2.1/ranger-ad/assessment-status\"}",
+      "elapsed_ms": 358.9,
       "shape": null
     },
     {
@@ -2088,7 +2166,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 770.2,
+      "elapsed_ms": 466.3,
       "shape": {
         "keys": [
           "data"
@@ -2116,7 +2194,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 928.1,
+      "elapsed_ms": 455.1,
       "shape": {
         "keys": [
           "data"
@@ -2150,7 +2228,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 954.9,
+      "elapsed_ms": 690.3,
       "shape": {
         "keys": [
           "data"
@@ -2172,7 +2250,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1881.9,
+      "elapsed_ms": 476.2,
       "shape": {
         "keys": [
           "data",
@@ -2181,7 +2259,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 308469
+        "total_items": 56511
       }
     },
     {
@@ -2194,7 +2272,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1333.9,
+      "elapsed_ms": 658.8,
       "shape": {
         "keys": [
           "data",
@@ -2216,7 +2294,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 7541.7,
+      "elapsed_ms": 7023.3,
       "shape": {
         "keys": [
           "data"
@@ -2235,7 +2313,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 659.6,
+      "elapsed_ms": 335.6,
       "shape": {
         "keys": [
           "data"
@@ -2254,7 +2332,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 330.1,
+      "elapsed_ms": 323.8,
       "shape": null
     },
     {
@@ -2267,7 +2345,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1560.7,
+      "elapsed_ms": 514.8,
       "shape": {
         "keys": [
           "data",
@@ -2276,7 +2354,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 112
+        "total_items": 104
       }
     },
     {
@@ -2289,7 +2367,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 7303.2,
+      "elapsed_ms": 7645.8,
       "shape": {
         "keys": [
           "data"
@@ -2308,7 +2386,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 964.1,
+      "elapsed_ms": 338.9,
       "shape": {
         "keys": [
           "data"
@@ -2327,7 +2405,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 2114.8,
+      "elapsed_ms": 324.3,
       "shape": null
     },
     {
@@ -2340,7 +2418,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2317.6,
+      "elapsed_ms": 650.8,
       "shape": {
         "keys": [
           "data",
@@ -2362,7 +2440,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 7032.4,
+      "elapsed_ms": 7459.9,
       "shape": {
         "keys": [
           "data"
@@ -2381,7 +2459,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2014.5,
+      "elapsed_ms": 334.6,
       "shape": {
         "keys": [
           "data"
@@ -2400,7 +2478,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 673.8,
+      "elapsed_ms": 338.5,
       "shape": null
     },
     {
@@ -2413,7 +2491,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 792.4,
+      "elapsed_ms": 392.1,
       "shape": {
         "keys": [
           "data",
@@ -2435,7 +2513,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 7161.5,
+      "elapsed_ms": 7219.7,
       "shape": {
         "keys": [
           "data"
@@ -2454,7 +2532,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 940.5,
+      "elapsed_ms": 322.3,
       "shape": {
         "keys": [
           "data"
@@ -2473,7 +2551,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 1572.4,
+      "elapsed_ms": 335.5,
       "shape": null
     },
     {
@@ -2486,7 +2564,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2184.6,
+      "elapsed_ms": 448.6,
       "shape": {
         "keys": [
           "data",
@@ -2495,7 +2573,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 38509
+        "total_items": 34310
       }
     },
     {
@@ -2507,8 +2585,8 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
-      "elapsed_ms": 10012.0,
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "elapsed_ms": 10003.3,
       "shape": null
     },
     {
@@ -2521,7 +2599,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 672.8,
+      "elapsed_ms": 331.3,
       "shape": {
         "keys": [
           "data"
@@ -2540,7 +2618,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 342.9,
+      "elapsed_ms": 347.8,
       "shape": null
     },
     {
@@ -2553,7 +2631,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1300.7,
+      "elapsed_ms": 477.2,
       "shape": {
         "keys": [
           "data",
@@ -2562,7 +2640,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 6122
+        "total_items": 2285
       }
     },
     {
@@ -2574,8 +2652,8 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
-      "elapsed_ms": 10012.7,
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "elapsed_ms": 10002.9,
       "shape": null
     },
     {
@@ -2588,7 +2666,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 711.3,
+      "elapsed_ms": 339.0,
       "shape": {
         "keys": [
           "data"
@@ -2607,7 +2685,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 348.6,
+      "elapsed_ms": 323.0,
       "shape": null
     },
     {
@@ -2620,7 +2698,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 400.3,
+      "elapsed_ms": 457.7,
       "shape": {
         "keys": [
           "data",
@@ -2642,7 +2720,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 7617.3,
+      "elapsed_ms": 7377.7,
       "shape": {
         "keys": [
           "data"
@@ -2661,7 +2739,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 709.1,
+      "elapsed_ms": 337.9,
       "shape": {
         "keys": [
           "data"
@@ -2680,7 +2758,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 773.0,
+      "elapsed_ms": 328.3,
       "shape": null
     },
     {
@@ -2693,7 +2771,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1985.3,
+      "elapsed_ms": 410.5,
       "shape": {
         "keys": [
           "data",
@@ -2702,7 +2780,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 286
+        "total_items": 278
       }
     },
     {
@@ -2715,7 +2793,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 8670.2,
+      "elapsed_ms": 6652.7,
       "shape": {
         "keys": [
           "data"
@@ -2734,7 +2812,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 3022.5,
+      "elapsed_ms": 351.3,
       "shape": {
         "keys": [
           "data"
@@ -2753,7 +2831,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 1617.7,
+      "elapsed_ms": 342.9,
       "shape": null
     },
     {
@@ -2766,7 +2844,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1343.1,
+      "elapsed_ms": 438.6,
       "shape": {
         "keys": [
           "data",
@@ -2775,7 +2853,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 8
+        "total_items": 7
       }
     },
     {
@@ -2788,7 +2866,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 9716.5,
+      "elapsed_ms": 7063.0,
       "shape": {
         "keys": [
           "data"
@@ -2807,7 +2885,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2570.6,
+      "elapsed_ms": 328.6,
       "shape": {
         "keys": [
           "data"
@@ -2826,7 +2904,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 1104.7,
+      "elapsed_ms": 326.5,
       "shape": null
     },
     {
@@ -2839,7 +2917,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 995.1,
+      "elapsed_ms": 574.9,
       "shape": {
         "keys": [
           "data",
@@ -2848,7 +2926,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 26755
+        "total_items": 15618
       }
     },
     {
@@ -2860,8 +2938,8 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
-      "elapsed_ms": 10018.0,
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "elapsed_ms": 10003.2,
       "shape": null
     },
     {
@@ -2874,7 +2952,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 968.2,
+      "elapsed_ms": 328.7,
       "shape": {
         "keys": [
           "data"
@@ -2893,7 +2971,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 678.5,
+      "elapsed_ms": 329.2,
       "shape": null
     },
     {
@@ -2906,7 +2984,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1017.8,
+      "elapsed_ms": 466.7,
       "shape": {
         "keys": [
           "data",
@@ -2915,7 +2993,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 2134
+        "total_items": 2166
       }
     },
     {
@@ -2927,8 +3005,8 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
-      "elapsed_ms": 10012.7,
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "elapsed_ms": 10003.8,
       "shape": null
     },
     {
@@ -2941,7 +3019,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1515.6,
+      "elapsed_ms": 335.3,
       "shape": {
         "keys": [
           "data"
@@ -2960,7 +3038,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 695.1,
+      "elapsed_ms": 333.9,
       "shape": null
     },
     {
@@ -2973,7 +3051,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 8928.3,
+      "elapsed_ms": 6604.6,
       "shape": {
         "keys": [
           "data"
@@ -2992,7 +3070,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2659.6,
+      "elapsed_ms": 325.5,
       "shape": {
         "keys": [
           "data"
@@ -3011,7 +3089,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 2027.7,
+      "elapsed_ms": 319.0,
       "shape": null
     },
     {
@@ -3024,7 +3102,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1485.0,
+      "elapsed_ms": 466.5,
       "shape": {
         "keys": [
           "data",
@@ -3046,7 +3124,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 7614.7,
+      "elapsed_ms": 7912.8,
       "shape": {
         "keys": [
           "data"
@@ -3065,7 +3143,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 600.8,
+      "elapsed_ms": 1226.4,
       "shape": {
         "keys": [
           "data"
@@ -3084,7 +3162,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 615.5,
+      "elapsed_ms": 342.4,
       "shape": null
     },
     {
@@ -3097,7 +3175,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 736.4,
+      "elapsed_ms": 1341.9,
       "shape": {
         "keys": [
           "data",
@@ -3106,7 +3184,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 1638
+        "total_items": 1611
       }
     },
     {
@@ -3119,7 +3197,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 7271.5,
+      "elapsed_ms": 7461.1,
       "shape": {
         "keys": [
           "data"
@@ -3138,7 +3216,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 667.1,
+      "elapsed_ms": 1249.7,
       "shape": {
         "keys": [
           "data"
@@ -3157,7 +3235,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 1227.7,
+      "elapsed_ms": 332.0,
       "shape": null
     },
     {
@@ -3170,7 +3248,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1757.8,
+      "elapsed_ms": 479.2,
       "shape": {
         "keys": [
           "data",
@@ -3179,7 +3257,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 32395
+        "total_items": 31769
       }
     },
     {
@@ -3189,11 +3267,17 @@
       "tag": "Inventory Identity Filters",
       "operationId": "_web_api_xdr_assets_identity_filters_count_get",
       "summary": "Filter counts",
-      "ok": false,
-      "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
-      "elapsed_ms": 10007.7,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 9405.3,
+      "shape": {
+        "keys": [
+          "data"
+        ],
+        "data_type": "list",
+        "data_len": 61
+      }
     },
     {
       "method": "GET",
@@ -3205,7 +3289,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 889.1,
+      "elapsed_ms": 321.3,
       "shape": {
         "keys": [
           "data"
@@ -3224,7 +3308,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 325.2,
+      "elapsed_ms": 348.0,
       "shape": null
     },
     {
@@ -3237,7 +3321,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 816.9,
+      "elapsed_ms": 404.2,
       "shape": {
         "keys": [
           "data",
@@ -3246,7 +3330,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 5660
+        "total_items": 5338
       }
     },
     {
@@ -3256,11 +3340,17 @@
       "tag": "Inventory Identity Surface Filters",
       "operationId": "_web_api_xdr_assets_surface_identity_filters_count_get",
       "summary": "Filter counts",
-      "ok": false,
-      "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
-      "elapsed_ms": 10016.2,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 7773.1,
+      "shape": {
+        "keys": [
+          "data"
+        ],
+        "data_type": "list",
+        "data_len": 61
+      }
     },
     {
       "method": "GET",
@@ -3272,7 +3362,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2261.0,
+      "elapsed_ms": 322.2,
       "shape": {
         "keys": [
           "data"
@@ -3291,7 +3381,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 624.2,
+      "elapsed_ms": 333.2,
       "shape": null
     },
     {
@@ -3304,7 +3394,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 747.0,
+      "elapsed_ms": 649.9,
       "shape": {
         "keys": [
           "data",
@@ -3313,7 +3403,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 1842
+        "total_items": 1825
       }
     },
     {
@@ -3326,7 +3416,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1078.1,
+      "elapsed_ms": 530.6,
       "shape": {
         "keys": [
           "data",
@@ -3335,7 +3425,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 248094
+        "total_items": 124685
       }
     },
     {
@@ -3347,8 +3437,8 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
-      "elapsed_ms": 10011.6,
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "elapsed_ms": 10003.6,
       "shape": null
     },
     {
@@ -3361,7 +3451,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1814.2,
+      "elapsed_ms": 328.8,
       "shape": {
         "keys": [
           "data"
@@ -3380,7 +3470,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 1387.5,
+      "elapsed_ms": 324.1,
       "shape": null
     },
     {
@@ -3393,7 +3483,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 7589.8,
+      "elapsed_ms": 7118.0,
       "shape": {
         "keys": [
           "data"
@@ -3412,7 +3502,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2175.3,
+      "elapsed_ms": 326.6,
       "shape": {
         "keys": [
           "data"
@@ -3431,7 +3521,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 684.3,
+      "elapsed_ms": 326.4,
       "shape": null
     },
     {
@@ -3444,7 +3534,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 741.5,
+      "elapsed_ms": 539.8,
       "shape": {
         "keys": [
           "data",
@@ -3453,7 +3543,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 237140
+        "total_items": 1406
       }
     },
     {
@@ -3465,8 +3555,8 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
-      "elapsed_ms": 10015.7,
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "elapsed_ms": 10002.4,
       "shape": null
     },
     {
@@ -3479,7 +3569,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1102.8,
+      "elapsed_ms": 325.7,
       "shape": {
         "keys": [
           "data"
@@ -3498,7 +3588,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 594.7,
+      "elapsed_ms": 336.7,
       "shape": null
     },
     {
@@ -3511,7 +3601,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 871.9,
+      "elapsed_ms": 366.7,
       "shape": {
         "keys": [
           "data",
@@ -3533,7 +3623,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 7310.2,
+      "elapsed_ms": 6577.5,
       "shape": {
         "keys": [
           "data"
@@ -3552,7 +3642,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 908.7,
+      "elapsed_ms": 332.7,
       "shape": {
         "keys": [
           "data"
@@ -3571,7 +3661,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 590.7,
+      "elapsed_ms": 329.4,
       "shape": null
     },
     {
@@ -3584,7 +3674,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1260.2,
+      "elapsed_ms": 3771.3,
       "shape": {
         "keys": [
           "data"
@@ -3603,7 +3693,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1773.6,
+      "elapsed_ms": 4142.4,
       "shape": {
         "keys": [
           "data",
@@ -3612,7 +3702,7 @@
         "data_type": "list",
         "data_len": 10,
         "paginated": true,
-        "total_items": 379
+        "total_items": 354
       }
     },
     {
@@ -3624,8 +3714,8 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
-      "elapsed_ms": 10013.5,
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "elapsed_ms": 10003.1,
       "shape": null
     },
     {
@@ -3638,7 +3728,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 762.5,
+      "elapsed_ms": 426.4,
       "shape": {
         "keys": [
           "data"
@@ -3657,7 +3747,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: text: Shorter than minimum length 2.",
-      "elapsed_ms": 315.4,
+      "elapsed_ms": 343.7,
       "shape": null
     },
     {
@@ -3670,7 +3760,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1304.3,
+      "elapsed_ms": 408.9,
       "shape": {
         "keys": [
           "data",
@@ -3679,7 +3769,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 1971
+        "total_items": 1408
       }
     },
     {
@@ -3692,7 +3782,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: dict_values(['agentIds']): Unknown field",
-      "elapsed_ms": 1624.0,
+      "elapsed_ms": 371.8,
       "shape": null
     },
     {
@@ -3705,7 +3795,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 7395.3,
+      "elapsed_ms": 6225.0,
       "shape": {
         "keys": [
           "data",
@@ -3727,7 +3817,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 737.8,
+      "elapsed_ms": 410.5,
       "shape": {
         "keys": [
           "data",
@@ -3749,7 +3839,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 328.4,
+      "elapsed_ms": 392.1,
       "shape": {
         "keys": [
           "data",
@@ -3771,7 +3861,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 772.3,
+      "elapsed_ms": 514.0,
       "shape": {
         "keys": [
           "data"
@@ -3793,7 +3883,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 648.9,
+      "elapsed_ms": 345.0,
       "shape": {
         "keys": [
           "_raw"
@@ -3807,11 +3897,19 @@
       "tag": "Mobile Integration",
       "operationId": "_web_api_mobile-integration_provisioning_partner-key_get",
       "summary": "Provision - Get MSSP partner key",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Single scope should have only one value for account id",
-      "elapsed_ms": 330.7,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 395.1,
+      "shape": {
+        "keys": [
+          "data"
+        ],
+        "data_type": "object",
+        "data_keys": [
+          "clientId"
+        ]
+      }
     },
     {
       "method": "GET",
@@ -3821,9 +3919,9 @@
       "operationId": "_web_api_mobile-integration_provisioning_tenant_get",
       "summary": "Provision - Get tenant with users",
       "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Single scope should have only one value for account id",
-      "elapsed_ms": 710.9,
+      "status": 404,
+      "error": "HTTP 404: Tenant not found",
+      "elapsed_ms": 355.1,
       "shape": null
     },
     {
@@ -3833,11 +3931,24 @@
       "tag": "Mobile Integration",
       "operationId": "_web_api_mobile-integration_provisioning_can-provision-tenant_get",
       "summary": "Provision - Check if tenant can be provisioned",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Single scope should have only one value for account id",
-      "elapsed_ms": 1041.1,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 577.5,
+      "shape": {
+        "keys": [
+          "data"
+        ],
+        "data_type": "object",
+        "data_keys": [
+          "affectingScopes",
+          "canProvision",
+          "msspScope",
+          "reason",
+          "reasonCode",
+          "underMSSPScope"
+        ]
+      }
     },
     {
       "method": "GET",
@@ -3846,11 +3957,21 @@
       "tag": "Mobile Integration",
       "operationId": "_web_api_mobile-integration_mssp-provisioning_partner_get",
       "summary": "Provision - Get MSSP partner with admin user",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Single scope should have only one value for account id",
-      "elapsed_ms": 567.7,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 625.1,
+      "shape": {
+        "keys": [
+          "data"
+        ],
+        "data_type": "object",
+        "data_keys": [
+          "adminUser",
+          "id",
+          "name"
+        ]
+      }
     },
     {
       "method": "GET",
@@ -3862,7 +3983,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1415.8,
+      "elapsed_ms": 421.4,
       "shape": {
         "keys": [
           "data",
@@ -3884,7 +4005,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1062.4,
+      "elapsed_ms": 1371.0,
       "shape": {
         "keys": [
           "data",
@@ -3906,7 +4027,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 3900.0,
+      "elapsed_ms": 374.7,
       "shape": {
         "keys": [
           "data",
@@ -3915,7 +4036,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 708
+        "total_items": 813
       }
     },
     {
@@ -3928,7 +4049,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 6794.8,
+      "elapsed_ms": 1895.7,
       "shape": {
         "keys": [
           "_raw"
@@ -3942,11 +4063,33 @@
       "tag": "Network Discovery",
       "operationId": "_web_api_ranger_settings_get",
       "summary": "Get Network Discovery Settings",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Must filter one account or be a single account user",
-      "elapsed_ms": 3141.0,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 1280.1,
+      "shape": {
+        "keys": [
+          "data"
+        ],
+        "data_type": "object",
+        "data_keys": [
+          "accountId",
+          "autoEnableNetworks",
+          "combineDevices",
+          "enabled",
+          "icmpScan",
+          "mdnsScan",
+          "minAgentsInNetworkToScan",
+          "networkDecommissionValue",
+          "newNetworkInHours",
+          "rdnsScan",
+          "restrictions",
+          "scanOnlyLocalSubnets",
+          "scopeId",
+          "smbScan",
+          "snapshotPeriod"
+        ]
+      }
     },
     {
       "method": "GET",
@@ -3958,7 +4101,7 @@
       "ok": false,
       "status": 404,
       "error": "HTTP 404: {\"errors\":[{\"code\":4040010,\"detail\":\"\",\"title\":\"Requested resource was not found\"}]}\n",
-      "elapsed_ms": 7109.0,
+      "elapsed_ms": 345.2,
       "shape": null
     },
     {
@@ -3971,7 +4114,7 @@
       "ok": false,
       "status": 404,
       "error": "HTTP 404: {\"errors\":[{\"code\":4040010,\"detail\":\"\",\"title\":\"Requested resource was not found\"}]}\n",
-      "elapsed_ms": 1141.3,
+      "elapsed_ms": 346.0,
       "shape": null
     },
     {
@@ -3984,7 +4127,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1620.9,
+      "elapsed_ms": 389.9,
       "shape": {
         "keys": [
           "data",
@@ -4006,7 +4149,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1563.2,
+      "elapsed_ms": 376.9,
       "shape": {
         "keys": [
           "data"
@@ -4033,7 +4176,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 706.9,
+      "elapsed_ms": 366.5,
       "shape": {
         "keys": [
           "data",
@@ -4055,7 +4198,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: dict_values(['scopeType', 'scopeLevel', 'osType']): Unknown field",
-      "elapsed_ms": 5171.5,
+      "elapsed_ms": 505.9,
       "shape": null
     },
     {
@@ -4068,7 +4211,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: dict_values(['scopeType', 'osType']): Unknown field",
-      "elapsed_ms": 1755.4,
+      "elapsed_ms": 502.7,
       "shape": null
     },
     {
@@ -4081,7 +4224,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: dict_values(['scopeType', 'osType']): Unknown field",
-      "elapsed_ms": 706.0,
+      "elapsed_ms": 490.4,
       "shape": null
     },
     {
@@ -4094,7 +4237,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 707.3,
+      "elapsed_ms": 501.5,
       "shape": {
         "keys": [
           "data"
@@ -4113,7 +4256,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: dict_values(['scopeType', 'osType']): Unknown field",
-      "elapsed_ms": 850.0,
+      "elapsed_ms": 496.5,
       "shape": null
     },
     {
@@ -4126,7 +4269,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1072.2,
+      "elapsed_ms": 527.9,
       "shape": {
         "keys": [
           "data"
@@ -4147,7 +4290,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1750.1,
+      "elapsed_ms": 508.4,
       "shape": {
         "keys": [
           "data"
@@ -4168,7 +4311,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1574.1,
+      "elapsed_ms": 902.7,
       "shape": {
         "keys": [
           "data"
@@ -4189,7 +4332,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1462.3,
+      "elapsed_ms": 515.2,
       "shape": {
         "keys": [
           "data"
@@ -4210,7 +4353,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 605.1,
+      "elapsed_ms": 427.1,
       "shape": {
         "keys": [
           "data"
@@ -4245,7 +4388,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1426.6,
+      "elapsed_ms": 419.8,
       "shape": {
         "keys": [
           "data"
@@ -4280,7 +4423,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 849.9,
+      "elapsed_ms": 407.1,
       "shape": {
         "keys": [
           "data"
@@ -4315,7 +4458,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 842.5,
+      "elapsed_ms": 530.8,
       "shape": {
         "keys": [
           "data",
@@ -4324,7 +4467,7 @@
         "data_type": "list",
         "data_len": 10,
         "paginated": true,
-        "total_items": 24
+        "total_items": 23
       }
     },
     {
@@ -4334,11 +4477,20 @@
       "tag": "RBAC",
       "operationId": "_web_api_rbac_role_get",
       "summary": "Get template for new role",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Single scope should have only one value for account id",
-      "elapsed_ms": 297.9,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 800.1,
+      "shape": {
+        "keys": [
+          "data"
+        ],
+        "data_type": "object",
+        "data_keys": [
+          "description",
+          "pages"
+        ]
+      }
     },
     {
       "method": "GET",
@@ -4350,7 +4502,7 @@
       "ok": false,
       "status": 500,
       "error": "HTTP 500: Server could not process the request.",
-      "elapsed_ms": 1270.4,
+      "elapsed_ms": 391.7,
       "shape": null
     },
     {
@@ -4363,7 +4515,7 @@
       "ok": false,
       "status": 500,
       "error": "HTTP 500: Server could not process the request.",
-      "elapsed_ms": 1481.4,
+      "elapsed_ms": 1379.6,
       "shape": null
     },
     {
@@ -4376,7 +4528,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 3883.3,
+      "elapsed_ms": 3541.0,
       "shape": {
         "keys": [
           "data",
@@ -4385,7 +4537,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 30
+        "total_items": 27
       }
     },
     {
@@ -4398,7 +4550,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: taskId: Missing data for required field.",
-      "elapsed_ms": 3324.3,
+      "elapsed_ms": 3323.2,
       "shape": null
     },
     {
@@ -4411,7 +4563,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: storyline: Missing data for required field.",
-      "elapsed_ms": 4958.0,
+      "elapsed_ms": 4458.0,
       "shape": null
     },
     {
@@ -4424,7 +4576,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 4513.5,
+      "elapsed_ms": 5482.8,
       "shape": {
         "keys": [
           "data"
@@ -4443,7 +4595,7 @@
       "ok": false,
       "status": 429,
       "error": "HTTP 429: <html>\r\n<head><title>429 Too Many Requests</title></head>\r\n<body>\r\n<center><h1>429 Too Many Requests</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n",
-      "elapsed_ms": 562.5,
+      "elapsed_ms": 304.0,
       "shape": null
     },
     {
@@ -4456,7 +4608,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: Either parent_task_id or parent_task_id__in should be a part of the request",
-      "elapsed_ms": 605.8,
+      "elapsed_ms": 344.8,
       "shape": null
     },
     {
@@ -4469,7 +4621,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1919.5,
+      "elapsed_ms": 1390.0,
       "shape": {
         "keys": [
           "data"
@@ -4488,9 +4640,9 @@
       "operationId": "_web_api_remote-scripts_script-content_get",
       "summary": "Get script content",
       "ok": false,
-      "status": 500,
-      "error": "HTTP 500: {\"error\":\"An error occurred. Please try again later. If the problem persists, contact Support\"}\n",
-      "elapsed_ms": 5573.9,
+      "status": 401,
+      "error": "HTTP 401: {\"errors\":[{\"code\":4010010,\"detail\":null,\"title\":\"Authentication Failed\"}]}\n",
+      "elapsed_ms": 475.4,
       "shape": null
     },
     {
@@ -4503,7 +4655,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 2453.5,
+      "elapsed_ms": 2404.2,
       "shape": {
         "keys": [
           "data",
@@ -4512,7 +4664,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 643
+        "total_items": 640
       }
     },
     {
@@ -4525,7 +4677,7 @@
       "ok": false,
       "status": 401,
       "error": "HTTP 401: {\"errors\":[{\"code\":4010010,\"detail\":null,\"title\":\"Authentication Failed\"}]}\n",
-      "elapsed_ms": 638.4,
+      "elapsed_ms": 442.5,
       "shape": null
     },
     {
@@ -4538,7 +4690,7 @@
       "ok": false,
       "status": 401,
       "error": "HTTP 401: {\"errors\":[{\"code\":4010010,\"detail\":null,\"title\":\"Authentication Failed\"}]}\n",
-      "elapsed_ms": 1119.7,
+      "elapsed_ms": 449.5,
       "shape": null
     },
     {
@@ -4551,7 +4703,7 @@
       "ok": false,
       "status": 500,
       "error": "HTTP 500: {\n  \"message\": \"Header must start with Bearer, but actually starts with \\\"ApiTok\\\"\",\n  \"status\": \"error/client/badParam\"\n}<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\" /><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" /><title>Error</title><script type=\"m",
-      "elapsed_ms": 268.4,
+      "elapsed_ms": 326.0,
       "shape": null
     },
     {
@@ -4564,7 +4716,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1099.0,
+      "elapsed_ms": 417.8,
       "shape": {
         "keys": [
           "data",
@@ -4586,7 +4738,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 794.2,
+      "elapsed_ms": 372.9,
       "shape": {
         "keys": [
           "data",
@@ -4617,7 +4769,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 3408
+        "total_items": 3426
       }
     },
     {
@@ -4630,7 +4782,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 752.0,
+      "elapsed_ms": 835.1,
       "shape": {
         "keys": [
           "data"
@@ -4662,7 +4814,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 15925.3,
+      "elapsed_ms": 1423.8,
       "shape": {
         "keys": [
           "_raw"
@@ -4679,7 +4831,7 @@
       "ok": false,
       "status": 403,
       "error": "HTTP 403: User does not have required permissions.",
-      "elapsed_ms": 293.7,
+      "elapsed_ms": 345.5,
       "shape": null
     },
     {
@@ -4690,9 +4842,9 @@
       "operationId": "_web_api_settings_sso_sp-cert_get",
       "summary": "Get SSO Service Provider Certificate",
       "ok": false,
-      "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='your-tenant.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
-      "elapsed_ms": 10011.4,
+      "status": 403,
+      "error": "HTTP 403: User does not have required permissions.",
+      "elapsed_ms": 365.2,
       "shape": null
     },
     {
@@ -4705,7 +4857,7 @@
       "ok": false,
       "status": 401,
       "error": "HTTP 401: An error occurred.",
-      "elapsed_ms": 693.7,
+      "elapsed_ms": 420.4,
       "shape": null
     },
     {
@@ -4718,7 +4870,7 @@
       "ok": false,
       "status": 401,
       "error": "HTTP 401: An error occurred.",
-      "elapsed_ms": 592.4,
+      "elapsed_ms": 405.4,
       "shape": null
     },
     {
@@ -4731,7 +4883,7 @@
       "ok": false,
       "status": 401,
       "error": "HTTP 401: An error occurred.",
-      "elapsed_ms": 292.1,
+      "elapsed_ms": 329.6,
       "shape": null
     },
     {
@@ -4744,7 +4896,7 @@
       "ok": false,
       "status": 501,
       "error": "HTTP 501: {\"errors\":[{\"code\":5010010,\"detail\":null,\"title\":\"Not supported\"}]}\n",
-      "elapsed_ms": 537.2,
+      "elapsed_ms": 357.1,
       "shape": null
     },
     {
@@ -4757,7 +4909,7 @@
       "ok": false,
       "status": 401,
       "error": "HTTP 401: An error occurred.",
-      "elapsed_ms": 536.4,
+      "elapsed_ms": 323.9,
       "shape": null
     },
     {
@@ -4770,7 +4922,7 @@
       "ok": false,
       "status": 403,
       "error": "HTTP 403: This feature was deliberately disabled. Please contact SentinelOne to enable it.",
-      "elapsed_ms": 921.7,
+      "elapsed_ms": 349.5,
       "shape": null
     },
     {
@@ -4783,7 +4935,7 @@
       "ok": false,
       "status": 403,
       "error": "HTTP 403: This feature was deliberately disabled. Please contact SentinelOne to enable it.",
-      "elapsed_ms": 542.1,
+      "elapsed_ms": 357.4,
       "shape": null
     },
     {
@@ -4796,7 +4948,7 @@
       "ok": false,
       "status": 501,
       "error": "HTTP 501: {\"errors\":[{\"code\":5010010,\"detail\":null,\"title\":\"Not supported\"}]}\n",
-      "elapsed_ms": 1232.7,
+      "elapsed_ms": 343.4,
       "shape": null
     },
     {
@@ -4834,7 +4986,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 8219.5,
+      "elapsed_ms": 1210.8,
       "shape": {
         "keys": [
           "_raw"
@@ -4851,7 +5003,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1049.4,
+      "elapsed_ms": 359.4,
       "shape": {
         "keys": [
           "data"
@@ -4876,7 +5028,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 496.6,
+      "elapsed_ms": 312.9,
       "shape": {
         "keys": [
           "data"
@@ -4897,7 +5049,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 580.2,
+      "elapsed_ms": 313.3,
       "shape": {
         "keys": [
           "data"
@@ -4918,7 +5070,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 565.6,
+      "elapsed_ms": 304.3,
       "shape": {
         "keys": [
           "data"
@@ -4939,7 +5091,7 @@
       "ok": false,
       "status": 403,
       "error": "HTTP 403: User does not have required permissions.",
-      "elapsed_ms": 537.9,
+      "elapsed_ms": 346.5,
       "shape": null
     },
     {
@@ -4952,7 +5104,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1112.4,
+      "elapsed_ms": 803.6,
       "shape": {
         "keys": [
           "data"
@@ -4975,7 +5127,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: type: 0: \"ALL\" is not a valid choice.",
-      "elapsed_ms": 1088.5,
+      "elapsed_ms": 363.5,
       "shape": null
     },
     {
@@ -4988,7 +5140,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: taskType: \"UPGRADE\" is not a valid choice.",
-      "elapsed_ms": 548.3,
+      "elapsed_ms": 343.1,
       "shape": null
     },
     {
@@ -5001,7 +5153,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: taskType: \"UPGRADE\" is not a valid choice.",
-      "elapsed_ms": 550.7,
+      "elapsed_ms": 334.6,
       "shape": null
     },
     {
@@ -5014,7 +5166,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: taskType: \"UPGRADE\" is not a valid choice.",
-      "elapsed_ms": 608.7,
+      "elapsed_ms": 347.1,
       "shape": null
     },
     {
@@ -5027,7 +5179,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: taskType: \"UPGRADE\" is not a valid choice.",
-      "elapsed_ms": 611.5,
+      "elapsed_ms": 349.7,
       "shape": null
     },
     {
@@ -5040,7 +5192,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: taskType: \"UPGRADE\" is not a valid choice.",
-      "elapsed_ms": 2619.1,
+      "elapsed_ms": 336.0,
       "shape": null
     },
     {
@@ -5050,11 +5202,20 @@
       "tag": "Threat Intelligence",
       "operationId": "_web_api_threat-intelligence_iocs_get",
       "summary": "Get IOCs",
-      "ok": false,
-      "status": 403,
-      "error": "HTTP 403: This page doesn't support multi-scopes users yet",
-      "elapsed_ms": 1389.3,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 410.0,
+      "shape": {
+        "keys": [
+          "data",
+          "pagination"
+        ],
+        "data_type": "list",
+        "data_len": 1,
+        "paginated": true,
+        "total_items": 2008
+      }
     },
     {
       "method": "GET",
@@ -5063,32 +5224,38 @@
       "tag": "Threat Intelligence",
       "operationId": "_web_api_threat-intelligence_user-config_get",
       "summary": "Get Threat Intelligence user config",
-      "ok": false,
-      "status": 403,
-      "error": "HTTP 403: This page doesn't support multi-scopes users yet",
-      "elapsed_ms": 654.9,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 401.8,
+      "shape": {
+        "keys": [
+          "data"
+        ],
+        "data_type": "list",
+        "data_len": 0
+      }
     },
     {
       "method": "GET",
       "path_template": "/web/api/v2.1/threats/{threat_id}/notes",
-      "path_called": "/web/api/v2.1/threats/2198251286189910322/notes",
+      "path_called": "/web/api/v2.1/threats/2202773500983592514/notes",
       "tag": "Threat Notes",
       "operationId": "_web_api_threats_{threat_id}_notes_get",
       "summary": "Get Threat Notes",
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 571.0,
+      "elapsed_ms": 356.9,
       "shape": {
         "keys": [
           "data",
           "pagination"
         ],
         "data_type": "list",
-        "data_len": 10,
+        "data_len": 1,
         "paginated": true,
-        "total_items": 18
+        "total_items": 1
       }
     },
     {
@@ -5101,7 +5268,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 844.1,
+      "elapsed_ms": 628.1,
       "shape": {
         "keys": [
           "data",
@@ -5110,20 +5277,20 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 62250
+        "total_items": 62330
       }
     },
     {
       "method": "GET",
       "path_template": "/web/api/v2.1/threats/{threat_id}/explore/events",
-      "path_called": "/web/api/v2.1/threats/2198251286189910322/explore/events",
+      "path_called": "/web/api/v2.1/threats/2202773500983592514/explore/events",
       "tag": "Threats",
       "operationId": "_web_api_threats_{threat_id}_explore_events_get",
       "summary": "Get Events",
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1849.3,
+      "elapsed_ms": 1869.2,
       "shape": {
         "keys": [
           "data",
@@ -5138,14 +5305,14 @@
     {
       "method": "GET",
       "path_template": "/web/api/v2.1/threats/{threat_id}/download-from-cloud",
-      "path_called": "/web/api/v2.1/threats/2198251286189910322/download-from-cloud",
+      "path_called": "/web/api/v2.1/threats/2202773500983592514/download-from-cloud",
       "tag": "Threats",
       "operationId": "_web_api_threats_{threat_id}_download-from-cloud_get",
       "summary": "Download from cloud",
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1982.6,
+      "elapsed_ms": 1783.6,
       "shape": {
         "keys": [
           "data"
@@ -5160,14 +5327,14 @@
     {
       "method": "GET",
       "path_template": "/web/api/v2.1/threats/{threat_id}/timeline",
-      "path_called": "/web/api/v2.1/threats/2198251286189910322/timeline",
+      "path_called": "/web/api/v2.1/threats/2202773500983592514/timeline",
       "tag": "Threats",
       "operationId": "_web_api_threats_{threat_id}_timeline_get",
       "summary": "Get Threat Timeline",
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1566.1,
+      "elapsed_ms": 444.5,
       "shape": {
         "keys": [
           "data",
@@ -5176,20 +5343,20 @@
         "data_type": "list",
         "data_len": 10,
         "paginated": true,
-        "total_items": 43
+        "total_items": 15
       }
     },
     {
       "method": "GET",
       "path_template": "/web/api/v2.1/export/threats/{threat_id}/timeline",
-      "path_called": "/web/api/v2.1/export/threats/2198251286189910322/timeline",
+      "path_called": "/web/api/v2.1/export/threats/2202773500983592514/timeline",
       "tag": "Threats",
       "operationId": "_web_api_export_threats_{threat_id}_timeline_get",
       "summary": "Export Threat Timeline",
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1565.1,
+      "elapsed_ms": 457.2,
       "shape": {
         "keys": [
           "_raw"
@@ -5199,14 +5366,14 @@
     {
       "method": "GET",
       "path_template": "/web/api/v2.1/export/threats/{threat_id}/explore/events",
-      "path_called": "/web/api/v2.1/export/threats/2198251286189910322/explore/events",
+      "path_called": "/web/api/v2.1/export/threats/2202773500983592514/explore/events",
       "tag": "Threats",
       "operationId": "_web_api_export_threats_{threat_id}_explore_events_get",
       "summary": "Export Events",
       "ok": false,
       "status": 400,
       "error": "HTTP 400: format: Missing data for required field.",
-      "elapsed_ms": 1608.0,
+      "elapsed_ms": 1344.4,
       "shape": null
     },
     {
@@ -5216,11 +5383,20 @@
       "tag": "Unprotected Endpoints Discovery",
       "operationId": "_web_api_rogues_table-view_get",
       "summary": "Get Unprotected Endpoints Discovery Table",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Must filter one account or be a single account user",
-      "elapsed_ms": 624.3,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 409.9,
+      "shape": {
+        "keys": [
+          "data",
+          "pagination"
+        ],
+        "data_type": "list",
+        "data_len": 1,
+        "paginated": true,
+        "total_items": 111264
+      }
     },
     {
       "method": "GET",
@@ -5229,11 +5405,15 @@
       "tag": "Unprotected Endpoints Discovery",
       "operationId": "_web_api_rogues_report_csv_get",
       "summary": "Export Unprotected Endpoints Discovery Data",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Must filter one account or be a single account user",
-      "elapsed_ms": 1245.5,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 10328.3,
+      "shape": {
+        "keys": [
+          "_raw"
+        ]
+      }
     },
     {
       "method": "GET",
@@ -5242,11 +5422,24 @@
       "tag": "Unprotected Endpoints Discovery",
       "operationId": "_web_api_rogues_settings_get",
       "summary": "Get Unprotected Endpoints Discovery Settings",
-      "ok": false,
-      "status": 400,
-      "error": "HTTP 400: Must filter one account or be a single account user",
-      "elapsed_ms": 677.7,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 383.6,
+      "shape": {
+        "keys": [
+          "data"
+        ],
+        "data_type": "object",
+        "data_keys": [
+          "accountId",
+          "enabled",
+          "minAgentsInNetworkToScan",
+          "restrictions",
+          "specificPorts",
+          "useSpecificPorts"
+        ]
+      }
     },
     {
       "method": "GET",
@@ -5258,7 +5451,7 @@
       "ok": false,
       "status": 500,
       "error": "HTTP 500: Server could not process the request.",
-      "elapsed_ms": 1727.7,
+      "elapsed_ms": 528.3,
       "shape": null
     },
     {
@@ -5271,7 +5464,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 761.0,
+      "elapsed_ms": 482.0,
       "shape": {
         "keys": [
           "data",
@@ -5293,7 +5486,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 344.0,
+      "elapsed_ms": 425.5,
       "shape": {
         "keys": [
           "data"
@@ -5328,7 +5521,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1206.8,
+      "elapsed_ms": 437.6,
       "shape": {
         "keys": [
           "data",
@@ -5337,7 +5530,7 @@
         "data_type": "list",
         "data_len": 10,
         "paginated": true,
-        "total_items": 374
+        "total_items": 373
       }
     },
     {
@@ -5350,7 +5543,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 3773.3,
+      "elapsed_ms": 772.7,
       "shape": {
         "keys": [
           "_raw"
@@ -5367,7 +5560,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 389.9,
+      "elapsed_ms": 364.6,
       "shape": {
         "keys": [
           "data"
@@ -5402,7 +5595,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 605.6,
+      "elapsed_ms": 367.2,
       "shape": {
         "keys": [
           "data"
@@ -5424,7 +5617,7 @@
       "ok": false,
       "status": 403,
       "error": "HTTP 403: {\"errors\":[{\"code\":4030010,\"detail\":null,\"title\":\"Insufficient permissions\"}]}\n",
-      "elapsed_ms": 284.0,
+      "elapsed_ms": 344.8,
       "shape": null
     },
     {
@@ -5437,7 +5630,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1018.3,
+      "elapsed_ms": 338.6,
       "shape": {
         "keys": [
           "data"
@@ -5458,7 +5651,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1075.3,
+      "elapsed_ms": 349.7,
       "shape": {
         "keys": [
           "data"
@@ -5479,7 +5672,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: Invalid verification code received.",
-      "elapsed_ms": 1297.7,
+      "elapsed_ms": 320.6,
       "shape": null
     },
     {
@@ -5492,7 +5685,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: one of the fields email, scope_id must be used",
-      "elapsed_ms": 271.3,
+      "elapsed_ms": 304.4,
       "shape": null
     },
     {
@@ -5505,7 +5698,7 @@
       "ok": false,
       "status": 403,
       "error": "HTTP 403: IDP re-auth cannot be initiated, because SSO is not enabled",
-      "elapsed_ms": 694.9,
+      "elapsed_ms": 341.6,
       "shape": null
     },
     {
@@ -5518,7 +5711,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: token: Missing data for required field.",
-      "elapsed_ms": 652.9,
+      "elapsed_ms": 306.6,
       "shape": null
     },
     {
@@ -5531,7 +5724,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: Required parameter 'scopeIds' is not present.",
-      "elapsed_ms": 392.5,
+      "elapsed_ms": 465.4,
       "shape": null
     },
     {
@@ -5544,7 +5737,7 @@
       "ok": false,
       "status": 403,
       "error": "HTTP 403: User does not have required tenant-level permissions.",
-      "elapsed_ms": 706.5,
+      "elapsed_ms": 485.7,
       "shape": null
     },
     {
@@ -5557,7 +5750,7 @@
       "ok": false,
       "status": 403,
       "error": "HTTP 403: User does not have required tenant-level permissions.",
-      "elapsed_ms": 395.8,
+      "elapsed_ms": 476.8,
       "shape": null
     },
     {
@@ -5570,7 +5763,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: Required parameter 'scopeIds' is not present.",
-      "elapsed_ms": 874.1,
+      "elapsed_ms": 460.7,
       "shape": null
     },
     {
@@ -5583,7 +5776,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 1140.8,
+      "elapsed_ms": 1561.4,
       "shape": {
         "keys": [
           "data",
@@ -5592,7 +5785,7 @@
         "data_type": "list",
         "data_len": 1,
         "paginated": true,
-        "total_items": 26315
+        "total_items": 26658
       }
     },
     {
@@ -5602,11 +5795,20 @@
       "tag": "marketplace",
       "operationId": "_web_api_singularity-marketplace_applications_get",
       "summary": "Get Installed Applications",
-      "ok": false,
-      "status": null,
-      "error": "Timeout: exceeded 45.0s batch deadline",
-      "elapsed_ms": 45000.0,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 2380.7,
+      "shape": {
+        "keys": [
+          "data",
+          "pagination"
+        ],
+        "data_type": "list",
+        "data_len": 83,
+        "paginated": true,
+        "total_items": 83
+      }
     },
     {
       "method": "GET",
@@ -5615,11 +5817,20 @@
       "tag": "marketplace",
       "operationId": "_web_api_singularity-marketplace_applications-catalog_get",
       "summary": "Get Applications Catalog",
-      "ok": false,
-      "status": null,
-      "error": "Timeout: exceeded 45.0s batch deadline",
-      "elapsed_ms": 45000.0,
-      "shape": null
+      "ok": true,
+      "status": 200,
+      "error": null,
+      "elapsed_ms": 3267.7,
+      "shape": {
+        "keys": [
+          "data",
+          "pagination"
+        ],
+        "data_type": "list",
+        "data_len": 175,
+        "paginated": true,
+        "total_items": 175
+      }
     },
     {
       "method": "POST",
@@ -5631,7 +5842,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: data: Missing data for required field.",
-      "elapsed_ms": 644.3,
+      "elapsed_ms": 332.0,
       "shape": null
     },
     {
@@ -5644,7 +5855,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: data: Missing data for required field.",
-      "elapsed_ms": 549.0,
+      "elapsed_ms": 329.5,
       "shape": null
     },
     {
@@ -5657,7 +5868,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: data: Missing data for required field.",
-      "elapsed_ms": 277.0,
+      "elapsed_ms": 315.9,
       "shape": null
     },
     {
@@ -5670,7 +5881,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: data: Invalid input type.",
-      "elapsed_ms": 1022.3,
+      "elapsed_ms": 330.0,
       "shape": null
     },
     {
@@ -5683,7 +5894,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: data: Invalid input type.",
-      "elapsed_ms": 298.2,
+      "elapsed_ms": 342.5,
       "shape": null
     },
     {
@@ -5696,7 +5907,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: data: Missing data for required field.",
-      "elapsed_ms": 552.8,
+      "elapsed_ms": 356.1,
       "shape": null
     },
     {
@@ -5709,7 +5920,7 @@
       "ok": false,
       "status": 400,
       "error": "HTTP 400: data: scriptId: Not a valid Identifier., agentIds: Missing data for required field.",
-      "elapsed_ms": 439.2,
+      "elapsed_ms": 454.8,
       "shape": null
     },
     {
@@ -5722,7 +5933,7 @@
       "ok": true,
       "status": 200,
       "error": null,
-      "elapsed_ms": 602.6,
+      "elapsed_ms": 317.8,
       "shape": {
         "keys": [
           "data"
