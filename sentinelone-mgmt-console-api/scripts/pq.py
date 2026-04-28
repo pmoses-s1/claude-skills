@@ -436,4 +436,10 @@ def list_data_sources(
                  "| sort -ct "
                  f"| limit {limit}")
     res = run_pq(client, query, hours=hours)
-    return res["rows"]
+    rows = res["rows"]
+    # The LRQ engine can return null for count() on some category-bucketed rows.
+    # Normalise here so callers never receive ct=None.
+    for row in rows:
+        if row.get("ct") is None:
+            row["ct"] = 0
+    return rows
