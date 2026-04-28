@@ -6,9 +6,11 @@ SentinelOne skills for Claude. Install the plugin to get everything; no individu
 
 1. Download the latest `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/)
 2. In Cowork, go to **Capabilities → Skills → Customise → Plugins → Personal plugins** and click **Upload plugin**, then select the `.plugin` file
-3. Drop a `credentials.json` directly into your Cowork project folder. See [Configuration](#configuration) below for the keys.
+3. When creating your Cowork project, add both `credentials.json` and `CLAUDE.md` under **Add files** so Claude has access to them in every session. See [Configuration](#configuration) below for the credential keys.
 
-That's it. The plugin's SessionStart hook auto-discovers the file and makes it available to every skill in the session.
+   ![Adding credentials.json and CLAUDE.md when creating a new Cowork project](assets/new-project-credentials.png)
+
+That's it. The plugin's SessionStart hook auto-discovers the credentials file and makes it available to every skill in the session.
 
 ## What's included
 
@@ -66,9 +68,6 @@ The full investigation workflow requires three components to be installed and co
 2. Name it **PrincipalSOCAnalyst**
 3. Click **Select Folder** and choose this `claude-skills` folder (which contains `CLAUDE.md`)
 4. Under **Add files**, add both `credentials.json` and `CLAUDE.md` to the project so Claude has access to them in every session
-
-   ![Adding credentials.json and CLAUDE.md when creating a new Cowork project](assets/new-project-credentials.png)
-
 5. Click **Create**
 
 **Step 2: Verify all components are active**
