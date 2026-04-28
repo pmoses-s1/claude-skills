@@ -6,9 +6,9 @@ SentinelOne skills for Claude. Install the plugin to get everything; no individu
 
 1. Download the latest `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/)
 2. In Cowork, go to **Capabilities → Skills → Customise → Plugins → Personal plugins** and click **Upload plugin**, then select the `.plugin` file
-3. Drop a `credentials.json` into a folder Cowork can access. Recommended path: `$COWORK_WORKSPACE/.sentinelone/credentials.json` (or any folder Cowork has access to under `.sentinelone/credentials.json`). See [Configuration](#configuration) below for the keys.
+3. Drop a `credentials.json` directly into your Cowork project folder. See [Configuration](#configuration) below for the keys.
 
-That's it. The plugin's SessionStart hook auto-copies the file to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of every session, so all six skills find it without any further setup.
+That's it. The plugin's SessionStart hook auto-discovers the file and makes it available to every skill in the session.
 
 ## What's included
 
@@ -60,10 +60,16 @@ The full investigation workflow requires three components to be installed and co
 
 **Step 1: Create the project**
 
-1. Open Cowork and click **New Project**
+> **Important:** This project must be created in **Cowork**, not in Claude.ai chat. Cowork is a mode inside the Claude desktop app: open the Claude desktop app and navigate to **Cowork** from the sidebar. The project folder, credentials file, and skill plugin are Cowork features and are not available in the web chat interface.
+
+1. In the Claude desktop app, navigate to **Cowork** and click **New Project**
 2. Name it **PrincipalSOCAnalyst**
 3. Click **Select Folder** and choose this `claude-skills` folder (which contains `CLAUDE.md`)
-4. Click **Create**
+4. Under **Add files**, add both `credentials.json` and `CLAUDE.md` to the project so Claude has access to them in every session
+
+   ![Adding credentials.json and CLAUDE.md when creating a new Cowork project](assets/new-project-credentials.png)
+
+5. Click **Create**
 
 **Step 2: Verify all components are active**
 
@@ -328,64 +334,44 @@ These are real questions you can ask. Claude will pick the right skill automatic
 
 ## Configuration
 
-All skills read credentials from a single JSON file. **Recommended path:**
+All skills read credentials from a single JSON file: `credentials.json` dropped directly in your Cowork project folder. The plugin's SessionStart hook auto-discovers it and makes it available to every skill in the session.
 
-```
-$COWORK_WORKSPACE/.sentinelone/credentials.json
-```
+**Setup is two commands.** Copy [`credentials.example.json`](./sentinelone-skills-plugin/credentials.example.json) from this repo into your Cowork project folder, renaming it to `credentials.json`, then edit it.
 
-Or, if you don't want to set `$COWORK_WORKSPACE`, drop the file at `<any-folder-Cowork-has-access-to>/.sentinelone/credentials.json`. The plugin's SessionStart hook auto-discovers it and copies it to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of every session, so every script and CLI in the plugin finds it with zero preflight.
-
-Full credential resolution order (highest priority wins):
-1. Environment variables (`S1_CONSOLE_URL`, `S1_CONSOLE_API_TOKEN`, `SDL_*`)
-2. `$COWORK_WORKSPACE/.sentinelone/credentials.json` (recommended for Cowork)
-3. Auto-discovered `<workspace>/.sentinelone/credentials.json` (cwd walk-up, then any folder under `~/mnt/`; legacy `.claude/sentinelone/credentials.json` layout also accepted)
-4. `$HOME/.claude/sentinelone/credentials.json` (sandbox-local copy maintained by the SessionStart hook)
-5. `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` (Cowork session config, when set)
-6. `~/.config/sentinelone/credentials.json` (legacy terminal fallback)
-
-**macOS / Linux (recommended Cowork path):**
+**macOS / Linux:**
 
 ```bash
-# 1. Pick a folder Cowork has access to (your project folder works).
-#    Optionally export it as $COWORK_WORKSPACE so the explicit path is used:
-export COWORK_WORKSPACE=~/Documents/Claude/Projects/MyProject
+# 1. Pick your Cowork project folder.
+PROJECT_DIR=~/Documents/Claude/Projects/MyProject
 
-# 2. Drop the credentials there.
-mkdir -p "$COWORK_WORKSPACE/.sentinelone"
-cat > "$COWORK_WORKSPACE/.sentinelone/credentials.json" << 'EOF'
-{
-  "S1_CONSOLE_URL": "https://usea1-acme.sentinelone.net",
-  "S1_CONSOLE_API_TOKEN": "eyJ...your-management-console-api-token...",
-  "S1_HEC_INGEST_URL": "https://ingest.us1.sentinelone.net",
-  "SDL_XDR_URL": "https://xdr.us1.sentinelone.net",
-  "SDL_LOG_WRITE_KEY": "0Z1Fy0...your-log-write-key...",
-  "SDL_CONFIG_WRITE_KEY": "0mXas6PD...your-config-write-key..."
-}
-EOF
-chmod 600 "$COWORK_WORKSPACE/.sentinelone/credentials.json"
+# 2. Copy the example, renaming to credentials.json.
+cp sentinelone-skills-plugin/credentials.example.json "$PROJECT_DIR/credentials.json"
+
+# 3. Edit it: replace the placeholder values with your real ones.
+${EDITOR:-nano} "$PROJECT_DIR/credentials.json"
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-# Drop credentials in any folder Cowork has access to.
-$workspace = "$env:USERPROFILE\Documents\Claude\Projects\MyProject"
-$dir = "$workspace\.sentinelone"
-New-Item -ItemType Directory -Force -Path $dir | Out-Null
-@'
-{
-  "S1_CONSOLE_URL": "https://usea1-acme.sentinelone.net",
-  "S1_CONSOLE_API_TOKEN": "eyJ...your-management-console-api-token...",
-  "S1_HEC_INGEST_URL": "https://ingest.us1.sentinelone.net",
-  "SDL_XDR_URL": "https://xdr.us1.sentinelone.net",
-  "SDL_LOG_WRITE_KEY": "0Z1Fy0...your-log-write-key...",
-  "SDL_CONFIG_WRITE_KEY": "0mXas6PD...your-config-write-key..."
-}
-'@ | Set-Content "$dir\credentials.json" -Encoding UTF8
+# 1. Pick your Cowork project folder.
+$projectDir = "$env:USERPROFILE\Documents\Claude\Projects\MyProject"
+
+# 2. Copy the example, renaming to credentials.json.
+Copy-Item .\sentinelone-skills-plugin\credentials.example.json "$projectDir\credentials.json"
+
+# 3. Edit it: replace the placeholder values with your real ones.
+notepad "$projectDir\credentials.json"
 ```
 
-A fully annotated example with all optional keys is in [`credentials.example.json`](./credentials.example.json).
+If you only downloaded the `.plugin` file (not the full repo), extract `credentials.example.json` from the plugin zip with any unzip tool, or grab it directly from the repo at [`sentinelone-skills-plugin/credentials.example.json`](./sentinelone-skills-plugin/credentials.example.json).
+
+Resolution order (highest priority wins):
+1. Environment variables (`S1_CONSOLE_URL`, `S1_CONSOLE_API_TOKEN`, `SDL_*`)
+2. `<project folder>/credentials.json` (auto-discovered)
+3. `~/.config/sentinelone/credentials.json` (terminal fallback when there is no project folder)
+
+A fully annotated example with all optional keys is in [`sentinelone-skills-plugin/credentials.example.json`](./sentinelone-skills-plugin/credentials.example.json).
 
 | Credential key | Required for | How to get it |
 |---|---|---|

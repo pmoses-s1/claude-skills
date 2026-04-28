@@ -48,19 +48,15 @@ Self-check against `references/validation-rules.md` before presenting the workfl
 ### Step 5 — API submission (optional)
 If the user wants to submit to a live console, read `references/api-integration.md`.
 
-**Credentials**: The plugin's SessionStart hook auto-copies credentials from any
-Cowork-accessible folder (preferring `$COWORK_WORKSPACE/.sentinelone/credentials.json`)
-to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of
-every session. Read from there. If the file is missing, ask the user to drop a
-`credentials.json` into a folder Cowork can access.
+**Credentials**: The plugin's SessionStart hook auto-discovers a `credentials.json`
+dropped directly into the user's Cowork project folder at the start of every session.
+If the file is missing, ask the user to drop a `credentials.json` into their project folder.
 
 Resolution priority (highest wins):
 
 1. Environment variables `S1_CONSOLE_URL` / `S1_CONSOLE_API_TOKEN`
-2. `$HOME/.claude/sentinelone/credentials.json` (sandbox-local; populated by the SessionStart hook)
-3. Other layered fallbacks: `$COWORK_WORKSPACE/.sentinelone/credentials.json` direct,
-   `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`, `~/.config/sentinelone/credentials.json`
-4. Ask the user to provide their console URL and personal Console User API token
+2. `<project folder>/credentials.json` (auto-discovered)
+3. Ask the user to provide their console URL and personal Console User API token
 
 To read credentials in Python:
 ```python

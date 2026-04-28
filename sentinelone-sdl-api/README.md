@@ -18,7 +18,7 @@ In Cowork/Claude Code, the path is:
 
 ## Configure
 
-The SDL API has four scoped key types plus (optionally) the same management-console API token used by `sentinelone-mgmt-console-api` (`S1_CONSOLE_API_TOKEN`). Drop a `credentials.json` into a folder Cowork has access to (recommended: `$COWORK_WORKSPACE/.sentinelone/credentials.json`) with the keys you need (see [`credentials.example.json`](../credentials.example.json) for all available keys). The plugin's SessionStart hook auto-copies it to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of every session, or run `bash scripts/bootstrap_creds.sh` to refresh manually:
+The SDL API has four scoped key types plus (optionally) the same management-console API token used by `sentinelone-mgmt-console-api` (`S1_CONSOLE_API_TOKEN`). Drop a `credentials.json` directly into your Cowork project folder with the keys you need (see [`credentials.example.json`](../credentials.example.json) for all available keys). The plugin's SessionStart hook auto-discovers it; run `bash scripts/bootstrap_creds.sh` to refresh manually:
 
 ```json
 {
@@ -59,7 +59,7 @@ The client picks the narrowest matching key per method (principle of least privi
 
 `console_api_token` is only used as a fallback for any of the above (except `uploadLogs`) when the matching SDL key is blank.
 
-Environment variables (`SDL_XDR_URL`, `SDL_LOG_WRITE_KEY`, etc.) override the credentials file if set. Legacy paths (`~/.config/sentinelone/credentials.json`, `~/.claude/sentinelone/credentials.json`, `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`) are read as fallbacks.
+Environment variables (`SDL_XDR_URL`, `SDL_LOG_WRITE_KEY`, etc.) override the credentials file if set.
 
 ## Quick test
 
@@ -128,7 +128,7 @@ The client picks the right key per method automatically, retries on 429/5xx/`err
 ## Layout
 
 - `SKILL.md` — instructions Claude reads when the skill triggers
-- `$COWORK_WORKSPACE/.sentinelone/credentials.json` — credentials (set `SDL_XDR_URL` and the keys you need); auto-copied to the sandbox by the plugin's SessionStart hook
+- `<project folder>/credentials.json` — credentials (set `SDL_XDR_URL` and the keys you need); auto-discovered by the plugin's SessionStart hook
 - `scripts/bootstrap_creds.sh` — idempotent helper to copy workspace creds into the sandbox-local path
 - `scripts/sdl_client.py` — `SDLClient` (auto key selection across 4 scoped keys + console token, `Bearer` auth, retries, `iter_query` pagination)
 - `scripts/sdl_cli.py` — shell CLI covering every method

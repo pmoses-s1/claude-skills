@@ -5,11 +5,7 @@ There is **no dedicated `testParser` REST endpoint** on the SDL tenant. The in-c
 ## Prerequisites
 
 - `sentinelone-sdl-api` skill is installed.
-- `credentials.json` is dropped into a folder Cowork can access (recommended: `$COWORK_WORKSPACE/.sentinelone/credentials.json`) and contains at minimum `SDL_CONFIG_WRITE_KEY`, `SDL_LOG_WRITE_KEY`, and `SDL_LOG_READ_KEY`, or `S1_CONSOLE_API_TOKEN` (the same management-console JWT; legacy `SDL_CONSOLE_API_TOKEN` is also accepted). The plugin's SessionStart hook copies it to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox. Check with:
-
-```bash
-cat "$HOME/.claude/sentinelone/credentials.json"
-```
+- `credentials.json` is dropped directly into your Cowork project folder and contains at minimum `SDL_CONFIG_WRITE_KEY`, `SDL_LOG_WRITE_KEY`, and `SDL_LOG_READ_KEY`, or `S1_CONSOLE_API_TOKEN` (the same management-console JWT; legacy `SDL_CONSOLE_API_TOKEN` is also accepted). The plugin's SessionStart hook auto-discovers it at session start.
 
 - You have a draft parser JSON and a sample log file.
 

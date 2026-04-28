@@ -10,7 +10,7 @@ Wraps the SentinelOne Management Console API (Swagger 2.0, spec version 2.1, 781
 
 ## Setup — configure credentials first
 
-Drop a file at `$COWORK_WORKSPACE/.sentinelone/credentials.json` (or any folder Cowork has access to under `.sentinelone/credentials.json`) with the required fields:
+Drop a `credentials.json` file directly into your Cowork project folder with the required fields:
 
 ```json
 {
@@ -22,15 +22,15 @@ Drop a file at `$COWORK_WORKSPACE/.sentinelone/credentials.json` (or any folder 
 
 `S1_CONSOLE_URL` is the tenant console URL (no trailing slash, no `/web/api/v2.1`). `S1_CONSOLE_API_TOKEN` is an API User token from Settings → Users → Service Users in the S1 console. `S1_HEC_INGEST_URL` is the SentinelOne HEC ingest host (region-specific, look up yours in [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961)) and is only required if you push alerts/indicators into UAM via the UAM Alert Interface.
 
-The plugin's SessionStart hook auto-copies the file to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of every session, so all S1 scripts and CLIs find it without any preflight. To trigger a manual refresh:
+The plugin's SessionStart hook auto-discovers the file at the start of every session, so all S1 scripts and CLIs find it without any preflight. To trigger a manual refresh:
 
 ```bash
 bash scripts/bootstrap_creds.sh   # idempotent, returns the destination path
 ```
 
-Environment variables (`S1_CONSOLE_URL`, `S1_CONSOLE_API_TOKEN`, `S1_HEC_INGEST_URL`, `S1_VERIFY_TLS`) still override the credentials file if set. Legacy paths (`~/.config/sentinelone/credentials.json`, `~/.claude/sentinelone/credentials.json`, `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`) are read as fallbacks.
+Environment variables (`S1_CONSOLE_URL`, `S1_CONSOLE_API_TOKEN`, `S1_HEC_INGEST_URL`, `S1_VERIFY_TLS`) still override the credentials file if set.
 
-Before running anything, confirm credentials resolved. If not, stop and ask the user to drop `credentials.json` into a folder Cowork can access.
+Before running anything, confirm credentials resolved. If not, stop and ask the user to drop `credentials.json` into their Cowork project folder.
 
 ## Workflow
 
@@ -57,7 +57,7 @@ It enumerates every GET plus a curated allow-list of read-only query POSTs, reco
 
 ## Files in this skill
 
-- `$COWORK_WORKSPACE/.sentinelone/credentials.json` — credentials (set `S1_CONSOLE_URL` and `S1_CONSOLE_API_TOKEN`; see Setup above). Auto-copied to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox by the plugin's SessionStart hook.
+- `<project folder>/credentials.json` — credentials (set `S1_CONSOLE_URL` and `S1_CONSOLE_API_TOKEN`; see Setup above). Auto-discovered by the plugin's SessionStart hook.
 - `scripts/bootstrap_creds.sh` — idempotent helper that copies workspace creds into the sandbox-local path. Wired to the plugin's SessionStart hook; safe to re-run manually.
 - `scripts/s1_client.py` — importable Python client. Handles auth, pooled HTTP connections, retries on 429/5xx, pagination, parallel fan-out via `get_many()`, and optional short-TTL response caching for rarely-changing reads (accounts, sites, groups, system/info, etc.).
 - `scripts/call_endpoint.py` — CLI for one-shot calls: `python scripts/call_endpoint.py GET /web/api/v2.1/agents --param limit=5`.

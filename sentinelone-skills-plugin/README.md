@@ -39,24 +39,9 @@ Set these environment variables once and all skills pick them up automatically.
 
 ## How to set credentials
 
-Drop a single JSON file into a folder Cowork has access to. The plugin's SessionStart hook discovers it and copies it to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of every session, so every script and CLI in the plugin finds it with no preflight or env vars.
+Drop a single JSON file named `credentials.json` directly into your Cowork project folder. The plugin's SessionStart hook auto-discovers it and makes it available to every skill in the session.
 
-Recommended path:
-
-```
-$COWORK_WORKSPACE/.sentinelone/credentials.json
-```
-
-Or any folder Cowork has access to under `.sentinelone/credentials.json`. The hook auto-discovers the workspace by scanning `$HOME/mnt/` if `$COWORK_WORKSPACE` isn't set.
-
-| Where | Path | When |
-|---|---|---|
-| Workspace (recommended for Cowork) | `$COWORK_WORKSPACE/.sentinelone/credentials.json` | Cowork sandbox copies it to `$HOME/.claude/sentinelone/` automatically on session start |
-| Any mounted folder | `<any-Cowork-accessible-folder>/.sentinelone/credentials.json` | Auto-discovered via `~/mnt/*` scan; same auto-copy |
-| Cowork session | `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json` | Read as fallback when set |
-| Legacy paths | `~/.claude/sentinelone/credentials.json`, `~/.config/sentinelone/credentials.json` | Older paths, still honoured |
-
-The file format is the same in every location. A fully annotated example is included in this repo at [`credentials.example.json`](credentials.example.json):
+A fully annotated example is included in this repo at [`credentials.example.json`](credentials.example.json):
 
 ```json
 {
@@ -69,47 +54,30 @@ The file format is the same in every location. A fully annotated example is incl
 }
 ```
 
-Only include the keys you need. `S1_CONSOLE_URL` + `S1_CONSOLE_API_TOKEN` covers most skills (including SDL query and config methods).
-Add `SDL_*` keys only if you need `uploadLogs` (`SDL_LOG_WRITE_KEY`) or parser/dashboard deploy (`SDL_CONFIG_WRITE_KEY`).
+Only include the keys you need. `S1_CONSOLE_URL` + `S1_CONSOLE_API_TOKEN` covers most skills (including SDL query and config methods). Add `SDL_*` keys only if you need `uploadLogs` (`SDL_LOG_WRITE_KEY`) or parser/dashboard deploy (`SDL_CONFIG_WRITE_KEY`).
 
-### Create the file
+### Setup is two commands
 
 **macOS / Linux** — paste into Terminal:
 ```bash
-# Pick a folder Cowork has access to. Optionally export it as $COWORK_WORKSPACE.
-export COWORK_WORKSPACE=~/Documents/Claude/Projects/MyProject
-mkdir -p "$COWORK_WORKSPACE/.sentinelone"
-cat > "$COWORK_WORKSPACE/.sentinelone/credentials.json" << 'EOF'
-{
-  "S1_CONSOLE_URL": "https://usea1-acme.sentinelone.net",
-  "S1_CONSOLE_API_TOKEN": "eyJ...your-token...",
-  "S1_HEC_INGEST_URL": "https://ingest.us1.sentinelone.net",
-  "SDL_XDR_URL": "https://xdr.us1.sentinelone.net",
-  "SDL_LOG_WRITE_KEY": "0Z1Fy0...your-log-write-key...",
-  "SDL_CONFIG_WRITE_KEY": "0mXas6PD...your-config-write-key..."
-}
-EOF
-chmod 600 "$COWORK_WORKSPACE/.sentinelone/credentials.json"
+PROJECT_DIR=~/Documents/Claude/Projects/MyProject
+cp credentials.example.json "$PROJECT_DIR/credentials.json"
+${EDITOR:-nano} "$PROJECT_DIR/credentials.json"   # replace placeholders with your real values
 ```
 
 **Windows** — paste into PowerShell:
 ```powershell
-$workspace = "$env:USERPROFILE\Documents\Claude\Projects\MyProject"
-$dir = "$workspace\.sentinelone"
-New-Item -ItemType Directory -Force -Path $dir | Out-Null
-@'
-{
-  "S1_CONSOLE_URL": "https://usea1-acme.sentinelone.net",
-  "S1_CONSOLE_API_TOKEN": "eyJ...your-token...",
-  "S1_HEC_INGEST_URL": "https://ingest.us1.sentinelone.net",
-  "SDL_XDR_URL": "https://xdr.us1.sentinelone.net",
-  "SDL_LOG_WRITE_KEY": "0Z1Fy0...your-log-write-key...",
-  "SDL_CONFIG_WRITE_KEY": "0mXas6PD...your-config-write-key..."
-}
-'@ | Set-Content "$dir\credentials.json" -Encoding UTF8
+$projectDir = "$env:USERPROFILE\Documents\Claude\Projects\MyProject"
+Copy-Item .\credentials.example.json "$projectDir\credentials.json"
+notepad "$projectDir\credentials.json"            # replace placeholders with your real values
 ```
 
-Start a new Claude session after creating the file. The SessionStart hook copies it into the sandbox automatically.
+Start a new Claude session after creating the file. The SessionStart hook discovers it automatically.
+
+Resolution order (highest priority wins):
+1. Environment variables (`S1_CONSOLE_URL`, `S1_CONSOLE_API_TOKEN`, `SDL_*`)
+2. `<project folder>/credentials.json` (auto-discovered)
+3. `~/.config/sentinelone/credentials.json` (terminal fallback when there is no project folder)
 
 ---
 

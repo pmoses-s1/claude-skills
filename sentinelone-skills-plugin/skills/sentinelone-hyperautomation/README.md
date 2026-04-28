@@ -23,7 +23,7 @@ cp -r sentinelone-hyperautomation ~/.claude/skills/
 
 ## Configure
 
-For API submission to a live console, drop credentials at `$COWORK_WORKSPACE/.sentinelone/credentials.json` (or any folder Cowork has access to under `.sentinelone/credentials.json`). The plugin's SessionStart hook auto-copies the file to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of every session.
+For API submission to a live console, drop a `credentials.json` directly into your Cowork project folder. The plugin's SessionStart hook auto-discovers it at the start of every session.
 
 ```json
 {
@@ -37,7 +37,7 @@ Use a **Console User (personal) API token** — not a Service User token. Workfl
 
 `S1_HEC_INGEST_URL` is the SentinelOne HEC ingest host (region-specific — see [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961)). It is not used by this Hyperautomation skill, but is shown here so the credentials file is consistent across all skills in this plugin (the mgmt-console skill's UAM Alert Interface uses it for OCSF alert/indicator ingest).
 
-Environment variables `S1_CONSOLE_URL`, `S1_CONSOLE_API_TOKEN`, and `S1_HEC_INGEST_URL` override the credentials file if set. Legacy paths (`~/.config/sentinelone/credentials.json`, `~/.claude/sentinelone/credentials.json`, `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`) are read as fallbacks.
+Environment variables `S1_CONSOLE_URL`, `S1_CONSOLE_API_TOKEN`, and `S1_HEC_INGEST_URL` override the credentials file if set.
 
 ## Usage
 

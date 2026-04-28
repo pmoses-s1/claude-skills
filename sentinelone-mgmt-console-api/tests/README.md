@@ -40,7 +40,7 @@ are assigned to more than one account simultaneously — with
 `HTTP 403 code 4030010 "This page doesn't support multi-scopes users
 yet"`. Confirmed today (2026-04-22) on `/web/api/v2.1/threat-intelligence/iocs`.
 
-Add two optional token fields to your `credentials.json` (recommended path: `$COWORK_WORKSPACE/.sentinelone/credentials.json`):
+Add two optional token fields to your `credentials.json` (in your Cowork project folder):
 
 ```json
 {

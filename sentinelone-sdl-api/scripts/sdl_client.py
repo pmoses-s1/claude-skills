@@ -7,16 +7,18 @@ callers do not need to worry about which token to send.
 
 Credential resolution order (highest wins, applied last):
   1. Environment variables
-  2. $COWORK_WORKSPACE/.sentinelone/credentials.json   (recommended for Cowork:
-     set $COWORK_WORKSPACE to your project folder, drop credentials.json there)
-  3. Auto-discovered <workspace>/.sentinelone/credentials.json
-     (cwd walk-up, then scan ~/mnt/* for any Cowork-accessible folder
-     containing .sentinelone/credentials.json. Legacy
-     .claude/sentinelone/credentials.json layout also accepted.)
+  2. $COWORK_WORKSPACE/credentials.json   (recommended: drop credentials.json
+     directly in your Cowork project folder.)
+  3. Auto-discovered <workspace>/credentials.json (cwd walk-up, then scan
+     ~/mnt/* for any Cowork-accessible folder containing credentials.json).
   4. $CLAUDE_CONFIG_DIR/sentinelone/credentials.json  (Cowork session)
-  5. ~/.claude/sentinelone/credentials.json           (persistent host path)
-  6. ~/.config/sentinelone/credentials.json           (legacy terminal fallback)
-  7. <skill>/config.json                              (last resort)
+  5. ~/.config/sentinelone/credentials.json           (host terminal fallback)
+  6. <skill>/config.json                              (last resort)
+
+  Legacy layouts (.sentinelone/credentials.json and
+  .claude/sentinelone/credentials.json under the same workspace roots)
+  are still accepted at every workspace pass, so existing setups keep
+  working without migration.
 
 Canonical keys:
   SDL_XDR_URL            -> base_url  (e.g. https://xdr.us1.sentinelone.net)
@@ -84,10 +86,12 @@ PLUGIN_CREDS_PATH = (Path(_CLAUDE_CONFIG_DIR) / "sentinelone" / "credentials.jso
                      if _CLAUDE_CONFIG_DIR else None)
 
 
-# Workspace creds layout: prefer .sentinelone/credentials.json. The legacy
-# .claude/sentinelone/credentials.json layout is also accepted so existing
-# setups keep working.
+# Workspace creds layout. The recommended path is just credentials.json
+# directly in the project folder. The legacy .sentinelone/ and
+# .claude/sentinelone/ subfolder layouts are still accepted so existing
+# setups keep working without migration.
 _WORKSPACE_CREDS_RELS = (
+    Path("credentials.json"),
     Path(".sentinelone") / "credentials.json",
     Path(".claude") / "sentinelone" / "credentials.json",
 )
@@ -101,17 +105,20 @@ def _walk_up_for_workspace_creds() -> Optional[Path]:
     Three-pass search (in priority order):
 
       1. $COWORK_WORKSPACE env var. If set, look for
-         $COWORK_WORKSPACE/.sentinelone/credentials.json (the recommended
-         explicit convention). Falls through if not found.
+         $COWORK_WORKSPACE/credentials.json (the recommended convention).
+         Falls through if not found.
 
-      2. Walk up from cwd looking for .sentinelone/credentials.json
-         (or the legacy .claude/sentinelone/credentials.json).
+      2. Walk up from cwd looking for credentials.json.
 
       3. Scan $HOME/mnt/<folder>/ for any Cowork-accessible folder that
-         contains .sentinelone/credentials.json. This is the simple
-         "drop the file in any folder Cowork can see" backup: in a
-         sandbox, the user's project folder is mounted at
-         ~/mnt/<projectname>/ but cwd is often /outputs.
+         contains credentials.json. This is the simple "drop the file in
+         any folder Cowork can see" backup: in a sandbox, the user's
+         project folder is mounted at ~/mnt/<projectname>/ but cwd is
+         often /outputs.
+
+    All three passes also accept the legacy .sentinelone/credentials.json
+    and .claude/sentinelone/credentials.json layouts so existing setups
+    keep working without migration.
     """
     # Pass 1: explicit $COWORK_WORKSPACE override.
     explicit = os.environ.get("COWORK_WORKSPACE", "").strip()
@@ -313,7 +320,7 @@ class SDLClient:
         if not self.base_url or "REPLACE-ME" in self.base_url:
             raise RuntimeError(
                 "SDL base_url is not set. Add SDL_XDR_URL to "
-                "$COWORK_WORKSPACE/.sentinelone/credentials.json (or any "
+                "$COWORK_WORKSPACE/credentials.json (or any "
                 "folder Cowork can access) or export SDL_XDR_URL."
             )
 
@@ -340,7 +347,7 @@ class SDLClient:
                 return self.keys[field]
         raise RuntimeError(
             f"No API key configured for chain '{chain_name}'. Tried {chain}. "
-            "Check $COWORK_WORKSPACE/.sentinelone/credentials.json (or any "
+            "Check $COWORK_WORKSPACE/credentials.json (or any "
             "folder Cowork can access)."
         )
 

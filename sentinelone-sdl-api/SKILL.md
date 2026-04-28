@@ -28,7 +28,7 @@ The query methods on this skill (`query`, `powerQuery`, `facetQuery`, `timeserie
 
 ## Setup — configure credentials first
 
-Drop a file at `$COWORK_WORKSPACE/.sentinelone/credentials.json` (or any folder Cowork has access to under `.sentinelone/credentials.json`) with the keys you need:
+Drop a `credentials.json` file directly into your Cowork project folder with the keys you need:
 
 ```json
 {
@@ -39,7 +39,7 @@ Drop a file at `$COWORK_WORKSPACE/.sentinelone/credentials.json` (or any folder 
 }
 ```
 
-The plugin's SessionStart hook auto-copies the file to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox at the start of every session, so the SDL client picks it up with no preflight. To trigger a manual refresh:
+The plugin's SessionStart hook auto-discovers the file at the start of every session, so the SDL client picks it up with no preflight. To trigger a manual refresh:
 
 ```bash
 bash scripts/bootstrap_creds.sh   # idempotent, returns the destination path
@@ -55,9 +55,9 @@ Each key type unlocks a specific set of methods (matrix below). The client picks
 | Configuration Write     | All of the above, plus `putFile` |
 | `S1_CONSOLE_API_TOKEN` (mgmt-console JWT)  | All query + config methods (NOT `uploadLogs`); set `SDL_S1_SCOPE` if multi-site/account. Same JWT used by `S1Client`. (Legacy alias `SDL_CONSOLE_API_TOKEN` still recognised.) |
 
-Environment variables (`SDL_XDR_URL`, `S1_CONSOLE_API_TOKEN`, `SDL_LOG_WRITE_KEY`, etc.) still override the credentials file if set. Legacy paths (`~/.config/sentinelone/credentials.json`, `~/.claude/sentinelone/credentials.json`, `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`) are read as fallbacks.
+Environment variables (`SDL_XDR_URL`, `S1_CONSOLE_API_TOKEN`, `SDL_LOG_WRITE_KEY`, etc.) still override the credentials file if set.
 
-Before running anything, confirm `SDL_XDR_URL` is set and at least one key for the operation chain is present. If not, stop and ask the user to drop `credentials.json` into a folder Cowork can access.
+Before running anything, confirm `SDL_XDR_URL` is set and at least one key for the operation chain is present. If not, stop and ask the user to drop `credentials.json` into their Cowork project folder.
 
 ## Workflow
 
@@ -135,7 +135,7 @@ Prefer numeric OCSF for filters; the string `severity_` is case-mixed
 
 ## Files in this skill
 
-- `$COWORK_WORKSPACE/.sentinelone/credentials.json` — credentials (set `SDL_XDR_URL` and the keys you need; see Setup above). Auto-copied to `$HOME/.claude/sentinelone/credentials.json` inside the sandbox by the plugin's SessionStart hook.
+- `<project folder>/credentials.json` — credentials (set `SDL_XDR_URL` and the keys you need; see Setup above). Auto-discovered by the plugin's SessionStart hook.
 - `scripts/bootstrap_creds.sh` — idempotent helper that copies workspace creds into the sandbox-local path. Wired to the plugin's SessionStart hook; safe to re-run manually.
 - `scripts/sdl_client.py` — importable Python client (`SDLClient`). Picks the right key per method, retries with exponential backoff, exposes ergonomic method names.
 - `scripts/sdl_cli.py` — CLI runner: `python scripts/sdl_cli.py power-query "dataset='accesslog' | group count() by status" --start 1h`.

@@ -1,5 +1,8 @@
 # Secrets — never commit
 **/config.json
+# Don't commit a real credentials.json. Anywhere. The example file
+# (credentials.example.json) is safe to track.
+**/credentials.json
 *.env
 .env.*
 *.pem
