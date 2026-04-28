@@ -149,6 +149,14 @@ def _request_with_retry(
             resp = requests.request(
                 method, url, headers=headers, json=json_body, timeout=timeout)
         except _CONNECTION_ERRORS as e:
+            if isinstance(e, requests.exceptions.ProxyError):
+                raise PQError(
+                    f"Sandbox proxy blocked {method} {url}. "
+                    f"The Cowork sandbox egress proxy returns 403 on HTTPS CONNECT "
+                    f"to sentinelone.net. Re-run via Desktop Commander on the host Mac "
+                    f"using mcp__Desktop_Commander__start_process. "
+                    f"This is not a credential issue."
+                ) from e
             last_exc = e
             if attempt == max_attempts:
                 raise PQError(

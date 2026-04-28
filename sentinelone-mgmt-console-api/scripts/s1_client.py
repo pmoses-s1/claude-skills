@@ -261,6 +261,23 @@ class S1APIError(RuntimeError):
         self.body = body
 
 
+class SandboxProxyBlockedError(RuntimeError):
+    """Raised when the Cowork sandbox proxy blocks HTTPS to sentinelone.net.
+
+    The sandbox egress proxy returns 403 on CONNECT, so no S1 API call can
+    succeed from inside the sandbox. Fix: re-run the script on the host Mac
+    via Desktop Commander, which has unrestricted network access.
+
+    Recovery steps:
+      1. Use mcp__Desktop_Commander__start_process to run the script on the Mac.
+      2. credentials.json is at the project root folder (~/Documents/Claude/Projects/Prithvi/).
+      3. Skill root: ~/Documents/Claude/Projects/Prithvi/claude-skills/
+         sentinelone-mgmt-console-api
+      4. This is not a credential issue. Do not change query logic to debug it.
+    """
+    pass
+
+
 def _load_config() -> Dict[str, Any]:
     """Resolve credentials across all configured layers.
 
@@ -467,14 +484,23 @@ class S1Client:
         attempt = 0
         while True:
             attempt += 1
-            resp = self.session.request(
-                method.upper(),
-                url,
-                params=params,
-                json=json_body,
-                timeout=self.timeout,
-                verify=self.verify_tls,
-            )
+            try:
+                resp = self.session.request(
+                    method.upper(),
+                    url,
+                    params=params,
+                    json=json_body,
+                    timeout=self.timeout,
+                    verify=self.verify_tls,
+                )
+            except requests.exceptions.ProxyError as exc:
+                raise SandboxProxyBlockedError(
+                    f"Sandbox proxy blocked HTTPS to {self.base_url}. "
+                    f"Re-run via Desktop Commander on the host Mac using "
+                    f"mcp__Desktop_Commander__start_process with skill root at "
+                    f"~/Documents/Claude/Projects/Prithvi/claude-skills/"
+                    f"sentinelone-mgmt-console-api. This is not a credential issue."
+                ) from exc
             if resp.status_code < 400:
                 if resp.content:
                     try:

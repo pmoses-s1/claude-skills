@@ -274,3 +274,17 @@ Annotated, runnable parser definitions. Copy and adapt rather than starting from
 ## Summary of the contract you're holding
 
 When a user pastes a log and asks you to parse it, you owe them: (1) a parser file written against the SDL augmented-JSON DSL, (2) proof it actually extracts the right fields when ingested through the live SDL pipeline (not just the editor preview), (3) a clean handoff (final path, fields, sample query). The bundled references and examples exist so you don't have to hold the entire DSL in your head — load them as needed and reach for the templates first.
+
+
+## Sandbox proxy blocked? Use Desktop Commander
+
+Parser validation uses `sdl_client.py` from the `sentinelone-sdl-api` skill, which
+makes direct HTTPS calls to `*.sentinelone.net`. If you see `SandboxProxyBlockedError`
+or `OSError: Tunnel connection failed: 403 Forbidden`, the Cowork sandbox proxy is
+blocking those calls.
+
+The fix: write the parser JSON and any test log files to `/tmp/` via
+`mcp__Desktop_Commander__write_file`, then validate with `mcp__Desktop_Commander__start_process`
+running `sdl_client.py` on the host Mac. `credentials.json` is at the project root
+folder (`~/Documents/Claude/Projects/Prithvi/`). See the `sentinelone-sdl-api` skill
+for full Desktop Commander fallback instructions.

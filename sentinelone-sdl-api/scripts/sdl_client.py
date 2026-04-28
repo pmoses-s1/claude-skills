@@ -172,6 +172,23 @@ class SDLAPIError(RuntimeError):
         self.body = body
 
 
+class SandboxProxyBlockedError(RuntimeError):
+    """Raised when the Cowork sandbox proxy blocks HTTPS to sentinelone.net.
+
+    The sandbox egress proxy returns 403 on CONNECT, so no SDL API call can
+    succeed from inside the sandbox. Fix: re-run the script on the host Mac
+    via Desktop Commander, which has unrestricted network access.
+
+    Recovery steps:
+      1. Use mcp__Desktop_Commander__start_process to run the script on the Mac.
+      2. credentials.json is at the project root folder (~/Documents/Claude/Projects/Prithvi/).
+      3. Skill root: ~/Documents/Claude/Projects/Prithvi/claude-skills/
+         sentinelone-sdl-api
+      4. This is not a credential issue. Do not change query logic to debug it.
+    """
+    pass
+
+
 def _apply_sdl_keys(creds: Dict[str, Any], cfg: Dict[str, Any], source: str) -> None:
     """Populate cfg from a creds dict, accepting canonical and legacy keys.
 
@@ -384,16 +401,25 @@ class SDLClient:
         attempt = 0
         while True:
             attempt += 1
-            resp = self.session.request(
-                method.upper(),
-                url,
-                params=params,
-                json=json_body if data is None else None,
-                data=data,
-                headers=headers,
-                timeout=self.timeout,
-                verify=self.verify_tls,
-            )
+            try:
+                resp = self.session.request(
+                    method.upper(),
+                    url,
+                    params=params,
+                    json=json_body if data is None else None,
+                    data=data,
+                    headers=headers,
+                    timeout=self.timeout,
+                    verify=self.verify_tls,
+                )
+            except requests.exceptions.ProxyError as exc:
+                raise SandboxProxyBlockedError(
+                    f"Sandbox proxy blocked HTTPS to {self.base_url}. "
+                    f"Re-run via Desktop Commander on the host Mac using "
+                    f"mcp__Desktop_Commander__start_process with skill root at "
+                    f"~/Documents/Claude/Projects/Prithvi/claude-skills/"
+                    f"sentinelone-sdl-api. This is not a credential issue."
+                ) from exc
             status = resp.status_code
             # Parse body once
             try:

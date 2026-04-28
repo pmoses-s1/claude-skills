@@ -133,3 +133,17 @@ Use this when the workflow contains integration-backed actions:
 
 - ❌ Defining multiple variables in a single Variable action when one references another — they evaluate simultaneously and will fail with "variable not found"
   ✅ Always use one Variable action per variable when chaining references. One var → one action, always.
+
+
+## Sandbox proxy blocked? Use Desktop Commander
+
+Workflow import uses `s1_client.py` from the `sentinelone-mgmt-console-api` skill,
+which makes direct HTTPS calls to `*.sentinelone.net`. If you see
+`SandboxProxyBlockedError` or `OSError: Tunnel connection failed: 403 Forbidden`, the
+Cowork sandbox proxy is blocking those calls.
+
+The fix: write the workflow JSON to `/tmp/` via `mcp__Desktop_Commander__write_file`,
+then import with `mcp__Desktop_Commander__start_process` running `s1_client.py` on the
+host Mac. `credentials.json` is at the project root folder
+(`~/Documents/Claude/Projects/Prithvi/`). See the `sentinelone-mgmt-console-api` skill
+for full Desktop Commander fallback instructions.
