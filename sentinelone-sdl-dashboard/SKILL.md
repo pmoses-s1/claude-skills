@@ -13,10 +13,10 @@ This skill helps you design, author, and deploy Singularity Data Lake (SDL) dash
 
 1. **Understand the ask** — What data should the dashboard show? Who is the audience (SOC analyst, manager, customer POC)? What time range makes sense?
 2. **Design the structure** — Choose tabs (if multi-topic), then panels per tab. Match panel type to the data shape.
-3. **Write the JSON** — Use the panel type reference below and real examples in `references/community-examples.md`.
-4. **Validate queries** — Each panel's `query` or `filter` should be tested first. Use the `sentinelone-powerquery` skill to run queries interactively.
-5. **Deploy** — Use the `sentinelone-sdl-api` skill to `put_file` to a path like `/dashboards/my-dashboard`.
-6. **Iterate** — Show the user what was built, explain each panel, offer to tweak.
+3. **Write the JSON** — Use the panel type reference below and real examples in `references/community-examples.md`. Compute explicit `x`/`y`/`w`/`h` for every panel.
+4. **Validate queries** — Sample 3-5 events per source/event-ID to confirm field semantics. Test each panel query via the `sentinelone-powerquery` skill. Run the parallel load test (see **Pre-deploy validation**) — acceptance thresholds: slowest panel ≤ 2s, wall-clock ≤ 5s.
+5. **Deploy** — Use the `sentinelone-sdl-api` skill to `put_file` to a path like `/dashboards/my-dashboard`. Save a backup of the prior JSON first. Sleep 3s, then `get_file` to verify the version bumped.
+6. **Iterate** — Show the user what was built, explain each panel, offer to tweak. If the dashboard hangs, follow the escalation ladder in **Pre-deploy validation**.
 
 ## Dashboard JSON structure
 
@@ -62,10 +62,27 @@ A dashboard is a JSON object (SDL also accepts unquoted keys — JavaScript-lite
 Every panel is an object inside `graphs`. The `graphStyle` property picks the panel type.
 
 ### Layout
-Every panel can include a `layout` object placed by the GUI. For hand-authored JSON, you can set `w` (width, max 60) and `h` (height, ~14 units per half-page). The x/y are auto-computed if omitted.
+Every panel **must** have explicit `x`, `y`, `w`, `h` in its `layout` object. Dashboards with many panels (observed at 18+) where `x`/`y` are omitted can hang the browser renderer indefinitely — the auto-layout pass appears to loop on collision detection when panels stack at the implicit (0,0) origin. The symptom is the browser tab becoming unresponsive before any query fires.
 
 ```json
 "layout": { "w": 30, "h": 14, "x": 0, "y": 0 }
+```
+
+Use this helper to pack panels into the 60-wide grid when generating JSON:
+
+```python
+class Grid:
+    def __init__(self, width=60):
+        self.W = width; self.x = 0; self.y = 0; self.row_h = 0
+    def place(self, w, h):
+        if self.x + w > self.W:
+            self.y += self.row_h; self.x = 0; self.row_h = 0
+        layout = {"w": w, "h": h, "x": self.x, "y": self.y}
+        self.x += w; self.row_h = max(self.row_h, h)
+        return layout
+    def newline(self):
+        if self.x > 0:
+            self.y += self.row_h; self.x = 0; self.row_h = 0
 ```
 
 ---
@@ -172,16 +189,16 @@ Query must reduce to a single number (use `group count()`, `estimate_distinct()`
 {
   "title": "Distinct active endpoints",
   "graphStyle": "number",
-  "query": "| group estimate_distinct(agent.uuid)",
+  "query": "| group estimate_distinct(agent.uuid) | limit 1",
   "options": {
-    "backgroundColor": "white",
-    "color": "black",
-    "precision": "0",
     "format": "auto",
+    "precision": "0",
     "suffix": " endpoints"
   }
 }
 ```
+
+> **Options — stick to the minimal set.** Production reference dashboards only set `{format, precision, suffix}`. Fields like `backgroundColor` and `color` are documented in some places but are not consistently honoured by the renderer — at best silently ignored, at worst the panel renders blank or hangs. Do not add them until tested against the specific tenant.
 
 With trend indicator (S-25.1.5+):
 ```json
@@ -272,6 +289,12 @@ preemptively when authoring panels of these shapes.
 | `area` chart with `query` field shows an indefinite spinner; no error in UI | `graphStyle: "area"` is built around the `plots: [...]` pattern. A query-driven multi-series chart that ends in `transpose` does not render under `area`. | Switch to `graphStyle: "stacked_bar"` (or `"line"`) with `xAxis: "time"`. The query body stays the same. |
 | `Couldn't load content` — `"transpose" can only be used as the last command in a query` | `transpose` is the terminal command in the PQ pipeline; nothing can follow it | Remove any `\| limit N` / `\| sort` / `\| filter` placed AFTER `transpose`. If you need a limit, apply it pre-transpose via a subquery or a column-list filter |
 | `Couldn't load content` — `Identifier "x-y" is ambiguous. To subtract, add spaces: "x - y". Otherwise, add backslashes: "x\-y"` | The PQ parser reads hyphenated text as a single identifier, not as subtraction | Add spaces around `-` in arithmetic: `total - min`, `max - min`, `(a - b) / (c - d)`. Same applies to all PQ panels and rule bodies. |
+| `transpose <field> on timestamp` hangs the renderer when field values contain hyphens (e.g. `db-prod-01`, ISO dates, UUIDs, container names) | The renderer must parse the transposed values as column names for the chart legend. The PQ parser reads `db-prod-01` as subtraction and throws `Identifier is ambiguous` — or hangs silently. The V1 API tolerates this; the renderer does not. | **Option A** — pre-process: `\| let host_safe = replace_all(host_raw, '-', '_')` then transpose on `host_safe`. **Option B (preferred for by-host charts)** — avoid transpose: use `"xAxis": "grouped_data"` with a grouping query. Loses time dimension but renders reliably. **Option C** — only use `transpose` on fields whose values are guaranteed free of hyphens (numeric codes, single-token labels like `Success`/`Failure`). |
+| Number panel, table panel, or whole dashboard slow to load on first open | "All API queries pass" ≠ "dashboard loads fast". The browser fires all panel queries in parallel; total load time ≈ slowest single panel. Serial validation in a script wildly overestimates wall-clock load time. | Run a parallel load test before every `put_file` — see **Pre-deploy validation** section below. Acceptance thresholds: slowest single panel ≤ 2s, wall-clock ≤ 5s, zero failures. |
+| `get_file` returns HTTP 404 immediately after a successful `put_file` | `put_file` is synchronous but the file propagates across replicas with eventual consistency (~2-3s). | Always `time.sleep(3)` between `put_file` and the subsequent `get_file` verification call. |
+| `min(timestamp)` / `max(timestamp)` displays as a giant integer like `1.777e18` | Aggregating over `timestamp` returns raw nanoseconds. The renderer has no implicit date formatter for aggregate output. | Wrap with `simpledateformat(min(timestamp), 'yyyy-MM-dd HH:mm:ss z', '<TZ>')`. For millisecond-typed fields (e.g. `time` on `dataSource.name='asset'`), multiply by 1000000 first: `simpledateformat(max(time) * 1000000, ...)`. Functions that do NOT exist: `format_timestamp`, `formatTimestamp`, `iso8601`, `date_format`. |
+| Hostname/value-list filter is slow or behaves differently in the renderer vs API | `field matches '(host-a\|host-b)'` is evaluated as a regex per event, and hyphenated literals inside alternation can interact with the parser. | Use `field in ('host-a', 'host-b', 'host-c')` for any fixed list. Faster (indexed lookup), no escaping needed, consistent across renderer and API. Fall back to `matches` only when a true regex pattern is needed. |
+| "User" panels dominated by machine accounts (e.g. `host123$`, `dc-prod-01$`) | Machine accounts carry a trailing `$` and appear in the same fields as human accounts. | Add `\| filter !(field matches '.*\\$$')` after the event filter and before the group. Verify with 5-10 sample rows that no machine accounts leak through. |
 | Dashboard panel times out, indefinite spinner | A subquery inside the main query forces the engine to scan-and-aggregate twice. Dashboards rerun panels on every load, so the cost compounds. | Don't gate a panel query on a subquery if you can avoid it. Hardcode top-N values via inline OR clauses, or accept the full cardinality (often small after the initial filter). If a subquery is unavoidable, prefer a `lookup` against a precomputed datatable. |
 | Number panel slow on a busy index | Engine keeps scanning after the answer is computed | Always terminate number panels with `\| limit 1` after the `\| group` that reduces to one row |
 | Wide range + fine `timebucket` = thousands of points per series | E.g. `timebucket("10m")` over 7d = 1,008 points × N series | Match bucket to duration: 1d → `10m`, 7d → `1h` (minimum), 30d → `1 day` minimum |
@@ -492,13 +515,18 @@ dataSource.category = 'security' event.category = *
 
 Too-fine granularity creates thousands of data points per series, slowing both query and render:
 
-| Dashboard duration | Minimum safe timebucket |
-|---|---|
-| 1 day | `"10m"` (144 points) |
-| 7 days | `"1h"` (168 points) |
-| 30 days | `"1 day"` (30 points) |
+| Dashboard duration | Safe `timebucket` | Points per series |
+|---|---|---|
+| `1h`  | `'1m'`  | 60 |
+| `4h`  | `'5m'`  | 48 |
+| `24h` | `'1h'`  | 24 |
+| `7d`  | `'1h'`  | 168 |
+| `14d` | `'1d'`  | 14 |
+| `30d` | `'1d'`  | 30 |
 
-**Never use `timebucket("10m")` on a 7-day dashboard** — that's 1,008 points per series.
+For a 24h dashboard, `'10m'` (144 points) can work for low-cardinality single-series panels but should not be the default — use `'1h'`. For a multi-series transpose, the data-point count compounds: `timebucket('10m')` on a 24h dashboard with a 7-series transpose = 1,008 cells per chart.
+
+**Never use `timebucket('10m')` on a 7-day dashboard** — that's 1,008 points per series.
 
 ### 6. Push filters early — before the first pipe
 
@@ -550,6 +578,127 @@ dataSource.name='FortiGate' unmapped.action='close'
 `number(x)` returns 0 for null/missing and NaN for unparseable strings. Already-numeric data is unaffected. Cost is one `let` per panel; benefit is the dashboard keeps working when a parser pushes a string-typed write or a tenant column is locked. Apply this to every numeric counter / severity / port / duration field unless this session's schema discovery proved the column type with a successful unwrapped `sum()`.
 
 See `sentinelone-powerquery/references/pitfalls.md` for the full discussion of column-type lock and when the `parse "$x{regex=\\d+}$"` extraction is preferable to `number()`.
+
+---
+
+## Pre-deploy validation
+
+### The browser renderer is a separate execution path
+
+The SDL engine has three query surfaces: the V1 query API, the LRQ async API, and the in-browser dashboard renderer. The renderer has different timeouts, a stricter column-name parser, and a different concurrency model. A query that returns results instantly via the API can still hang the renderer. "All API queries pass" is necessary but not sufficient. The renderer is the only path that matters for dashboards, and it cannot be tested directly except by deploying and opening the page.
+
+The learnings below let you predict and eliminate renderer failures before deploy.
+
+### Parallel load test (run before every `put_file`)
+
+The browser fires all panel queries in parallel on load. Total dashboard load time ≈ slowest single panel + small per-panel render overhead. Always run a parallel load test before deploying a new or significantly modified dashboard:
+
+```python
+import concurrent.futures, time
+
+def run_one(panel_query):
+    c = SDLClient()
+    # auth setup ...
+    t0 = time.time()
+    try:
+        res = c.power_query(query=panel_query, start_time="24h")
+        return ("OK", time.time() - t0, res.get("matchingEvents") or 0)
+    except Exception as e:
+        return ("FAIL", time.time() - t0, str(e)[:200])
+
+queries = [p["query"] for tab in dashboard["tabs"] for p in tab["graphs"]
+           if p.get("graphStyle") != "markdown" and p.get("query")]
+
+wall_t0 = time.time()
+with concurrent.futures.ThreadPoolExecutor(max_workers=10) as pool:
+    results = list(pool.map(run_one, queries))
+wall_clock = time.time() - wall_t0
+
+print(f"  Total serial:        {sum(r[1] for r in results):.1f}s")
+print(f"  Wall-clock parallel: {wall_clock:.1f}s   <- expect this in browser")
+print(f"  Slowest single:      {max(r[1] for r in results):.1f}s")
+```
+
+**Acceptance thresholds:** slowest single panel ≤ 2s, wall-clock parallel ≤ 5s, zero failures. If the slowest panel exceeds 2s, identify it and rewrite: replace `group` with `top K`, narrow the initial filter, raise the timebucket granularity, or split the dashboard.
+
+### Deploy-and-verify: sleep before re-fetching
+
+`put_file` returns `{"status": "success"}` synchronously, but the file propagates across replicas with eventual consistency. Calling `get_file` ~100ms after a successful PUT can return HTTP 404. Always wait:
+
+```python
+res = c.put_file(path=DASH_PATH, content=new_content, expected_version=cur_version)
+assert res.get("status") == "success"
+
+import time
+time.sleep(3)            # eventual-consistency window
+
+post = c.get_file(DASH_PATH)
+assert post.get("version") != cur_version  # version bumped
+```
+
+Without the sleep, verification looks like a deploy failure even when the deploy succeeded.
+
+---
+
+## Field semantics: verify before grouping
+
+Two patterns cause panels to look broken silently:
+
+**Subject vs target in Windows logon events.** For event 4624 on a domain controller, `subjectUserName` is almost always the machine account or `-`. The account that actually logged on is in `targetUserName`. A panel that groups by `subjectUserName` renders mostly empty rows.
+
+**Same field name, different semantic per event ID.** `targetUserName` in 4624 is the human account; in 4771 (Kerberos pre-auth failure) it includes machine accounts (`host123$`). 4625 and 4740 may use `subjectUserName` depending on the failure path.
+
+Always sample 3-5 events per event ID before authoring a grouping query:
+
+```python
+res = c.query(
+    filter=f"dataSource.name=='<source>' <event-id-filter> <host-filter>",
+    max_count=5, start_time="1h",
+)
+for m in res.get("matches") or []:
+    attrs = m.get("attributes", {})
+    for k in sorted(attrs.keys()):
+        if any(s in k.lower() for s in ("user","subject","target","domain","logonid")):
+            print(f"  {k} = {str(attrs[k])[:80]}")
+```
+
+This is the same V1-query schema-discovery pattern from the `sentinelone-sdl-api` skill — apply it per-event-ID, not just per-source.
+
+---
+
+## Escalation ladder when a deployed dashboard hangs
+
+1. **Hard refresh** (`Ctrl+Shift+R` / `Cmd+Shift+R`). Eliminates cached state from a previous broken version. Resolves ~10% of "still hung" reports.
+2. **Check dev-tools network tab.** If panel queries are NOT being fired, the renderer is stuck before any HTTP call. Cause is structural (layout/options/JSON parse), not query performance. If queries ARE firing, record the slowest and move to step 3.
+3. **Run the slow panel's query in isolation via the V1 API.** If it returns fast, the issue is renderer-side (column names, `transpose`, panel options). If it is slow, optimise the query.
+4. **Reduce panel count by 50%.** If the dashboard now loads, the issue was concurrency or memory in the renderer. Add panels back 25% at a time until a regression isolates the offender.
+5. **Diff against a working reference dashboard in the same tenant.** `list_files /dashboards/`, `get_file` on a working dashboard, compare top-level keys, panel `layout` shape, `options` keys, and `graphStyle`-specific fields. Working dashboards in the same tenant are more reliable ground truth than any external documentation, because rendering rules drift between SDL releases.
+6. **Roll back.** Always keep a backup of the prior dashboard JSON before `put_file`-ing a new version. Restore via `put_file(expected_version=current)` to unblock analysts while iterating offline.
+
+---
+
+## Pre-deploy checklist
+
+Run this before every `put_file`:
+
+```
+[ ] Every panel has explicit x, y, w, h in layout
+[ ] No panel uses `transpose <field> on timestamp` where <field> values can contain hyphens
+[ ] All number panels end with `| limit 1`
+[ ] All table panels end with explicit `| limit N`
+[ ] All time-series panels use a timebucket appropriate for duration (see table above)
+[ ] min/max(timestamp) columns wrapped in simpledateformat(...) with tz
+[ ] Any millisecond-typed time field multiplied by 1000000 before simpledateformat
+[ ] Hostname/value-list filters use `field in (...)` not `field matches '(...)'`
+[ ] Number panels use only {format, precision, suffix} in options
+[ ] Markdown panels use `markdown:` field, not `content:`
+[ ] 3-5 sample events checked to verify which field carries the user semantic per event ID
+[ ] Machine-account filter applied on user-facing panels
+[ ] Parallel load test passes: wall-clock <= 5s, slowest panel <= 2s, zero failures
+[ ] Backup of current dashboard JSON saved (for rollback)
+[ ] put_file called with expected_version of the current deployed copy
+[ ] sleep(3) before re-fetching to verify deploy
+```
 
 ---
 
