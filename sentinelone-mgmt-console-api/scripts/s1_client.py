@@ -270,9 +270,9 @@ class SandboxProxyBlockedError(RuntimeError):
 
     Recovery steps:
       1. Use mcp__Desktop_Commander__start_process to run the script on the Mac.
-      2. credentials.json is at the project root folder (~/Documents/Claude/Projects/Prithvi/).
-      3. Skill root: ~/Documents/Claude/Projects/Prithvi/claude-skills/
-         sentinelone-mgmt-console-api
+      2. credentials.json is at the project root folder (the folder you selected in Cowork).
+      3. Skill root: <PROJECT_ROOT>/claude-skills/sentinelone-mgmt-console-api
+         (use mdfind -name "s1_client.py" | grep claude-skills to locate it)
       4. This is not a credential issue. Do not change query logic to debug it.
     """
     pass
@@ -498,8 +498,8 @@ class S1Client:
                     f"Sandbox proxy blocked HTTPS to {self.base_url}. "
                     f"Re-run via Desktop Commander on the host Mac using "
                     f"mcp__Desktop_Commander__start_process with skill root at "
-                    f"~/Documents/Claude/Projects/Prithvi/claude-skills/"
-                    f"sentinelone-mgmt-console-api. This is not a credential issue."
+                    f"sentinelone-mgmt-console-api (use mdfind -name s1_client.py | grep claude-skills "
+                    f"to locate it). This is not a credential issue."
                 ) from exc
             if resp.status_code < 400:
                 if resp.content:

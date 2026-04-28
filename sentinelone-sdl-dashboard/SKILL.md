@@ -725,5 +725,5 @@ blocking those calls.
 The fix: write the dashboard JSON to `/tmp/` via `mcp__Desktop_Commander__write_file`,
 then deploy with `mcp__Desktop_Commander__start_process` running `sdl_client.py` on the
 host Mac. `credentials.json` is at the project root folder
-(`~/Documents/Claude/Projects/Prithvi/`). See the `sentinelone-sdl-api` skill for
+(the folder you selected in Cowork). See the `sentinelone-sdl-api` skill for
 full Desktop Commander fallback instructions.

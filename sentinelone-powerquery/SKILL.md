@@ -245,10 +245,11 @@ Desktop Commander, which has unrestricted network access.
 
 1. Re-run via `mcp__Desktop_Commander__start_process`:
    ```
-   cd ~/Documents/Claude/Projects/Prithvi/claude-skills/sentinelone-mgmt-console-api
+   cd <PROJECT_ROOT>/claude-skills/sentinelone-mgmt-console-api
    python3 scripts/pq.py <args>
    ```
-2. `credentials.json` is at the project root folder (`~/Documents/Claude/Projects/Prithvi/`).
+   To locate the skill root: `mdfind -name "pq.py" | grep claude-skills | head -1`
+2. `credentials.json` is at the project root folder (the folder you selected in Cowork).
 3. For inline Python, write to `/tmp/` via `mcp__Desktop_Commander__write_file`,
    then execute with `mcp__Desktop_Commander__start_process`.
 

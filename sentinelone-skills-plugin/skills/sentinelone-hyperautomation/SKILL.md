@@ -145,5 +145,5 @@ Cowork sandbox proxy is blocking those calls.
 The fix: write the workflow JSON to `/tmp/` via `mcp__Desktop_Commander__write_file`,
 then import with `mcp__Desktop_Commander__start_process` running `s1_client.py` on the
 host Mac. `credentials.json` is at the project root folder
-(`~/Documents/Claude/Projects/Prithvi/`). See the `sentinelone-mgmt-console-api` skill
+(the folder you selected in Cowork). See the `sentinelone-mgmt-console-api` skill
 for full Desktop Commander fallback instructions.
