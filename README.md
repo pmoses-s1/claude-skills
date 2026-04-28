@@ -5,7 +5,7 @@ SentinelOne skills for Claude. Install the plugin to get everything; no individu
 ## Quick start
 
 1. Download the latest `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/)
-2. In Cowork, go to **Capabilities → Skills → Customise → Plugins → Personal plugins** and click **Upload plugin**, then select the `.plugin` file
+2. In the Claude desktop app, go to the **Cowork** tab, click **Customize** in the left sidebar, then click **Browse plugins**. In the plugins window, find the upload option and select the `.plugin` file
 3. When creating your Cowork project, add both `credentials.json` and `CLAUDE.md` under **Add files** so Claude has access to them in every session. See [Configuration](#configuration) below for the credential keys.
 
    ![Adding credentials.json and CLAUDE.md when creating a new Cowork project](assets/new-project-credentials.png)
@@ -72,7 +72,7 @@ The full investigation workflow requires three components to be installed and co
 
 **Step 2: Verify all components are active**
 
-Go to **Capabilities → Skills → Customise → Plugins** and confirm:
+In the Claude desktop app, go to the **Cowork** tab, click **Customize** in the left sidebar, then **Browse plugins**, and confirm:
 - `sentinelone-skills` is listed under Personal plugins
 - Purple MCP is connected under MCP Servers
 - Your threat intel MCP (e.g. VirusTotal) is connected under MCP Servers
@@ -327,7 +327,7 @@ These are real questions you can ask. Claude will pick the right skill automatic
 
 ## Installing
 
-**Plugin (recommended)**: download from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/), then in Cowork go to **Capabilities → Skills → Customise → Plugins → Personal plugins** and click **Upload plugin**. All six skills are installed in one step.
+**Plugin (recommended)**: download from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/), then in the Claude desktop app go to the **Cowork** tab, click **Customize** in the left sidebar, click **Browse plugins**, and select the `.plugin` file from the upload option in the plugins window. All six skills are installed in one step.
 
 **Individual skills (for development only)**: drop a skill folder into `~/.claude/skills/`. Claude will pick it up on next session.
 
