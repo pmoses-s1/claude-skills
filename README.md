@@ -331,6 +331,20 @@ These are real questions you can ask. Claude will pick the right skill automatic
 
 **Individual skills (for development only)**: drop a skill folder into `~/.claude/skills/`. Claude will pick it up on next session.
 
+## Updating to a new plugin version
+
+When a newer `sentinelone-skills-vX.Y.Z.plugin` is published in [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/), update in place by replacing the existing plugin:
+
+1. **Download** the new `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/) (latest version, e.g. `sentinelone-skills-v1.0.12.plugin`).
+2. In the Claude desktop app go to the **Cowork** tab.
+3. Click **Customize** in the left sidebar.
+4. Click **Browse plugins**.
+5. Use the upload option in the plugins window and select the newly-downloaded `.plugin` file.
+6. When prompted that a plugin with the same name (`sentinelone-skills`) is already installed, click **Replace**.
+7. All six skills are upgraded in one step. Existing `credentials.json` and project-folder configuration are untouched.
+
+To verify the new version is active, ask Claude `which version of sentinelone-skills is installed?` or check the plugin entry in the Cowork plugins window — it should show the version you just uploaded.
+
 ## Configuration
 
 All skills read credentials from a single JSON file: `credentials.json` dropped directly in your Cowork project folder. The plugin's SessionStart hook auto-discovers it and makes it available to every skill in the session.
