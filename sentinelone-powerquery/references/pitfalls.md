@@ -356,6 +356,28 @@ The query timeout is 5 minutes. If a 30-day query times out:
 - Use `top` instead of `group`.
 - Consider running the query over 7-day chunks and `savelookup`-ing each, then `union`-ing.
 
+### Reaching for `message contains` on a JSON-blob source
+
+Some data sources (O365 audit, generic webhook ingest, custom HEC sources) keep most fields inside a raw JSON `message` blob rather than as parsed top-level columns. The first instinct is to write `message contains 'value'`, but that forces a substring scan of the entire blob and falls off a performance cliff fast: queries that work at 1 day routinely time out at 7.
+
+Fix: use the multi-field shortcut `* contains 'value'` (or `* matches 'regex'`) in the initial filter. It searches across all indexed fields, including parsed scalars from the source, and is dramatically faster than scanning a single concatenated blob.
+
+```
+// slow — single-column substring scan
+dataSource.name='<source>' message contains 'value'
+
+// fast — multi-field index search
+dataSource.name='<source>' * contains 'value'
+```
+
+Same rule applies to value-anywhere lookups regardless of the source: when a user asks for "all column search", "search all fields", "search all data", or "anywhere in the event", the canonical idiom is `* contains` / `* matches` in the initial filter, not `message contains`.
+
+Three caveats worth remembering:
+
+- `* contains` / `* matches` only work in the **initial** filter — before the first `|`. They cannot be used in `| filter …` after a pipe, in Alerts, or after a `| group` / `| columns` that has reshaped the row.
+- If the value really only lives inside a JSON blob (e.g., a deeply nested key not exposed as a parsed field), neither `* contains` nor `message contains` will surface it efficiently. Pull rows with a narrower predicate (event type, actor, time slice) and post-process the blob in Python.
+- Negation against a JSON blob (e.g., "recipients NOT in `<owned_domain>`") is not expressible inline. Filter by the positive predicate, then post-process to apply the exclusion.
+
 ### High-cardinality `by`
 
 Grouping by full URL or full command line yields one row per variant — useless for summaries and likely to hit memory limits. Prefer:

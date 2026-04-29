@@ -1,7 +1,7 @@
 // JSON body with a non-JSON envelope prefix.
 //
 // Sample line the parser targets:
-//   2026-04-20T10:25:34.123Z host-7 app:myservice {"user":"prithvi","action":"login","meta":{"ip":"10.0.0.5","country":"US"}}
+//   2026-04-20T10:25:34.123Z host-7 app:myservice {"user":"alice","action":"login","meta":{"ip":"10.0.0.5","country":"US"}}
 //
 // Extraction plan:
 //   timestamp at the start, then `host` and an `app:<name>` tag, then a JSON body.

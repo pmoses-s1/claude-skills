@@ -968,7 +968,7 @@ When deploying STAR / Custom Detection rules via `POST /web/api/v2.1/cloud-detec
 | `400: Field 'count_distinct' must be enclosed in a grouping function` | Scheduled-rule bodies only accept simple aggregates inside `group`. Replace `count_distinct(x)` with `count()` or with `group ... by x \| group count()` chained pattern. |
 | `400: Trigger expression does not match any supported pattern` | Same root cause — non-trivial aggregation outside `group`. Simplify to `\| group hits=count() by ...`. |
 | Rule-creation payload: PQ goes inside `data.scheduledParams.query`, NOT `data.s1ql` | `s1ql` is for `queryType: "events"`. PowerQuery rules use the `scheduledParams` block: `{query, lookbackWindowMinutes, runIntervalMinutes, threshold: {value, operator}}` |
-| Site name lookup returns nothing | Console site names can include spaces (e.g. `pmoses demo`, not `pmoses-demo`). Use `name__contains=<substring>` to fuzzy-match, then exact-match by id. |
+| Site name lookup returns nothing | Console site names can include spaces (e.g. `acme demo`, not `acme-demo`). Use `name__contains=<substring>` to fuzzy-match, then exact-match by id. |
 | Rule listing returns 0 after successful creation | The `GET /cloud-detection/rules?siteIds=...` filter shape varies by tenant. Trust the POST's returned `data.id` — that's authoritative. |
 
 ## VirusTotal Cross-Check Patterns Worth Building In

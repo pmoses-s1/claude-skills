@@ -128,6 +128,7 @@ Key points:
 - The `X-Dataset-Query-Forward-Tag` response header from the launch must be echoed on every subsequent GET/DELETE. GET/DELETE without it is rejected.
 - Per-user rate cap is 3 rps. For multi-slice parallel runs over long windows (7d+), see the `sentinelone-powerquery` skill's `references/lrq-api.md` for slicing, two-JWT round-robin, and merge patterns.
 - For interactive hunts over short windows, the Purple MCP `powerquery` tool is simpler; fall back to this LRQ pattern when the MCP times out or the window is longer than a few days.
+- **LOG queries have a different body shape than PQ.** A `LOG` body is `{queryType: "LOG", log: {filter, limit}}`, NOT `{pq: {query, resultType: "LOG"}}` (the latter returns HTTP 400). LOG also has a server-side `log.limit` cap (typically 5000) that silently truncates; detect cap-hit (`len(matches) == log.limit`) and subdivide the slice. For multi-slice or long-running LOG investigations, use the per-slice checkpoint pattern. Full LOG-specific guidance, including the investigation-noise separator (partition on `dataSource.name` presence) for identity hunts, is in `references/lrq-api.md`.
 
 ---
 
@@ -142,7 +143,7 @@ check = c.post("/web/api/v2.1/remote-scripts/guardrails/check",
 # execute after user consents
 c.post("/web/api/v2.1/remote-scripts/execute",
        json_body={"data": {"scriptId": SCRIPT_ID,
-                           "taskDescription": "ad-hoc by Prithvi",
+                           "taskDescription": "ad-hoc",
                            "filter": {"ids": [AGENT_ID]},
                            "outputDestination": "SentinelCloud"}})
 # poll status

@@ -82,8 +82,30 @@ $"regex"                                 // shorthand for message matches "regex
 
 Key facts about `*`:
 - `*` by itself is NOT a valid filter. `*` alone returns a 500 error on many tenants. Use an empty initial filter (start the query with `|`) if you want "all events".
-- `* contains` and `* matches` only work as the initial filter — not in `| filter …` later in the pipeline, not in Alerts, and not optimized for dashboards.
+- `* contains` and `* matches` only work as the initial filter, not in `| filter …` later in the pipeline, not in Alerts, and not optimized for dashboards.
 - `field = *` is how you write "field is present".
+
+### Phrasebook: natural-language asks to canonical operator
+
+When a user describes the search in English, the phrasing usually maps to one of a few PQ idioms. Reach for the canonical form on the first draft instead of guessing field names or scanning the raw `message` blob.
+
+| User asks for | Canonical PQ |
+|---|---|
+| "all column search" / "search all fields" / "search all data" / "anywhere in the event" / "wherever it appears" | `* contains 'value'` (initial filter) |
+| "regex across every field" / "pattern match anywhere" | `* matches 'regex'` (initial filter) |
+| "is this field set" / "rows where X is populated" | `field = *` |
+| "field is missing / null / empty" | `!(field = *)` |
+| "field equals one of these values" (case-sensitive) | `field in ('a','b','c')` |
+| "field equals one of these values" (case-insensitive) | `field in:anycase ('a','b','c')` |
+| "find the substring, case doesn't matter" | `field contains 'value'` |
+| "find the substring, exact case" | `field contains:matchcase 'Value'` |
+| "OR over several substrings on one field" | `field contains ('a','b','c')` |
+| "all events" / "no filter" | start the query with `|` (empty initial filter); never use `*` alone |
+
+Two common mistakes the phrasebook prevents:
+
+- "Search all data" sounds like a scope instruction (every site, all time) but is almost always a field-coverage instruction (every column). Map to `* contains`, not to a wider time range or `tenant=true` request body.
+- Reaching for `message contains 'value'` for value-anywhere lookups is a performance cliff on JSON-blob sources. `* contains 'value'` indexes across parsed fields and is dramatically faster. See `references/pitfalls.md` → "Reaching for `message contains` on a JSON-blob source".
 
 ---
 

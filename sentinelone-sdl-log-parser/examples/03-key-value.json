@@ -1,7 +1,7 @@
 // Freeform key=value lines with an optional bracketed timestamp.
 //
 // Sample lines:
-//   [2026-04-20 10:25:34] src=10.0.0.5 dst=10.0.0.9 user=prithvi result=allow
+//   [2026-04-20 10:25:34] src=10.0.0.5 dst=10.0.0.9 user=alice result=allow
 //   src=10.0.0.6 dst=10.0.0.9 user=someone bytes=12345 result=deny reason="policy block"
 //
 // Extraction plan:

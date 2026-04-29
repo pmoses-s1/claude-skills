@@ -182,7 +182,7 @@ c.add_events(
     session_info={"serverHost": "demo-host", "serverType": "frontend"},
     events=[
         {"ts": c.now_ns(), "sev": 3,
-         "attrs": {"message": "user login", "user": "prithvi", "latencyMs": 42}},
+         "attrs": {"message": "user login", "user": "alice", "latencyMs": 42}},
     ],
 )
 

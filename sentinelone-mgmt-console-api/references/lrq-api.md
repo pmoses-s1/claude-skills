@@ -117,6 +117,23 @@ i.scheme="edr"
 
 Without this, an `event.type=*` aggregate on `your-tenant` over 30 days returned `matchCount=0` until the filter was added; with it, 574M events across 50 types.
 
+## Silent `matchCount=0`: the diagnostic ladder
+
+LRQ returning `matchCount=0` with HTTP 200 is the most common silent-failure mode. Walk these in order before widening the time range or rewriting the query.
+
+1. **Confirm the data source string.** Call `list_data_sources(c, hours=24)` (or run `| group ct=count() by dataSource.name | sort -ct | limit 50`) on the same tenant scope. The exact spelling, capitalization, and punctuation must match what's in the index. `'SentinelOne'` and `'sentinelone'` are different strings to the engine.
+
+2. **Confirm the request body has the right scope.**
+   - `tenant: true` is required unless `accountIds` is passed. Without either, the query runs against a near-empty default scope and silently returns zero rows.
+   - `accountIds` must pair with `tenant: false`. Sending both `tenant: true` and `accountIds` returns HTTP 400.
+   - `tenant: true` is **not** equivalent to "every account in the tenant" on every deployment. On multi-account tenants where an integration writes only to a sub-account or site, `tenant: true` can silently scope to a default account that doesn't carry that integration. **If a Purple MCP query returns rows for the same time window and query but LRQ returns `matchCount=0`, suspect multi-account scoping**. Re-run with explicit `accountIds` set to the account that actually carries the data. Discover candidate account IDs via `GET /web/api/v2.1/accounts`.
+
+3. **Check `matchCount` vs `row_count`.** `matchCount=0` means the initial filter eliminated everything (data source, scope, or filter mismatch). `matchCount > 0` with `row_count=0` means the post-filter pipeline (`| filter`, `| group` with a missing key, `| filter` after `group`) threw everything out, in which case the fix is in the pipeline, not the scope.
+
+4. **For SentinelOne EDR data, confirm the EDR prefix.** `dataSource.name='SentinelOne' dataSource.category='security'` (or `i.scheme="edr"`) is required to surface EDR telemetry. Without it the query may match only Scalyr/infra logs.
+
+5. **Only after the above** widen the time range. A correct query running against an empty data source still returns zero, no matter how long the window.
+
 ## PQ functions that fail on the LRQ engine
 
 - `count_distinct(x)` - not supported on the DV/LRQ engine. Use `estimate_distinct(x)` or drop it.
@@ -200,14 +217,100 @@ Key pieces, in order of importance:
 4. **parallel_run_roundrobin(clients, query, spans, max_workers)** - binds each span to `clients[i % len(clients)]` and runs each slice's full lifecycle on its bound client.
 5. **merge_aggregate(results, key_cols, sum_cols, min_cols, max_cols)** - client-side post-aggregation.
 
-## Checklist before launching a programmatic PQ
+## LOG queries are a separate primitive
+
+`scripts/pq.py` runs `queryType: "PQ"` only. For workflows that need every parsed field on every matching row (identity investigations, all-attribute hunts, evidence-grade exports), the right primitive is `queryType: "LOG"`, which has a different body shape and different failure modes from PQ.
+
+### Body shape
+
+```json
+{
+  "queryType": "LOG",
+  "tenant": true,
+  "startTime": "2026-04-01T00:00:00Z",
+  "endTime":   "2026-04-02T00:00:00Z",
+  "queryPriority": "HIGH",
+  "log": {
+    "filter": "<filter expression, no pipes>",
+    "limit": 5000
+  }
+}
+```
+
+Two differences from PQ that bite first-time callers:
+
+- The filter goes inside `log.filter`, not `pq.query`. The filter expression is just the initial-filter portion of a PQ (e.g., `dataSource.name='<source>' * contains 'value'`), no pipes, no commands.
+- A LOG body with `pq: {query, resultType: "LOG"}` returns HTTP 400 `Unexpected value 'LOG'`. The fix is body-shape (`log: {...}` and `queryType: "LOG"`), not result-type.
+
+### LOG-specific slicing constraints
+
+PQ slicing concerns the LRQ deadline budget; LOG slicing concerns server-side row caps. Different failure modes:
+
+- LOG has a server-side `log.limit` cap (typically 5000). Any slice that hits the cap **silently truncates**, returning exactly N rows where N = `log.limit`. There is no "page 2" for LOG; the missing rows are simply dropped.
+- Detect cap-hit by comparing `len(matches)` to the requested `log.limit`. If they're equal, the slice is truncated; subdivide it (typically into 1-day chunks) and re-run each piece.
+- PQ aggregations don't have this problem because they aggregate before capping. LOG cannot aggregate; the cap is on raw rows.
+
+Standard subdivision pattern:
+
+```python
+def run_log_with_subdivision(client, filter_expr, start, end, limit=5000):
+    res = run_log_query(client, filter_expr, start_time=start,
+                        end_time=end, limit=limit)
+    if len(res["matches"]) < limit:
+        return res["matches"]                  # not capped
+    # Cap hit. Subdivide and recurse.
+    mid = midpoint(start, end)
+    return (run_log_with_subdivision(client, filter_expr, start, mid, limit)
+            + run_log_with_subdivision(client, filter_expr, mid, end, limit))
+```
+
+In practice, day-sized slices are a reasonable starting point for most M365 / identity sources; subdivide further only when a daily slice still hits the cap.
+
+### Per-slice checkpoint pattern for long-running multi-slice jobs
+
+Long multi-slice runs (year-long identity investigations, multi-month source profiling) lose state if the host process is killed between tool calls or sandbox sessions recycle. Without checkpointing, every retry starts from slice 0.
+
+Pattern: each completed slice writes one JSON file under a checkpoint directory, keyed by `{slice_start}_{slice_end}.json`. On resume, skip slices whose checkpoint file already exists. Idempotent on retry, cheap on disk, and avoids re-running expensive slices.
+
+```python
+def sliced_run(client, filter_expr, slices, ckpt_dir, *,
+               max_workers=3, runner=run_log_query):
+    ckpt_dir = Path(ckpt_dir); ckpt_dir.mkdir(parents=True, exist_ok=True)
+    todo = []
+    for (s, e) in slices:
+        path = ckpt_dir / f"{s}_{e}.json"
+        if path.exists():
+            continue                          # already done
+        todo.append((s, e, path))
+    # ... thread-pool over `todo`, each worker writes its slice's
+    # result to its `path` on completion.
+    return sorted(ckpt_dir.glob("*.json"))
+```
+
+The completed checkpoint set is the source of truth; merge with a column-union helper at the end (different slices can carry different attribute keys when parser changes land mid-window).
+
+### Investigation-noise separator
+
+When the LOG search predicate is an identity string (email, user id, IP), the result set interleaves real-world events from parsed sources with SDL platform-internal audit records of analysts who searched for that string previously. The audit records are themselves a finding (the subject has been investigated before), but they are not subject activity.
+
+Cleanest separator observed: **presence of `dataSource.name`** indicates a parsed real-world event; absence indicates SDL platform-internal audit. Always partition the result set on this and report investigation-noise as a separate quantity.
+
+```python
+subject = [r for r in matches if r.get("dataSource.name")]
+audit   = [r for r in matches if not r.get("dataSource.name")]
+```
+
+## Checklist before launching a programmatic PQ or LOG query
 
 - [ ] Target the console host, not `xdr.us1.sentinelone.net`
 - [ ] `Authorization: Bearer <jwt>` (same JWT as mgmt, different prefix)
-- [ ] Body has `queryType`, `tenant: true`, `pq: {query, resultType}`
-- [ ] Query starts with the EDR filter (for SentinelOne EDR data)
+- [ ] PQ body: `queryType: "PQ"`, `tenant: true`, `pq: {query, resultType}`
+- [ ] LOG body: `queryType: "LOG"`, `tenant: true`, `log: {filter, limit}` (NOT `pq: {…, resultType: "LOG"}`)
+- [ ] Query / filter starts with the EDR filter (for SentinelOne EDR data)
 - [ ] Grab `X-Dataset-Query-Forward-Tag` from POST response, echo on every GET and DELETE
 - [ ] Poll every 1-2s (query expires 30s after last poll)
 - [ ] Token-bucket at ~2.5 rps per user (under the 3 rps cap)
 - [ ] Cancel on success and on every error path
-- [ ] Merge slice results client-side (sum counts, min-of-mins, max-of-maxes)
+- [ ] PQ: merge slice results client-side (sum counts, min-of-mins, max-of-maxes)
+- [ ] LOG: detect cap-hit (`len(matches) == log.limit`) and subdivide; checkpoint per slice for long runs
+- [ ] LOG identity searches: partition on `dataSource.name` presence (subject activity vs investigation noise)

@@ -86,7 +86,7 @@ python scripts/sdl_cli.py timeseries-query --function count --filter "*" --start
 python scripts/sdl_cli.py upload-logs --text "hello sdl" --parser demo-parser --server-host dev
 python scripts/sdl_cli.py upload-logs --file ./data.log --parser demo-parser
 
-python scripts/sdl_cli.py add-events --message "user login" --attr user=prithvi --attr latencyMs=42
+python scripts/sdl_cli.py add-events --message "user login" --attr user=alice --attr latencyMs=42
 python scripts/sdl_cli.py put-file /lookups/MyTable --content-file ./table.json
 python scripts/sdl_cli.py put-file /lookups/Stale --delete
 ```
