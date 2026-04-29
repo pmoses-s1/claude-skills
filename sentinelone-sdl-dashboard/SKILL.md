@@ -11,12 +11,176 @@ This skill helps you design, author, and deploy Singularity Data Lake (SDL) dash
 
 ## Workflow
 
-1. **Understand the ask** — What data should the dashboard show? Who is the audience (SOC analyst, manager, customer POC)? What time range makes sense?
-2. **Design the structure** — Choose tabs (if multi-topic), then panels per tab. Match panel type to the data shape.
-3. **Write the JSON** — Use the panel type reference below and real examples in `references/community-examples.md`. Compute explicit `x`/`y`/`w`/`h` for every panel.
-4. **Validate queries** — Sample 3-5 events per source/event-ID to confirm field semantics. Test each panel query via the `sentinelone-powerquery` skill. Run the parallel load test (see **Pre-deploy validation**) — acceptance thresholds: slowest panel ≤ 2s, wall-clock ≤ 5s.
-5. **Deploy** — Use the `sentinelone-sdl-api` skill to `put_file` to a path like `/dashboards/my-dashboard`. Save a backup of the prior JSON first. Sleep 3s, then `get_file` to verify the version bumped.
+This workflow is mandatory for every new or modified dashboard. Steps 0, 1, and 7 are non-negotiable: pre-flight discovery, the safety pre-flight check, and the post-deploy log-evidence report. Skipping any of them produces dashboards that look fine in isolation but mislead, hang, or silently drop data.
+
+0. **Discovery (MANDATORY for every session)** — Re-enumerate connected data sources (`| group UniqueDataSourceNames = array_agg_distinct(dataSource.name) | limit 1000`), run V1-query schema discovery on every source the dashboard will touch, and validate the discriminator field for any `event.type` you intend to count. See **Pre-authoring discovery** below. Never start a panel from a remembered schema.
+1. **Understand the ask** — What data should the dashboard show? Who is the audience (SOC analyst, manager, customer POC)? What time range makes sense? What posture should each panel reflect (a panel that legitimately returns 0 needs a markdown header explaining the SOC-positive interpretation, see **Empty results are valid evidence**).
+2. **Design the structure** — Choose tabs (if multi-topic), then panels per tab. Match panel type to the data shape. Where one `event.type` covers multiple semantic populations (delivery-time vs click-time, scheduled vs on-demand, inbound vs outbound), build separate sections per population, not a mixed section.
+3. **Write the JSON** — Use the panel type reference below and real examples in `references/community-examples.md`. Compute explicit `x`/`y`/`w`/`h` for every panel. Apply the naming-hygiene rule from **Panel naming hygiene** so titles read as SLA-grade claims.
+4. **Validate queries** — Sample 3-5 events per source/event-ID to confirm field semantics. Test each panel query via the `sentinelone-powerquery` skill. Run the parallel load test (see **Pre-deploy validation**), acceptance thresholds: slowest panel ≤ 2s, wall-clock ≤ 5s. Run `scripts/panel_safety_check.py` against the dashboard JSON; resolve every flag before deploy.
+5. **Deploy** — Use the `sentinelone-sdl-api` skill to `put_file` to a path like `/dashboards/my-dashboard` with `expected_version` set from a prior `get_file` (CAS guard). Save a backup of the prior JSON first. Sleep 3s, then `get_file` to verify the version bumped AND grep the returned content for a canary string from your change.
 6. **Iterate** — Show the user what was built, explain each panel, offer to tweak. If the dashboard hangs, follow the escalation ladder in **Pre-deploy validation**.
+7. **Log-evidence report (MANDATORY)** — Run `scripts/validate_dashboard.py` against the deployed dashboard JSON to replay every panel, persist per-panel evidence (sample rows, row count, matchCount, elapsed, errors) to a JSON, and emit a markdown evidence file. Then run `scripts/render_validation_pdf.py` to render the PDF report (cover, per-tab sections, sample-data tables, empty-result appendix with SOC-meaningful interpretations). Deliver both alongside the dashboard. A dashboard delivered without an evidence report is incomplete.
+
+## Pre-authoring discovery
+
+Different tenants connect different data sources, and even the same tenant drifts between sessions as parsers are updated. Authoring a panel from a remembered schema is the single most common cause of empty-or-misleading dashboards.
+
+### 1. Enumerate connected data sources every session
+
+```
+| group UniqueDataSourceNames = array_agg_distinct(dataSource.name)
+| limit 1000
+```
+
+If the source the dashboard is meant to cover does not appear, the dashboard cannot work. Stop and surface this to the user. Do not silently switch to a different source.
+
+### 2. PowerQuery cannot discover a source's schema by itself
+
+`| limit N` against a parser-emitted source returns only `timestamp + message`. PowerQuery has no `| columns *` or wildcard projection. Use the V1 query endpoint (`/api/query`, returns full event JSON) via the SDL client. Force-clear the scoped keys so auth falls through to the console JWT (which has `query` permission):
+
+```python
+from sdl_client import SDLClient
+c = SDLClient()
+c.keys["log_read_key"]    = ""
+c.keys["config_read_key"] = ""
+c.keys["config_write_key"] = ""
+c.keys["log_write_key"]   = ""
+
+res = c.query(filter=f"dataSource.name=='{source}'", max_count=50, start_time="7d")
+attrs = sorted({k for m in res["matches"] for k in (m.get("attributes") or {}).keys()})
+```
+
+Persist `attrs` to a per-session JSON and reference it during panel authoring. Do this for every source the dashboard will query.
+
+### 3. A field visible in `raw_data` may NOT be queryable
+
+Parsers vary in what they extract to top-level OCSF / `unmapped.*` columns. A field plainly visible inside the `raw_data` JSON envelope may not exist as a queryable structured column. Always probe a single sample event with the V1 query to confirm a field is queryable before authoring a panel around it. Both the schema dump and a raw event are ground truth, neither alone is sufficient.
+
+If a field is only present in `raw_data`, it can still be filtered via a full-text predicate but **cannot be grouped or aggregated** efficiently. See **Full-text predicate cost** below.
+
+### 4. Identify the discriminator before counting
+
+A single `event.type` value frequently bundles multiple distinct event kinds (delivery-time vs click-time, scheduled vs on-demand, inbound vs outbound, policy-event vs detection-event). The discriminator field, often named `creationMethod`, `messageType`, `triggerType`, `disposition`, etc., may or may not be promoted to the top level. Run an exploration query before authoring count panels:
+
+```
+dataSource.name='<source>' event.type='<type>'
+| group hits=count() by <candidate-discriminator>
+| sort -hits
+| limit 50
+```
+
+If the same `event.type` row repeats with different discriminator values, that secondary field is part of the partition key. Panels must filter on both, or split into separate sections per population. Counting "events of type X" without splitting by discriminator gives a number that conflates two semantically different things, which is the highest-cost class of dashboard bug because it looks correct.
+
+### 5. `event.type` is not always the right partition key
+
+Some sources emit multiple log subtypes under the same `event.type` (header logs vs body logs, policy events vs detection events). Run the same exploration query above with `event.type` PLUS a secondary discriminator before assuming `event.type` partitions the source cleanly.
+
+---
+
+## PowerQuery feature gaps to design around
+
+The patterns below produce HTTP 500s or silent renderer failures on current SDL builds. They appear syntactically valid in language references and may even work in a developer's local PowerQuery preview, but they are not safe inside dashboard JSON. Treat them as red flags during code review. `scripts/panel_safety_check.py` scans for them automatically.
+
+| Pattern | Failure mode |
+|---|---|
+| `\| let x = if(predicate, then, else)` then aggregating on `x` | 500 server error |
+| `count_if(predicate)` / `countif(predicate)` aggregate functions | 500 server error |
+| `sum(if(predicate, value, 0))` inside `\| group ... by ...` | 500 server error |
+| `concat(field_a, ' literal ', field_b)` in `\| let` bindings | 500 server error |
+| `\| union (subquery)` to add synthetic rows or merge two pipelines | 500 server error |
+| `let totals = (... \| group ...)` named subquery before main pipeline | 500 server error |
+| `\| parse <field> /<regex>/` with named captures and grouping in same query | 500 server error |
+| `\| matches '<regex>'` with `\\s` / `\\d` escapes inside the regex literal | 500 server error |
+| Anything after `\| transpose` (terminal command) | "transpose can only be used as the last command" |
+| `graphStyle: "area"` panel with a `query` field (not `plots: [...]`) | Indefinite spinner, no error surfaced |
+| Hyphenated arithmetic: `total-min`, `max-min` without spaces | "Identifier is ambiguous" error |
+| `markdown` panel with `content:` field instead of `markdown:` | Renders blank tile, no error |
+
+### Patterns that DO work and should be preferred
+
+| Pattern | Use case |
+|---|---|
+| `\| group n=count() \| limit 1` | Number panel |
+| `\| group n=estimate_distinct(<field>) \| limit 1` | Cardinality number panel (HyperLogLog, fast) |
+| `\| group <metric>=count() by <key1>, <key2> \| sort -<metric> \| limit N` | Top-N table |
+| `\| group <metric>=count() by timestamp=timebucket('<window>'), <dim> \| transpose <dim> on timestamp` | Time-series stacked-bar / line |
+| `\| group <metric>=count() by <a>, <b> \| transpose <b> on <a>` | Cross-tab / per-category × action stacked-bar |
+| Long-format table: `\| group hits=count() by <category>, <action> \| sort <category>, -hits \| limit N` | When you need both dims as columns and a wide table can't be produced |
+| Index-level filter (before the first pipe) | Narrow scan to relevant events; cheaper than a post-pipe `\| filter` |
+| `\| filter <field> matches '<simple-regex>'` for selective dim filtering | Works with simple character classes; avoid `\\s` / `\\d` escapes |
+
+### Workaround for "I need totals AND breakdown in one panel"
+
+When `sum(if())`, `count_if()`, and `union` all fail, the cleanest substitute is two adjacent panels: one for totals, one for the per-action breakdown (long-format). Lay them side-by-side at half-width so they read as a single visual unit. Trying to force a single wide table with both columns generally requires one of the unsupported patterns above.
+
+---
+
+## Empty results are valid evidence (but distinguish from query errors)
+
+A query that runs successfully and returns 0 rows is a real datapoint, not a bug. Examples:
+
+- A "policy violations blocked" panel returning 0 because the policy is in monitor-only mode.
+- A "malicious URL delivered" panel returning 0 because the engine hard-blocks at a different layer.
+- A "compromised account auth" panel returning 0 because no compromise occurred this window.
+
+Rules:
+
+1. **Never silently switch the query** to make a panel "have data." If 0 is correct, surface it.
+2. **Distinguish 0-row from 0-matchCount.** A successful query with `matchCount > 0` and `rowCount = 0` means the post-pipe steps eliminated everything (often a `| filter` after `| group`). A query with `matchCount = 0` means no events matched the initial filter at all. The first hints at refining the filter; the second hints at validating coverage.
+3. **In dashboards, a panel that may legitimately be 0 should have a markdown header that explains the SOC-positive interpretation.** Example: *"0 here is the desired posture; non-zero indicates a regression worth investigating."* Without this, an analyst reads a blank panel as a broken dashboard.
+4. **In the evidence report (mandatory deliverable), every empty panel must include the underlying matchCount** so the reader can tell whether the source has data at all. The PDF Appendix lists every empty-result panel with its SOC-meaningful interpretation.
+
+---
+
+## Full-text predicate cost (when to use raw_data string matching)
+
+When a field needed for the panel is buried inside `raw_data` rather than parsed to a structured column, the only filter is a full-text predicate against `raw_data`. Example:
+
+```
+dataSource.name='<source>' event.type='<type>' '<json-snippet>'
+```
+
+The bare-string token is interpreted as a literal substring search across `raw_data`. It works but the cost is significant: full-text scan reads every event in the time window before applying the predicate, so cost is proportional to total events scanned, not to the matched subset. Combined with `| group` over high-cardinality dimensions, full-text predicates frequently exceed the 60s MCP timeout. Combined with `timebucket + transpose`, they almost always time out.
+
+### Safe full-text patterns
+
+| Use | Example | Why it works |
+|---|---|---|
+| Number panel: simple count | `<src> '<token>' \| group n=count() \| limit 1` | One row, no grouping; fast even at 100k+ events |
+| Number panel: count with structured co-filter | `<src> '<token>' <field>='<value>' \| group n=count() \| limit 1` | Co-filter narrows scan first |
+| Table panel: top-N with restrictive co-filter | `<src> '<token>' <selective-field>='<value>' \| group ... by ... \| sort \| limit 25` | Working set is small after co-filter |
+
+### Risky full-text patterns
+
+| Use | Why it fails |
+|---|---|
+| Stacked-bar timeline with full-text + transpose | Scan + bucket + group + transpose under full-text → timeout |
+| Top-N grouping over the whole source under full-text | High-cardinality grouping under full-text → timeout |
+| Multiple full-text tokens combined (`'<a>' '<b>' \| ...`) | Each token is a separate scan; cost compounds |
+
+### Design rule
+
+If a panel needs a discriminator that lives in `raw_data` only, lobby the parser team to promote it to a top-level structured field. Until then, design the panel to use full-text only where the cost is acceptable (number panels, selective tables) and replace timeline / heavy-grouping panels with structured-field equivalents.
+
+---
+
+## Panel naming hygiene
+
+The single most common cause of misleading dashboards is a panel title that overstates what the underlying query measures.
+
+| Wrong title | Why it's wrong | Correct title |
+|---|---|---|
+| "URL clicks" | Counts both clicks and delivery-time scans | "URL events (clicks + scans)" |
+| "Phishing emails clicked" | Counts events that include a click discriminator AND those that don't | "Phishing-classified emails (events)" |
+| "Allowed malicious URLs" | Counts the rewriting policy disposition, not the user's actual click | "Malicious URL events delivered (warn)" |
+| "Distinct users compromised" | Counts users associated with a detection, not confirmed-compromise users | "Distinct users with detected events" |
+
+Rule: **the panel title should be readable as an SLA / report claim.** If a CISO would feel misled reading the title without seeing the query, rename the panel.
+
+When two semantically distinct event populations exist within the same `event.type` (delivery-time vs click-time, scheduled vs on-demand), build separate sections of the dashboard for each population, with markdown headers that explain the split. A single section that mixes both populations is almost always wrong.
+
+---
 
 ## Dashboard JSON structure
 
@@ -436,25 +600,55 @@ event.type='process' | group count=count() by timestamp=timebucket('1h'), endpoi
 
 Use the `sentinelone-sdl-api` skill to deploy. Dashboard config files live at paths like `/dashboards/my-dashboard-name`.
 
+### 1. Always read existing version before put_file (CAS guard)
+
 ```python
-import sys
-sys.path.insert(0, "/path/to/sentinelone-sdl-api/scripts")
+import json, time
 from sdl_client import SDLClient
-import json
 
 client = SDLClient()
-dashboard_json = { ... }  # your dashboard dict
+DASH_PATH = "/dashboards/soc-overview"
 
-# List existing dashboards
-files = client.list_files(path="/dashboards")
+# Read existing version (or treat 404 as version=0 for a brand-new dashboard)
+try:
+    existing = client.get_file(DASH_PATH)
+    cur_version = existing.get("version")
+    backup_path = f"/tmp/{DASH_PATH.replace('/','_')}.{cur_version}.bak.json"
+    open(backup_path, "w").write(existing.get("content") or "{}")
+except Exception:
+    cur_version = None
+    backup_path = None
 
-# Upload / overwrite a dashboard
-result = client.put_file(
-    path="/dashboards/soc-overview",
-    content=json.dumps(dashboard_json, indent=2)
-)
-print(result)
+body = json.dumps(dashboard_json, indent=2)
+res = client.put_file(path=DASH_PATH, content=body, expected_version=cur_version)
+assert res.get("status") == "success", res
 ```
+
+The `expected_version` argument is a CAS guard against concurrent writes from the SDL UI or another script.
+
+### 2. Verify deployment by re-fetching (and grep for a canary)
+
+```python
+time.sleep(3)  # eventual-consistency window
+verify = client.get_file(DASH_PATH)
+deployed_content = verify.get("content", "")
+assert verify.get("version") != cur_version, "version did not bump"
+assert "<canary-string-from-new-section>" in deployed_content, "deploy did not include new content"
+```
+
+A `put_file` response of `{"status": "success"}` does not guarantee the new content was written, always re-fetch and grep for a canary string from the change.
+
+### 3. Avoid duplicate dashboard paths
+
+The SDL UI's **Save** button writes to `/dashboards/id/<dashboardId>/<name>`. The file API can write to either that path OR the simpler `/dashboards/<name>`. **Pick one canonical path before the first deploy and never mix.** Each deploy to the alternate path creates a silent duplicate alongside the UI-saved copy. Recommend `/dashboards/<name>` for hand-authored dashboards and `/dashboards/id/<id>/<name>` only for files originally saved through the UI.
+
+### 4. Layout coordinates accumulate
+
+Panels are placed by `layout: {w, h, x, y}`. When appending a new section to an existing dashboard, compute the next `y` as `max(existing_y + existing_h)` across the tab, not by visual estimation. Off-by-a-few errors stack panels on top of each other and the UI will not flag this as an error.
+
+### 5. Test panels in the SDL UI before declaring done
+
+The SDL dashboard render engine has a longer query budget than the PowerQuery MCP. A query that times out in MCP validation may still render in the UI. Conversely, a query that returns from MCP may render slowly in the UI. The final smoke test for every dashboard is: open it in the UI, watch each tab load, confirm no panel spins indefinitely.
 
 After deploying, open in the SDL UI: **Visibility Enhanced → Dashboards** → select the dashboard by name.
 
@@ -462,11 +656,43 @@ After deploying, open in the SDL UI: **Visibility Enhanced → Dashboards** → 
 
 ## Reference files in this skill
 
-- `references/panel-type-cheatsheet.md` — One-line summary of every panel type + gotchas
-- `references/community-examples.md` — Full real-world dashboard JSON examples (console audit, threat stats, alert investigation, O365, Fortinet)
-- `references/common-queries.md` — Ready-to-paste PowerQuery snippets for common security use cases
+- `references/panel-type-cheatsheet.md`: one-line summary of every panel type plus gotchas.
+- `references/community-examples.md`: full real-world dashboard JSON examples (console audit, threat stats, alert investigation, O365, Fortinet).
+- `references/common-queries.md`: ready-to-paste PowerQuery snippets for common security use cases.
+- `references/lessons-learned.md`: source-agnostic patterns and gotchas from production engagements (PowerQuery feature gaps, full-text cost, naming hygiene, discriminator handling, validation runner shape).
+- `references/evidence-report-template.md`: required format for the post-deploy log-evidence report (per-panel JSON, markdown, PDF appendix).
 
-Read the community examples before creating a new dashboard — they show the patterns for tabs, filters, parameters, and layout that work in production.
+Read the community examples before creating a new dashboard, and read `lessons-learned.md` if any of: a panel may legitimately return 0, an `event.type` covers multiple semantic populations, the panel needs a field only present in `raw_data`, or a previous version of this skill produced a 500 error on `count_if`, `sum(if())`, or `| union`.
+
+## Skill scripts (in `scripts/`)
+
+These scripts are mandatory parts of the workflow, not optional tooling.
+
+- `scripts/panel_safety_check.py <dashboard.json>`: pre-deploy. Scans dashboard JSON for known-bad patterns (markdown `content` vs `markdown` field, `area` + `query`, transpose-not-terminal, hyphenated arithmetic, `count_if` / `sum(if())` / `| union` / named subqueries, `\\s`/`\\d` regex escapes inside `matches`, full-text combined with timebucket+transpose, missing layout, missing `| limit` on number/table panels). Exits non-zero on any flag. Run before every `put_file`.
+- `scripts/validate_dashboard.py <dashboard.json> [--start 7d] [--out <dir>]`: post-deploy. Replays every non-markdown panel against the SDL `power_query` API, persists per-panel evidence (style, query, elapsed, rowCount, matchCount, columns, sample rows, error) to a JSON keyed on `tab::title`, and emits a markdown evidence file. Idempotent, resumes cleanly, persists after each panel. Auth falls through to console JWT (force-clears scoped keys).
+- `scripts/render_validation_pdf.py <evidence.json> [--out <pdf>]`: post-deploy. Reads the validation JSON and emits a PDF report with cover page, per-tab sections, sample-data tables (first 3 rows of N), and an Appendix listing every empty-result panel with the operator's prepared SOC-meaningful interpretation. The PDF is the leadership deliverable; the markdown evidence stays in version control.
+
+## Log-evidence report (mandatory deliverable)
+
+Every dashboard delivered, whether new or modified, ships with a log-evidence report. The report's purpose is to prove that each panel's query runs against live data, captures actual sample rows, and either renders data or has a documented reason for being empty. Without this report a dashboard is incomplete; do not consider the workflow done.
+
+The minimum the report captures, per panel:
+
+- `ok` (did the query execute), `elapsed_s`, `row_count`, `columns`, `sample_rows` (first 3 rows verbatim, this is the log evidence), `matchCount` (events scanned before grouping), `error` (first 300 chars when `ok=False`).
+
+Verdict per panel style:
+
+| Panel style | Pass condition |
+|---|---|
+| `number` | `row_count == 1` and `len(columns) == 1`; OR `row_count == 0` (acknowledged empty) |
+| `donut` / `pie` | `row_count >= 1` and `len(columns) >= 2` (text + numeric); OR `row_count == 0` |
+| `stacked_bar` / `bar` / `line` / `area` | `row_count >= 1` and `len(columns) >= 2`; OR `row_count == 0` |
+| `table` | Always passes if `ok=True`; sample rows captured |
+| `markdown` | Excluded (no query) |
+
+The PDF report MUST include an Appendix listing every empty-result panel (`row_count == 0`) with its SOC-meaningful interpretation, sourced from the markdown header authored alongside the panel. A panel returning 0 rows without explanation is indistinguishable to the reader from a broken panel; always document the "why."
+
+See `references/evidence-report-template.md` for the exact structure.
 
 ---
 
@@ -679,25 +905,63 @@ This is the same V1-query schema-discovery pattern from the `sentinelone-sdl-api
 
 ## Pre-deploy checklist
 
-Run this before every `put_file`:
+Run this before every `put_file`. Items marked **[scripted]** are checked automatically by `scripts/panel_safety_check.py`.
 
 ```
-[ ] Every panel has explicit x, y, w, h in layout
-[ ] No panel uses `transpose <field> on timestamp` where <field> values can contain hyphens
-[ ] All number panels end with `| limit 1`
-[ ] All table panels end with explicit `| limit N`
-[ ] All time-series panels use a timebucket appropriate for duration (see table above)
+PRE-AUTHORING
+[ ] Live data-source enumeration confirms every dataSource.name used by the dashboard exists
+[ ] V1-query schema discovery run for every source; field list saved for the session
+[ ] Discriminator field validated for every event.type the dashboard counts
+[ ] No panel relies on a field that is only present in raw_data (or, if it does, the panel
+    is a number/selective-table that won't time out under full-text)
+
+JSON STRUCTURE (scripted)
+[ ] Every panel has explicit x, y, w, h in layout                                  [scripted]
+[ ] When appending to existing dashboard, next y = max(existing_y + existing_h)
+[ ] No panel uses `transpose <field> on timestamp` where <field> values may contain hyphens
+[ ] No `graphStyle: "area"` panel with a `query:` field (must use `plots:`)        [scripted]
+[ ] Markdown panels use `markdown:` field, not `content:`                          [scripted]
+[ ] No content after `| transpose` (transpose must be terminal)                    [scripted]
+[ ] No hyphenated arithmetic (`x-y` without spaces)                                [scripted]
+
+QUERY HYGIENE (scripted)
+[ ] All number panels end with `| limit 1`                                         [scripted]
+[ ] All table panels end with explicit `| limit N`                                 [scripted]
+[ ] All time-series panels use a timebucket appropriate for duration
 [ ] min/max(timestamp) columns wrapped in simpledateformat(...) with tz
 [ ] Any millisecond-typed time field multiplied by 1000000 before simpledateformat
 [ ] Hostname/value-list filters use `field in (...)` not `field matches '(...)'`
+[ ] Numeric fields wrapped with number() before arithmetic / sum / avg
+[ ] No use of count_if / sum(if(predicate, value, 0)) / | union / named subqueries [scripted]
+[ ] No `\\s` / `\\d` regex escapes inside `matches '...'`                          [scripted]
+[ ] No full-text predicate combined with timebucket+transpose                      [scripted]
 [ ] Number panels use only {format, precision, suffix} in options
-[ ] Markdown panels use `markdown:` field, not `content:`
+
+NAMING & SEMANTICS
+[ ] Every panel title reads as an SLA-grade claim (no overstated counts)
+[ ] Distinct event populations under the same event.type live in separate sections
+    each with a markdown header explaining the split
+[ ] Panels that may legitimately return 0 have a markdown header explaining the
+    SOC-positive interpretation
 [ ] 3-5 sample events checked to verify which field carries the user semantic per event ID
 [ ] Machine-account filter applied on user-facing panels
+
+PERFORMANCE & LOAD
 [ ] Parallel load test passes: wall-clock <= 5s, slowest panel <= 2s, zero failures
+[ ] All time-series panels obey the timebucket-vs-duration table
+
+DEPLOYMENT
 [ ] Backup of current dashboard JSON saved (for rollback)
 [ ] put_file called with expected_version of the current deployed copy
 [ ] sleep(3) before re-fetching to verify deploy
+[ ] Re-fetched content greps for a canary string from the change
+[ ] Path is canonical (either /dashboards/<name> OR /dashboards/id/<id>/<name>, never both)
+
+POST-DEPLOY (MANDATORY)
+[ ] scripts/validate_dashboard.py run; per-panel evidence JSON persisted
+[ ] Markdown evidence file emitted alongside the JSON
+[ ] scripts/render_validation_pdf.py run; PDF report delivered with the dashboard
+[ ] PDF Appendix lists every empty-result panel with a SOC-meaningful interpretation
 ```
 
 ---

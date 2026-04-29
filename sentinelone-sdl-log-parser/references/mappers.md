@@ -316,3 +316,89 @@ Result: `labels = { env: "prod", team: "sec" }`.
             algo:  "sha256" } },
 { drop:   { field: "actor.session.terminal.ip" } }
 ```
+
+### Indexed positional access for CSV / pipe-delimited columns (v1 only)
+
+When the source is a positional CSV captured with `{parse=commaSeparatedvalues}` or `{parse=pipeSeparatedValues}`, the parser deposits columns under the synthetic prefix `attr` indexed by position. Use this in a v1 mappings block:
+
+```js
+mappings: {
+  version: 1,
+  mappings: [
+    {
+      predicate: "true",
+      transformations: [
+        { rename: { from: "attr[0]",  to: "raw.receive_time" } },
+        { rename: { from: "attr[1]",  to: "raw.serial" } },
+        { rename: { from: "attr[7]",  to: "src_endpoint.ip" } },
+        { rename: { from: "attr[8]",  to: "dst_endpoint.ip" } },
+        { rename: { from: "attr[24]", to: "src_endpoint.port" } },
+        { cast:   { field: "src_endpoint.port", type: "int" } }
+      ]
+    }
+  ]
+}
+```
+
+**Indexed access is v1-only.** A `mappings.version: 0` block rejects `attr[0]` syntax. Canonical example: `parsers/sentinelone/marketplace-paloaltonetworksfirewall-latest/` (731 indexed transformations across 14 formats).
+
+### Building observable arrays (v1)
+
+OCSF events optionally carry an `observables: [...]` array of `{name, type_id, type, value}` records summarizing the IPs/users/domains/files seen in the event. Construct it via labeled-index `copy`:
+
+```js
+{ copy: { from: "src_endpoint.ip", to: "observables[srcip].value" } },
+{ constant: { value: "Source IP",  field: "observables[srcip].name" } },
+{ constant: { value: 2,            field: "observables[srcip].type_id" } },
+{ constant: { value: "IP Address", field: "observables[srcip].type" } },
+
+{ copy: { from: "dst_endpoint.ip", to: "observables[dstip].value" } },
+{ constant: { value: "Destination IP", field: "observables[dstip].name" } },
+{ constant: { value: 2,                field: "observables[dstip].type_id" } },
+{ constant: { value: "IP Address",     field: "observables[dstip].type" } }
+```
+
+Each `[srcip]` / `[dstip]` is a labeled index — referenced multiple times within the same mapping entry, the engine appends once and then targets that same array slot. Produces a clean array of dicts rather than separately-named scalars. Reference: `parsers/sentinelone/marketplace-fortinetfortigate-latest/` and `parsers/sentinelone/marketplace-cloudflare-latest/`.
+
+### Tree operations on gron-flattened JSON
+
+Source `{"Resource": {"Id": "abc", "Type": "user"}}` after `${parse=gron}$` becomes two flat keys: `unmapped.Resource.Id` and `unmapped.Resource.Type`. To rename the whole subtree at once:
+
+```js
+{ rename_tree: { from: "unmapped.Resource", to: "resource" } }
+```
+
+The engine walks every key with that dotted prefix and renames all of them. **Do NOT escape the dots inside the subtree path** (`from: "unmapped\\.Resource"` does not match — even though the published `PARSER_TEMPLATE.conf` shows escaped dots; that template is stale on current tenants). The dots in flat-gron keys are literal parts of the key string, not navigation operators. Reference: `parsers/sentinelone/marketplace-cloudflare-latest/`.
+
+### Enum cast with default sentinel (v1)
+
+`cast: { type: "enum", enum: {...} }` does not have a fallback by default — unmapped source values pass through unchanged. To map every unknown to a sentinel (so downstream queries can group "known" vs "unknown"), set `enum_default`:
+
+```js
+{ cast: { field: "action_id", type: "enum",
+          enum: { "1": "Allow", "2": "Block", "3": "Drop", "4": "Quarantine" },
+          enum_default: 99 } }
+```
+
+Cloudflare uses `enum_default: 99` (the OCSF "Unknown" sentinel) consistently — copy that pattern. Reference: `parsers/sentinelone/marketplace-cloudflare-latest/`.
+
+### Conditional class assignment via per-format `attributes:`
+
+When one parser handles multiple OCSF classes (Windows Event Log emits Authentication for 4624/4625 but Account Change for 4720/4728), put the class metadata on each format rather than at parser root:
+
+```js
+formats: [
+  { id: "evt4624", format: "...", halt: true,
+    attributes: { class_uid: 3002, class_name: "Authentication",
+                  category_uid: 3, category_name: "Identity & Access Management",
+                  activity_id: 1, activity_name: "Logon" } },
+  { id: "evt4625", format: "...", halt: true,
+    attributes: { class_uid: 3002, class_name: "Authentication",
+                  activity_id: 2, activity_name: "Logoff" } },
+  { id: "evt4720", format: "...", halt: true,
+    attributes: { class_uid: 3001, class_name: "Account Change",
+                  activity_id: 1, activity_name: "Create" } }
+]
+```
+
+Per-format `attributes:` override parser-root `attributes:`, so you can set sane defaults at root and let formats specialize. Look up every dotted name and class number in `references/ocsf-schema-documentation.md`. Reference: `parsers/community/microsoft_windows_eventlog-latest/` (5 sub-EventID directories).

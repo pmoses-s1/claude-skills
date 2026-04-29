@@ -35,7 +35,16 @@ This skill has no Python client of its own — dashboards are authored as JSON a
 
 ## Layout
 
-- `SKILL.md` — instructions Claude reads when the skill triggers
-- `references/panel-type-cheatsheet.md` — JSON schema for every panel type with annotated examples
-- `references/common-queries.md` — ready-to-use PQ queries for security, network, identity, and compliance dashboards
-- `references/community-examples.md` — full dashboard JSON examples from the SentinelOne community
+- `SKILL.md`: instructions Claude reads when the skill triggers.
+- `references/panel-type-cheatsheet.md`: JSON schema for every panel type with annotated examples.
+- `references/common-queries.md`: ready-to-use PQ queries for security, network, identity, and compliance dashboards.
+- `references/community-examples.md`: full dashboard JSON examples from the SentinelOne community.
+- `references/lessons-learned.md`: source-agnostic patterns and gotchas from production engagements (PowerQuery feature gaps, full-text cost, naming hygiene, discriminator handling, mandatory validation runner).
+- `references/evidence-report-template.md`: required schema for the per-panel JSON, markdown, and PDF the validation runner produces.
+- `scripts/panel_safety_check.py`: pre-deploy linter for known-bad panel patterns. Run before every `put_file`.
+- `scripts/validate_dashboard.py`: post-deploy panel replay; persists per-panel evidence (sample rows, row count, matchCount, elapsed, errors) and emits a markdown report.
+- `scripts/render_validation_pdf.py`: renders the evidence JSON into a leadership-ready PDF with cover, per-tab sections, sample-data tables, and an empty-result appendix.
+
+## Mandatory log-evidence report
+
+Every dashboard delivered with this skill ships with a log-evidence report produced by `scripts/validate_dashboard.py` plus `scripts/render_validation_pdf.py`. The PDF is the leadership deliverable, the markdown stays in version control. See `references/evidence-report-template.md` for the full schema and what a passing dashboard's report looks like.

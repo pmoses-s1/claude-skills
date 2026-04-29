@@ -8,6 +8,37 @@ description: Use whenever the user wants to author, edit, debug, validate, or ex
 
 This skill turns raw log samples into deployed, validated SDL parser definitions. A parser is an *augmented-JSON* file at `/logParsers/<name>` on the SDL tenant that extracts fields from each ingested line. The parser editor and the `Test Parser` button in the console run the parser client-side in JavaScript; this skill mirrors that workflow programmatically and finishes by ingesting a sample through the deployed parser to confirm the actual ingest path works.
 
+## Two hard rules (every parser, every time)
+
+These two rules apply to every parser you write or edit, regardless of source, regardless of whether you're starting from scratch or copying from the catalog. Violating either produces a non-conformant parser even if extraction works.
+
+**Rule 1: The 4 mandatory attributes are always present.**
+
+```js
+attributes: {
+  "dataSource.category": "security",   // hardcoded constant, never any other value
+  "dataSource.name":     "Corelight",  // specific product/service name
+  "dataSource.vendor":   "Corelight",  // parent vendor / company name
+  "metadata.version":    "1.0.0"       // semver; bump on substantive parser changes
+}
+```
+
+`dataSource.category` is fixed at `"security"`. Not `application`, not `network`, not `system`, not `audit`. The catalog has parsers that violate this; you do not.
+
+`metadata.version` is mandatory and follows semver (`MAJOR.MINOR.PATCH`, with optional pre-release suffix like `-rc1` or `-beta1`). **Increment it on every build.** Patch bump for fixes, minor for additive changes, major for breaking schema changes. It can also be set inside `mappings` via a `constant` op when the source itself carries a vendor schema version you'd rather propagate per-event:
+
+```js
+{ constant: { field: "metadata.version", value: "<your-current-version>" } }
+```
+
+A `constant` in `mappings` overrides the parser-root `attributes:` value when it fires, which is useful when one parser handles multiple vendor schema versions and you want each event tagged with the right one.
+
+**Rule 2: Every OCSF field name comes from `references/ocsf-schema-documentation.md`.**
+
+Before emitting any OCSF dotted path (`src_endpoint.ip`, `actor.user.name`, `metadata.product.vendor_name`, etc.), grep `references/ocsf-schema-documentation.md` for the exact string. Do not invent field names. Do not copy from a catalog parser without verifying. Do not rely on memory. The reference is the single source of truth for the ~25,759 documented OCSF field names across the 7 categories.
+
+The rest of this skill assumes both rules are upheld. If either is unclear for a given parser, stop and resolve before continuing.
+
 ## When to use this skill
 
 Use this skill when the user wants to turn raw log text into structured SDL events. Common triggers:
@@ -32,36 +63,77 @@ Follow this loop. Skipping steps 1 (catalog check) and 5 (end-to-end validation)
 6. **Iterate.** If a field is missing or wrong, identify which format/rewrite was responsible, edit, redeploy, re-ingest with a fresh `Nonce`, re-query.
 7. **Hand off.** Show the user the final parser file (path + version), the sample they gave, and the parsed fields the query returned.
 
-## Required default attributes on every parser
+## Required default attributes on every parser (MANDATORY)
 
-**Always set these four attributes** on the top-level `attributes:` block of every parser, regardless of source:
+**Four attributes are MANDATORY on the top-level `attributes:` block of every parser**, regardless of source. These are non-negotiable:
 
 ```js
-"metadata.version":    "1.0.0",       // semver; bump on substantive parser changes
-"dataSource.category": "security",    // ALWAYS hardcoded to "security" — never change this
-"dataSource.name":     "AWS RDS",     // specific product/service name
-"dataSource.vendor":   "AWS"          // parent vendor / company name
+"dataSource.category": "security",    // ALWAYS hardcoded to "security": fixed constant, never change
+"dataSource.name":     "Corelight",   // specific product/service name (example value)
+"dataSource.vendor":   "Corelight",   // parent vendor / company name (example value)
+"metadata.version":    "1.0.0"        // semver; required on every parser
 ```
 
-They are required by the downstream SDL pipeline (Marketplace routing, parser catalog, content-pack grouping). Omitting any of them produces a non-conformant parser even when field extraction is correct.
+These four are required by the downstream SDL pipeline (Marketplace routing, parser catalog, content-pack grouping). Omitting any of them produces a non-conformant parser even when field extraction is correct.
 
-**`dataSource.category` MUST always be hardcoded to `"security"`.** This is not a taxonomy pick — it is a fixed constant. Never substitute another value regardless of the source type.
+**`dataSource.category` MUST always be hardcoded to `"security"`.** This is not a taxonomy pick, it is a fixed constant. Never substitute another value (`application`, `network`, `system`, `audit`) regardless of the source type. Empirical audit of the ai-siem catalog (2026-04) shows ~17% of community parsers violate this rule with values like `application`, `network`, `system`, `audit`. Fix on copy.
 
-`dataSource.vendor` is the parent company (`Cisco` for Umbrella, `Microsoft` for Azure AD). `dataSource.name` is the specific product (`Cisco Umbrella`, `Azure AD`).
+`dataSource.vendor` is the parent company (`Cisco` for Umbrella, `Microsoft` for Azure AD). `dataSource.name` is the specific product (`Cisco Umbrella`, `Azure AD`). For single-product vendors both can be the same string (`Corelight` / `Corelight`).
 
-These three — `dataSource.category`, `dataSource.name`, `dataSource.vendor` — are mandatory on every parser you write or edit. Always include them. If you are editing an existing parser that is missing any of them, add them.
+`metadata.version` is semver (`MAJOR.MINOR.PATCH` with optional `-rcN` / `-betaN` suffix). **Always increment on a new build** so content-pack tooling can detect drift. Patch for fixes, minor for additive changes, major for breaking schema changes. May also be emitted from inside `mappings` via:
 
-## Default output schema: OCSF
+```js
+{ constant: { field: "metadata.version", value: "<your-current-version>" } }
+```
+
+A `mappings.constant` overrides the parser-root `attributes:` value when its predicate fires. This is the right pattern when one parser handles multiple vendor schema versions and you want each event labeled with the schema-version it actually came from.
+
+**Catalog-parser audit step.** When you start from a catalog parser, the very first edits you make are to confirm all four fields are present, that `dataSource.category` is `"security"`, and that `metadata.version` exists and reflects the change you're about to make. About 1/3 of the community parsers in `Sentinel-One/ai-siem` are missing `dataSource.category` outright; many that include it use a non-security value. Fix before doing anything else.
+
+## Default output schema: OCSF (mandatory reference)
 
 Unless the user explicitly asks for vendor-native names, **emit OCSF-shaped events**. This means:
 
 - Name captured fields with their OCSF dotted paths (e.g. `src_endpoint.ip`, `dst_endpoint.port`, `connection_info.protocol_num`, `app_name`, `actor.user.name`).
-- Tag every event with the class metadata on `attributes`: `class_uid`, `class_name`, `category_uid`, `category_name`, and `metadata.product.vendor_name` / `metadata.product.name` / `metadata.log_provider` — all IN ADDITION TO the four required defaults above.
+- Tag every event with the class metadata on `attributes`: `class_uid`, `class_name`, `category_uid`, `category_name`, and `metadata.product.vendor_name` / `metadata.product.name` / `metadata.log_provider`, all IN ADDITION TO the four mandatory attributes above.
 - Put the per-event subtype (`activity_id` + `activity_name`) on the **format**, not the top-level attributes, because one parser often handles multiple subtypes (SESSION_CREATE vs SESSION_CLOSE).
 
-Why: downstream PowerQuery hunts, STAR rules, dashboards, and Marketplace integrations assume OCSF. Vendor-native names force every consumer to learn each source format and break portability. The full class catalog, field-to-OCSF tables, and authoring idioms (capture-directly-into-dotted vs capture-vendor-then-rename) live in `references/ocsf-mapping.md` — read it before writing a parser. For the authoritative field-name list (all 25k+ documented OCSF fields across all classes), grep `references/ocsf-schema-documentation.md` rather than guessing or copying from memory.
+**OCSF mapping MUST always be done using `references/ocsf-schema-documentation.md`.** This file is the authoritative SentinelOne community-documented OCSF field catalog (7 categories, 96 articles, ~25,759 field entries across every event class). Before emitting any OCSF field name, grep this file for the exact dotted path. Do **not** invent field names, do **not** copy from memory, do **not** trust catalog parsers to have the right name (many community parsers in ai-siem use vendor-native or stale OCSF names that need correcting). Workflow:
 
-Quick picker: Network firewall/NAT/flow → `4001`, HTTP/web → `4002`, DNS → `4003`, TLS → `4006`, authentication → `3002`, file ops → `1001`, process → `1007`. When the source could reasonably belong to multiple classes (proxy logs are a common example), confirm with the user rather than picking silently.
+1. Pick the OCSF class (see Quick picker below).
+2. Open `references/ocsf-schema-documentation.md` and grep for the class number / category to find the field block.
+3. Copy the dotted path verbatim into your parser.
+4. If unsure between two candidate fields, confirm with the user rather than guessing.
+
+`references/ocsf-mapping.md` covers the two authoring idioms (capture-directly-into-dotted vs capture-vendor-then-rename) and the most common class-specific tables (Network Activity, Authentication, File Activity).
+
+Why this matters: downstream PowerQuery hunts, STAR rules, dashboards, and Marketplace integrations assume OCSF. Vendor-native names force every consumer to learn each source format and break portability. A wrong dotted path (`source.ip` instead of `src_endpoint.ip`, `dst.port` instead of `dst_endpoint.port`) is silently wrong: it ingests, but every downstream consumer fails to match.
+
+Quick picker (use this to find the class number, then look up fields in `ocsf-schema-documentation.md`):
+
+- Network firewall / NAT / flow → `4001` Network Activity
+- HTTP / web / proxy → `4002` HTTP Activity
+- DNS → `4003` DNS Activity
+- DHCP → `4004` DHCP Activity
+- RDP / SSH session → `4005` RDP Activity
+- TLS / SSL handshake → `4006` SSH Activity (TLS uses connection_info under 4001/4002)
+- Email → `4009` Email Activity
+- Authentication → `3002` Authentication
+- Account change → `3001` Account Change
+- API activity → `6003` API Activity
+- File system ops → `1001` File System Activity
+- Kernel ops → `1003` Kernel Activity
+- Memory ops → `1004` Memory Activity
+- Module ops → `1005` Module Activity
+- Process ops → `1007` Process Activity
+- Registry ops → `201001` (Windows Registry)
+- Detection finding → `2004` Detection Finding
+- Compliance finding → `2003` Compliance Finding
+- Vulnerability finding → `2002` Vulnerability Finding
+- Inventory / device → `5001` Device Inventory Info
+- Email / file finding → `2007` (Email Finding) / `2006` (File Hosting Finding)
+
+When the source could reasonably belong to multiple classes (proxy logs, EDR alerts), confirm with the user rather than picking silently.
 
 ## Top-level parser structure
 
@@ -121,11 +193,41 @@ Rules that bite people often:
 
 For the full directive list see `references/syntax.md` and `references/parse-directives.md`.
 
+## Canonical reference parsers by input shape
+
+When you've identified the shape of the source log, jump straight to the canonical catalog parser for that shape and start from it. These are battle-tested in production:
+
+| Input shape | Canonical parser | What to learn from it |
+|---|---|---|
+| Pure JSON-per-line (flat or nested) | `community/abnormal_security_logs-latest/` | `${parse=gron}$` capture, then mappings to OCSF |
+| JSON with envelope (`<ts> <host> <json>`) | `community/json_generic-latest/` (or `examples/02-json-with-envelope.json`) | `dottedJson` on the body |
+| JSON, nested, multi-class | `sentinelone/marketplace-cloudflare-latest/` | gron + format IDs + enum cast + tree ops, all in v1 mappings |
+| Already-OCSF JSON | `community/okta_ocsf_logs-latest/` | Pass-through with light renames |
+| CEF over syslog | `community/generic_access_logs-latest/` (or `examples/01-cef-over-syslog.json`) | Pipe-delimited header + KV extension |
+| LEEF over syslog | `community/leef_template_logs-latest/` | Multi-format header + KV body |
+| Pure key=value freeform | `sentinelone/marketplace-fortinetfortigate-latest/` | `repeat: true` catch-all, attrBlacklist, observables array |
+| Positional CSV (100+ columns) | `sentinelone/marketplace-paloaltonetworksfirewall-latest/` | `commaSeparatedvalues`, `skipNumericConversion`, `attr[N]` indexed access in v1 mappings |
+| Positional space-delimited | `sentinelone/marketplace-awsvpcflowlogs-latest/` | `intermittentTimestamps`, fixed columns |
+| Pipe-delimited (non-CEF) | `sentinelone/marketplace-zscalerinternetaccess-latest/` | `pipeSeparatedValues` parse directive |
+| Multi-line stack / SQL | `community/sql_database_logs-latest/` and `sentinelone/marketplace-awsrdslogs-latest/` | `lineGroupers` start/continueThrough, format-id sentinels for sub-shapes |
+| Windows Event XML | `community/microsoft_windows_eventlog-latest/` | XML with `\\t` / `\\n` escapes, per-EventID sub-parsers (4624, 4625, 4720, 4728, 1102) |
+| HTTP access logs | `community/apache_http_logs-latest/` | Built-in `accessLog` alias-or-extend |
+| pfSense / iptables freeform firewall | `community/pfsense_firewall_logs-latest/` | Frame → subtype → protocol cascade with `discard: true` for IPv6 |
+| Rewrites-only legacy style | `community/okta_logs-latest/` | Minimal-diff edits when you can't migrate to mappings |
+| Gron-capture + everything-in-mappings | `community/PARSER_TEMPLATE/` (and `examples/08-gron-capture-template.json`) | The most general scaffold; use when you want all transformations in one block |
+
+When in doubt, `marketplace-cloudflare-latest/` is the most complete reference for "modern v1 parser doing everything right" (gron, format IDs, enum cast, tree ops, OCSF tagging). Start there if you're not sure.
+
 ## Strategy decision tree
 
 Apply in order — first match wins:
 
-1. **Is there a parser in the ai-siem catalog?** Search `Sentinel-One/ai-siem` for the vendor/product name. If so, start from that parser (see `references/ai-siem-catalog.md` for the fetch recipe and per-shape template map). Add or correct the four required default attributes if missing — especially ensure `dataSource.category` is `"security"` (catalog parsers often use other values). Optionally re-emit OCSF field names if the catalog parser used vendor-native, bump `metadata.version`, and validate.
+1. **Is there a parser in the ai-siem catalog?** Search `Sentinel-One/ai-siem` for the vendor/product name. If so, start from that parser (see `references/ai-siem-catalog.md` for the fetch recipe and per-shape template map). On copy, immediately audit and fix:
+   - The **4 mandatory attributes** (`dataSource.category` hardcoded to `"security"`, `dataSource.name`, `dataSource.vendor`, `metadata.version`). About 1/3 of community parsers miss `dataSource.category` outright; many that include it use `application`/`network`/`system`/`audit` instead of `"security"`. Force them to `"security"`. Add `metadata.version` if missing, bump it if you're changing the parser.
+   - All OCSF field names against `references/ocsf-schema-documentation.md`. Catalog parsers frequently use vendor-native names (`source_ip`, `dst_port`) where OCSF dotted paths (`src_endpoint.ip`, `dst_endpoint.port`) are required. Rewrite via `mappings.rename` or change the capture name directly.
+   - Stale tenant-specific attributes (e.g. hardcoded `site.id`).
+   - `class_uid` should be an integer, not a string.
+   - Bump `metadata.version`.
 2. **Is there a built-in parser?** Web access logs → `accessLog`. Pure JSON-per-line → `json` or `dottedJson`. Syslog → `systemLog`. Key=value pairs → `keyValue`. Heroku logplex → `heroku-logplex`. MySQL/Postgres → their dedicated parsers. CloudFront/ELB/S3/Redshift → AWS parsers. See `references/builtin-parsers.md`. If a built-in fits, recommend it and (optionally) just author an alias parser: `{ aliasTo: "json" }`.
 3. **Is the log JSON-per-line but with a vendor envelope?** Use one format that captures the envelope and applies `{parse=json}` (or `dottedJson`/`escapedJson`/`urlEncodedJson`/`base64EncodedJson`) on the embedded body. Add `discardAttributes: ["message"]` to save storage.
 4. **Is the whole line an OCSF/JSON blob you want flattened?** Use the gron-capture-then-mappings idiom: `format: "$unmapped.{parse=gron}$"` at the top, then rename/copy/cast everything in a `mappings` block. See `examples/08-gron-capture-template.json` and the `community/PARSER_TEMPLATE/` reference.
@@ -133,9 +235,10 @@ Apply in order — first match wins:
 6. **Is it CEF or LEEF?** Treat the header as a positional pipe-delimited line, then apply key/value catch-all to the extension. See `examples/01-cef-over-syslog.json`.
 7. **Is it positional / CSV / TSV?** Use `commaSeparatedValues` / `commaSeparatedvalues` or `pipeSeparatedValues` parse directives with `skipNumericConversion: true`, and name the columns in a `mappings` block by positional index (`attr[N]`). Palo Alto Networks Firewall in ai-siem is the canonical reference.
 8. **Does the source emit multiple distinct event shapes** (e.g. MySQL error vs MySQL general vs Postgres from one RDS stream)? Give each `format` an `id:` and fan mapping entries out with `predicate: "<id>='true'"`. See the AWS RDS marketplace parser.
-9. **Are events multi-line?** Add a `lineGroupers` block with `start` + one of `continueThrough` / `continuePast` / `haltBefore` / `haltWith`. Then write formats against the joined event. **Beware** `uploadLogs` newline splitting (see ingest-path gotchas).
-10. **Do you need to restructure to OCSF or another schema?** Use `mappings` (gron-style mappers). See `references/mappers.md` — note the two equivalent syntaxes (v1 singular / v0 marketplace).
-11. **None of the above?** Hand-write a line format. Look for stable delimiters and use named patterns when delimiters are insufficient (e.g., a timestamp containing spaces). Drop events you never want (`discard: true` on the format) rather than letting them fall through to a looser format.
+9. **Are events multi-line?** Add a `lineGroupers` block with `start` + one of `continueThrough` / `continuePast` / `haltBefore` / `haltWith`. Then write formats against the joined event. **Beware** `uploadLogs` newline splitting (see ingest-path gotchas). Canonical multi-line examples: `parsers/community/sql_database_logs-latest/` (Postgres SQL) and `parsers/sentinelone/marketplace-awsrdslogs-latest/` (RDS mysql/postgres mixed stream).
+10. **Is the source Windows Event Log XML?** Use the per-EventID sub-parser idiom from `parsers/community/microsoft_windows_eventlog-latest/`: a `lineGroupers` block joins multi-line XML, then one format per EventID (4624, 4625, 4720, 4728, 1102, etc.) extracts EventID-specific fields. Remember the `\\t` / `\\n` double-escape gotcha. Class fan-out: 4624/4625 → `class_uid: 3002` Authentication, 4720/4728 → `class_uid: 3001` Account Change, 1102 → `class_uid: 6004` Web Resources Activity (or whatever fits).
+11. **Do you need to restructure to OCSF or another schema?** Use `mappings` (gron-style mappers). See `references/mappers.md` for the two equivalent syntaxes (v1 singular / v0 marketplace). For new parsers prefer v1; only stay on v0 when extending an existing v0 parser. **Always look up dotted paths in `references/ocsf-schema-documentation.md` before emitting them.**
+12. **None of the above?** Hand-write a line format. Look for stable delimiters and use named patterns when delimiters are insufficient (e.g., a timestamp containing spaces). Drop events you never want (`discard: true` on the format) rather than letting them fall through to a looser format.
 
 ## Common gotchas (memorize)
 
@@ -151,6 +254,19 @@ Apply in order — first match wins:
 - **Regex alternation cannot wrap a `$...$` token.** `($a$|$b$)` is invalid. Use multiple line fragments instead.
 - **SDL regex engine does NOT support lookarounds.** `(?=...)`, `(?!...)`, `(?<=...)`, `(?<!...)` all fail silently. Use explicit token delimiters or split into multiple formats.
 - **`$pri{parse=syslogPriority}$` can cause silent event drops on some tenants.** If you suspect priority parsing is the culprit, capture the priority as a plain field (`$pri{regex=\\d+}$`) and skip the parse directive.
+- **Indexed positional access `attr[N]` only works in `mappings.version: 1`.** v0 mappings reject `attr[0]`/`attr[1]` syntax. If the source is positional CSV (Palo Alto Firewall is the canonical case), use v1. Reference: `parsers/sentinelone/marketplace-paloaltonetworksfirewall-latest/`.
+- **`{parse=gron}` flattens nested JSON to dotted keys, but the keys themselves contain dots.** A source `{"Resource": {"Id": 5}}` becomes the single flat field `unmapped.Resource.Id` (one key with two dots), not a nested object. To rename it use `from: "unmapped.Resource.Id"` (no escapes). To rename a whole subtree use `rename_tree: { from: "unmapped.Resource", to: "resource" }` and the engine walks the dotted-prefix subtree. Reference: `parsers/sentinelone/marketplace-cloudflare-latest/`.
+- **`attrBlacklist={field1,field2}` only filters subfields produced by a `{parse=...}` directive.** It does NOT filter top-level captured fields you named explicitly in the format string. To drop a top-level field use `discardAttributes: ["fieldname"]` at the parser root. Reference: `parsers/sentinelone/marketplace-fortinetfortigate-latest/`.
+- **`skipNumericConversion: true` is required when columns contain numeric strings you want preserved as strings.** Without it, `commaSeparatedvalues` and `pipeSeparatedValues` parse will coerce `"00123"` → `123` (loses leading zeros), `"0xDEADBEEF"` → `3735928559`, and `"1.0"` → `1`. Set `skipNumericConversion: true` on the format whenever any column is an opaque ID or a hex/octal string. Canonical: Palo Alto Firewall.
+- **`intermittentTimestamps: true` is the only fix for sources where only the first record on each second has a timestamp.** Common with MySQL general query log, AWS RDS, sometimes VPC flow logs. Without it, every line that lacks a timestamp gets the ingest timestamp, not the inferred one. Reference: `parsers/sentinelone/marketplace-awsvpcflowlogs-latest/` and `parsers/community/sql_database_logs-latest/`.
+- **`enum` cast in v1 mappings without `enum_default` leaves unmapped values UNCHANGED, not null.** If you want unknowns to map to a known sentinel, set `enum_default: <value>` on the cast. Cloudflare uses `enum_default: 99` ("Unknown") consistently — copy that pattern.
+- **`severity_id` is an integer 0–6 reserved by ingest, just like `severity`.** Setting `severity_id: 999` silently fails. Use `severity` for the normalized integer (preferred), `severity_name` for the OCSF label string. Do not emit BOTH `severity` and `severity_id` from the same parser.
+- **Rewrites run during format parsing; mappings run after all formats.** A field renamed in `mappings.rename` cannot be referenced by a `rewrites:` block on a later format on the same line because `rewrites:` runs per-format during capture. If you need a derived field from a renamed one, do the derivation inside `mappings` (use `copy` then `cast`, or `replace`).
+- **Mixing `mappings.version: 0` and `mappings.version: 1` syntax in the same block is a hard error.** The engine rejects with "expected list got object" or "unsupported event mapper version -1". Pick one version per parser and stick to it.
+- **Windows Event Log XML payloads ship with double-escaped tabs/newlines.** A parser for Windows EventLog in the catalog (`parsers/community/microsoft_windows_eventlog-latest/`) deals with `\\t` and `\\n` literals embedded inside XML strings; capturing them needs `\\\\t` / `\\\\n` (four backslashes) at the augmented-JSON layer.
+- **Some catalog parsers ship without `dataSource.category` at all (~33% of community).** When you copy from `Sentinel-One/ai-siem`, audit the top-level `attributes:` block. If `dataSource.category` is missing, add it as `"security"`. If present with another value, change it to `"security"`. Same audit for `dataSource.name` and `dataSource.vendor`.
+- **`$_=identifier$=$_=quoteOrSpace$` repeating idiom requires `repeat: true` AND a leading anchor.** Without an explicit anchor, the format will match starting at the first `=` it finds and miss earlier pairs. The common pattern is to capture the static prefix in a sibling format (with `halt: false`), then let the repeating format walk the rest.
+- **Conditional class assignment (one parser, multiple OCSF classes) is best done by stamping `class_uid`/`class_name` on each `format`'s `attributes:` block, not on the parser root.** The root attributes are baseline; per-format attributes override. Reference for fan-out via format-id sentinel + mapping predicates: `parsers/sentinelone/marketplace-awsrdslogs-latest/`.
 
 ### Ingest-path gotchas (discovered empirically via live validation)
 

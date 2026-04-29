@@ -2,6 +2,12 @@
 
 Complete data payloads for every action type in SentinelOne Hyperautomation.
 
+> **See also**: `building-blocks-catalog.md`, same atoms, organized by *when to reach for
+> them*, with composite patterns (success/fail branch, pagination loop, hash enrichment),
+> end-to-end SOAR recipes, and anti-patterns. Mined from 643 active production workflows.
+> Use this file (`building-blocks.md`) for the field-by-field schema; use the catalog when
+> you need to *compose* a workflow.
+
 ---
 
 ## TRIGGERS
@@ -123,9 +129,14 @@ Reference incoming data: `{{http-trigger.body.someField}}`
           "operator": "and",
           "conditions": [
             {
+              "input_value": "severity",
+              "compared_value": "[\"HIGH\",\"CRITICAL\"]",
+              "comparison_operator": "in"
+            },
+            {
               "input_value": "detectionSource.product",
-              "compared_value": "EDR",
-              "comparison_operator": "equals"
+              "compared_value": "[\"EDR\"]",
+              "comparison_operator": "in"
             }
           ]
         },
@@ -138,6 +149,14 @@ Reference incoming data: `{{http-trigger.body.someField}}`
   }
 }
 ```
+
+`event_type` options (count in active corpus): `"alert"` (406), `"misconfiguration"` (15),
+`"vulnerability"` (10), `"activity"` (3).
+`event_subtypes` options: `"CREATE"` (434), `"UPDATE"` (26).
+
+> **`compared_value` format trap**: when `comparison_operator` is `"in"`, `compared_value` must
+> be a **JSON-encoded string of an array** (e.g. `"[\"HIGH\",\"CRITICAL\"]"`), not a raw JSON
+> array. Every active production flow uses this string-encoded format.
 Common trigger data references:
 - `{{singularity-response-trigger.data.id}}` — alert ID
 - `{{singularity-response-trigger.data.name}}` — alert name
@@ -181,20 +200,31 @@ Reference: `{{email-trigger.body}}`, `{{email-trigger.subject}}`
       {
         "name": "myVar",
         "value": "someValue or {{expression}}",
+        "should_use_as_output": false,
         "is_secret": false
       },
       {
         "name": "emptyArray",
         "value": "[]",
+        "should_use_as_output": false,
         "is_secret": false
       }
     ],
-    "variables_scope": "local"
+    "variables_scope": "local",
+    "expire_in_unit": null,
+    "expire_in_value": null,
+    "expire_method": null,
+    "workflows_acl": null
   }
 }
 ```
 `variables_scope`: `"local"` (default) or `"global"`
 Reference: `{{local_var.myVar}}` or `{{global_var.myVar}}`
+`should_use_as_output: true` exposes the variable as a workflow-level output (visible in the
+execution detail and consumable by parent workflows).
+`is_secret: true` redacts the value from the UI / execution logs (useful for tokens).
+`expire_in_unit` / `expire_in_value` / `expire_method` are only used for global variables that
+should TTL out; leave null for local.
 
 > **HARD RULE — one variable per action when referencing other local variables**
 >
@@ -319,8 +349,16 @@ See workflow-schema.md for simple vs. multi style details.
   }
 }
 ```
-Operators: `"equals"`, `"not_equals"`, `"contains"`, `"not_contains"`, `"greater_than"`,
-`"greater_than_or_equals"`, `"less_than"`, `"less_than_or_equals"`, `"in"`, `"is_empty"`, `"is_not_empty"`
+Operators (with usage counts in active corpus):
+`"equals"` (1,105), `"not_equals"` (271), `"greater_than_or_equals"` (194), `"greater_than"`
+(168), `"contains"` (34), `"in"` (1), `"less_than_or_equals"` (1), `"less_than"` (1).
+Also valid but unused in corpus: `"not_contains"`, `"is_empty"`, `"is_not_empty"`.
+
+> **`condition_type` is universally `"multi"`** in active flows (1,697 of 1,697). Always emit
+> multi, even for a single comparison.
+
+> **For `comparison_operator: "in"`**, encode `compared_value` as a JSON string of an array
+> (e.g. `"[\"HIGH\",\"CRITICAL\"]"`), not a raw array.
 
 ### Delay
 ```json
@@ -370,8 +408,32 @@ Must have `"parent_action": <loop_export_id>`. `"connected_to": []`.
   }
 }
 ```
-`mime_type`: `"text/plain"` or `"text/html"`
-For attachments: `"attachments": [{"name": "file.zip", "content": "{{Function.COMPRESS(...)}}"}]`
+`mime_type`: `"text/plain"` or `"text/html"`. HTML is more common in active flows (analyst-
+friendly tables, embedded SentinelOne logo banner).
+For attachments: `"attachments": [{"name": "file.zip", "content": "{{Function.COMPRESS(...)}}"}]`.
+99% of active flows send to a single recipient. `to` and friends are arrays of strings; each
+element can be a literal or a `{{...}}` expression.
+
+### Data Formation
+```json
+{
+  "type": "data_formation",
+  "tag": "core_action",
+  "data": {
+    "name": "Generate UUID",
+    "action_type": "data_formation",
+    "data": {
+      "uuid": "{{Function.SUBSTRING(Function.GENERATE_UUID4(), 6)}}"
+    }
+  }
+}
+```
+Builds a structured object on the fly without paying for a Variable action. `data` is an
+object whose values can be literals or `{{...}}` expressions; reference downstream as
+`{{generate-uuid.data.uuid}}`. Real corpus uses include: building Slack channel-config dicts,
+shaping note bodies, normalizing event objects before SDL ingest. **75 of 249 data_formation
+actions in the corpus are exactly the "Generate UUID" template above**, copy it verbatim
+when you need a correlation ID.
 
 ### HTTP Request (core — no integration)
 ```json
@@ -393,23 +455,36 @@ For attachments: `"attachments": [{"name": "file.zip", "content": "{{Function.CO
     "payload": null,
     "parameters": [],
     "retry_on_status_code": null,
-    "retry_on_status_codes": [],
+    "retry_on_status_codes": [500],
     "ssl_verification": true,
     "timeout": 30,
     "headers": { "Content-Type": "application/json" },
-    "use_authentication_data": true,
+    "use_authentication_data": false,
     "use_proxy": false,
     "proxy_user": null,
     "proxy_password": null,
     "proxy_host": null,
     "proxy_port": null,
     "redirect_follow": true,
-    "continue_on_fail": false
+    "continue_on_fail": false,
+    "body_type": null
   }
 }
 ```
-`method`: `"get"`, `"post"`, `"put"`, `"patch"`, `"delete"`
-Reference response: `{{action-slug.body}}`, `{{action-slug.status_code}}`
+`method` (count in active corpus): `"post"` (1,962), `"get"` (664), `"put"` (55),
+`"delete"` (13), `"patch"` (5).
+Reference response: `{{action-slug.body}}`, `{{action-slug.status_code}}`,
+`{{action-slug.headers}}`.
+
+**Defaults observed in the active corpus** (cargo-cult these unless you have a reason not to):
+
+- `retry_on_status_codes: [500]`: cheap insurance against transient backend hiccups.
+- `timeout: 30` (seconds).
+- `ssl_verification: true`.
+- `redirect_follow: true`.
+- `continue_on_fail: false`: let the workflow fail loudly on a bad call.
+- `body_type: null` (raw payload string). Set to `"form"`/`"multipart"` if the upstream
+  requires `application/x-www-form-urlencoded` or `multipart/form-data`.
 
 ### HTTP Request (integration-backed)
 Same as above but:
@@ -449,18 +524,19 @@ Snippets are reusable groups of actions. Connect using `custom_handle: "inner"`.
   "type": "create_interaction",
   "tag": "core_action",
   "data": {
-    "name": "Create Interaction",
+    "name": "Create Wait on User Creation",
     "action_type": "create_interaction",
-    "interactions": [
-      { "label": "1 hour", "value": "1 hour" },
-      { "label": "4 hours", "value": "4 hours" },
-      { "label": "24 hours", "value": "24 hours" }
-    ]
+    "interaction_type": "choice",
+    "options": ["user-creation"],
+    "form_schema": null
   }
 }
 ```
-Reference interaction URLs: `{{create-interaction.interaction_url.1 hour}}`
-Reference interaction ID: `{{create-interaction.interaction_id}}`
+`interaction_type: "choice"` is the only flavor seen in active flows. `options` is the array
+of button labels presented to the analyst in the Hyperautomation console; `form_schema` (when
+non-null) defines a structured form for free-text/multi-field input.
+Reference interaction URLs: `{{create-interaction.interaction_url.<option-name>}}`.
+Reference interaction ID: `{{create-interaction.interaction_id}}`.
 
 ### Wait for Interaction
 ```json
@@ -468,14 +544,20 @@ Reference interaction ID: `{{create-interaction.interaction_id}}`
   "type": "wait_for_interaction",
   "tag": "core_action",
   "data": {
-    "name": "Wait for Interaction",
+    "name": "Wait For Interaction",
     "action_type": "wait_for_interaction",
-    "interaction_id": "{{create-interaction.interaction_id}}",
+    "identifier": "{{create-wait-on-user-creation.interaction_id}}",
     "time_unit": "hours",
-    "value": 24
+    "time_value": 1,
+    "expected_respondents": 1,
+    "response_targets": null,
+    "authentication_type": null
   }
 }
 ```
+**Field name trap**: this action uses `identifier` (not `interaction_id`) and `time_value`
+(not `value`). Earlier docs got this wrong; the corpus is unambiguous.
+`expected_respondents: N` blocks until N analysts have responded; default to 1.
 
 ### Wait for Slack
 ```json

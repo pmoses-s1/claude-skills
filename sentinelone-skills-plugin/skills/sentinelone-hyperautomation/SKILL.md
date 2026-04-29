@@ -91,9 +91,34 @@ token — see `references/api-integration.md` for the reason.
 |------|-------------|
 | `references/workflow-schema.md` | Always when generating JSON — defines the envelope and action structure |
 | `references/building-blocks.md` | Need the exact shape of a specific action type (trigger, loop, condition, etc.) |
+| `references/building-blocks-catalog.md` | **Picking what to use** for a given step / composing multi-action idioms / bootstrapping a SOAR recipe. Mined from 643 active production workflows. Read FIRST when designing a new workflow. |
 | `references/functions-reference.md` | Using `{{Function.X()}}` syntax or PowerQuery patterns |
 | `references/validation-rules.md` | Before outputting any workflow — run the checklist |
 | `references/api-integration.md` | User wants to import/export/submit to a live console |
+
+## Decision guide: pick the right pattern by use case
+
+The catalog (`references/building-blocks-catalog.md`) names every reusable block. Use this
+table to jump straight to the right starting point:
+
+| User says... | Start with | Composite patterns to layer on |
+|--------------|-----------|--------------------------------|
+| "When an alert fires, do X" | A1 (Singularity Response Trigger) + recipe C1 | B1 safe-field DEFAULT chain, B2 success/fail branch, B6 add-note |
+| "Every day / every N hours, do X" | A3 (Scheduled Trigger) + recipe C2 | B7 SDL ingest, B9 IOC create, B5 JQ shaping |
+| "When a webhook hits, do X" | A4 (HTTP Trigger) + recipe C3 | B2 status-code branch, B11 Slack ack |
+| "Let an analyst kick this off with parameters" | A2 dynamic Manual Trigger + recipe C4 | B5 JQ shaping, B4 APPEND accumulator |
+| "Wait for analyst approval before remediating" | recipe C5 (Slack approval) | B11 Slack interactive, B6 add-note |
+| "Periodic posture / UEBA report" | A3 + recipe C6 | B8 PowerQuery, B7 SDL ingest |
+| "Page through a paginated API" | B3 (cursor + break_loop) | B4 APPEND accumulator |
+| "Summarize this evidence with an LLM" | B12 (OpenAI) | B6 add-note |
+| "Create a Threat Intelligence indicator" | B9 (TI IOC create) | B4 accumulator inside loop |
+| "Add a note on the alert" | B6 (UAM GraphQL addAlertNote) | always wrap text in `Function.HTML_ENCODE` |
+
+When in doubt, the load-bearing 17 atoms are:
+`http_request`, `variable`, `condition`, `loop`, `singularity_response_trigger`,
+`data_formation`, `send_email`, `snippet`, `break_loop`, `manual_trigger`, `wait_for_slack`,
+`delay`, `http_trigger`, `scheduled_trigger`, `create_interaction`, `wait_for_interaction`,
+`email_trigger`. Anything outside this set is exotic; confirm it exists before generating.
 
 ## Example workflows (in references/examples/)
 Annotated real examples to use as structural references:
@@ -133,6 +158,17 @@ Use this when the workflow contains integration-backed actions:
 
 - ❌ Defining multiple variables in a single Variable action when one references another — they evaluate simultaneously and will fail with "variable not found"
   ✅ Always use one Variable action per variable when chaining references. One var → one action, always.
+- ❌ Forgetting `Function.HTML_ENCODE` on note text passed to UAM GraphQL. Any quote, ampersand, or angle bracket breaks the mutation string.
+  ✅ Always wrap: `\\\"{{Function.HTML_ENCODE(local_var.note)}}\\\"`.
+- ❌ Encoding `compared_value` for `comparison_operator: "in"` as a raw JSON array.
+  ✅ JSON-string-encode it: `"[\"HIGH\",\"CRITICAL\"]"`.
+- ❌ `condition_type: "simple"`: never used in active corpus. Always emit `"multi"`.
+- ❌ `wait_for_interaction` using `interaction_id` / `value` field names (older docs).
+  ✅ Real fields are `identifier` / `time_value`.
+- ❌ Hard-coding site IDs in TI IOC creates: breaks on tenant transfer.
+  ✅ Pull from a Variable, Manual Trigger param, or `singularity-response-trigger.data.scopeId`.
+- ❌ Importing with a Service User token: workflows become invisible to humans in the UI.
+  ✅ Always use a personal Console User API token for `S1_CONSOLE_API_TOKEN`.
 
 
 ## Sandbox proxy blocked? Use Desktop Commander

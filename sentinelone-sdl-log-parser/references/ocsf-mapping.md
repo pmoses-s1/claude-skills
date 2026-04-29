@@ -4,6 +4,14 @@ The Open Cybersecurity Schema Framework (OCSF) is the schema this skill emits **
 
 **Why default to OCSF:** Downstream PowerQuery hunts, dashboards, STAR rules, and Marketplace integrations all assume OCSF. Vendor-native names force every consumer to learn each source format and break portability across vendors.
 
+> ## NON-NEGOTIABLE: ALL OCSF mapping uses `ocsf-schema-documentation.md`
+>
+> Before emitting any OCSF dotted path in a parser, **grep `references/ocsf-schema-documentation.md` for the exact string**. That file is the single source of truth for the ~25,759 documented OCSF field names. Do not invent. Do not copy from a catalog parser without verifying. Do not rely on memory or on the tables in this document — they are summaries for common cases, not the catalog.
+>
+> The two reasons people drift from this rule:
+> 1. "I'm sure it's `source.ip`." It is not. It is `src_endpoint.ip`. Many vendors use `source.ip` natively. OCSF does not. Always grep.
+> 2. "The catalog parser uses `attacker_ip`, so I'll keep it." Catalog parsers are full of vendor-native names. Replace them with the OCSF dotted path from the schema reference, then map via `mappings.rename`.
+
 ## Authoritative field list — `ocsf-schema-documentation.md`
 
 Before inventing any OCSF field name, look it up in `references/ocsf-schema-documentation.md`. That file is the complete SentinelOne community-documented OCSF schema (7 categories × 96 articles × ~25,759 field entries) and is the canonical source of truth for field names and casing:

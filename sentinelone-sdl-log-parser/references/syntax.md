@@ -131,7 +131,7 @@ Constant key/value pairs attached to every matching event. Can live at the top l
 
 A format's `attributes:` block **overrides** the top-level attributes for events that match that format. This is the idiomatic way to produce multiple OCSF classes from one parser (e.g., Abnormal Security's parser emits `class_uid: 2001` for email events and `class_uid: 3002` for authentication events from the same parser) — set the common attributes at top level, then let each format override `class_uid`, `activity_id`, `severity_id`, and `activity_name`.
 
-The four required default attributes (`metadata.version`, `dataSource.category/name/vendor`) should live at the top level, not per-format. OCSF subtype fields (`activity_id`, `activity_name`, per-subtype `severity_id`) should live per-format.
+The 4 mandatory attributes (`dataSource.category` hardcoded to `"security"`, `dataSource.name`, `dataSource.vendor`, `metadata.version`) should live at the parser-root `attributes:` block, not per-format. OCSF subtype fields (`activity_id`, `activity_name`, per-subtype `severity_id`) should live per-format. Per-format `attributes:` override parser-root `attributes:`, which is the mechanism for one parser fanning out to multiple OCSF classes (e.g. Windows Event 4624 → Authentication, 4720 → Account Change). `metadata.version` may also be overridden per-event from inside a `mappings.constant` op when the source carries its own schema version.
 
 ### `class_uid` string vs integer
 

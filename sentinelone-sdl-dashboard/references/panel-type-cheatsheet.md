@@ -11,7 +11,7 @@
 | `number` | Gauge | PowerQuery | — | Single numeric value; supports `options.suffix`, `options.format` |
 | `honeycomb` | Heatmap | PowerQuery | — | Needs text + numeric columns; use `columns` to alias names |
 | `distribution` | Distribution | filter + facet field | value buckets | Uses `filter` + `facet` (not `query`); good for port/size distributions |
-| `markdown` | Text | — | — | GitHub-flavored markdown; use `content` field |
+| `markdown` | Text | — | — | GitHub-flavored markdown; use `markdown:` field (NOT `content:`, which renders blank) |
 
 ## Key gotchas
 

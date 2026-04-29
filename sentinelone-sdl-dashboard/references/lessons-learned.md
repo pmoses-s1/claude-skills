@@ -1,0 +1,347 @@
+# SDL Dashboard Skill: Lessons Learned (Source-Agnostic)
+
+This file captures patterns and gotchas discovered while building multi-tab SDL dashboards against real third-party data sources. It is intentionally written source-agnostic: every section refers to generic data-source / field / category / action concepts, not to any specific vendor or tenant.
+
+The companion documents in this directory are tactical (cheatsheets, copy-paste queries, full examples). This file is strategic: when one of these patterns surfaces in an engagement, treat it as a hard rule, not a suggestion.
+
+---
+
+## 1. Pre-authoring is non-negotiable
+
+### 1.1 Always run live data-source enumeration before authoring any panel
+
+Different tenants have different data sources connected; even between sessions on the same tenant, the catalogue can drift. Never start a dashboard from a remembered list of `dataSource.name` values. Re-enumerate every session:
+
+```
+| group UniqueDataSourceNames = array_agg_distinct(dataSource.name)
+| limit 1000
+```
+
+If the source the dashboard is meant to cover does not appear, the dashboard cannot work. Stop and surface this. Do not silently switch to a different source.
+
+### 1.2 PowerQuery cannot discover a source's schema by itself
+
+`| limit N` against a parser-emitted source returns only `timestamp + message`. PowerQuery has no `| columns *` or wildcard projection. To enumerate the actual queryable attributes a parser emits for a source, use the V1 query endpoint (`/api/query`, returns full event JSON) via the SDL client. Force-clear the scoped keys so auth falls through to the console JWT:
+
+```python
+c.keys["log_read_key"]    = ""
+c.keys["config_read_key"] = ""
+c.keys["config_write_key"] = ""
+c.keys["log_write_key"]   = ""
+
+res = c.query(filter=f"dataSource.name=='{source}'", max_count=50, start_time="7d")
+attrs = sorted({k for m in res["matches"] for k in (m.get("attributes") or {}).keys()})
+```
+
+### 1.3 Top-level parsed fields can be empty even when the data exists in `raw_data`
+
+Parsers vary in what they extract to the top-level OCSF / `unmapped.*` columns. A field plainly visible inside `raw_data` (the JSON envelope) may not be queryable as a structured column. Always probe a single sample event with the V1 query to confirm a field is queryable before authoring panels around it. The schema dump and the raw event are both ground truth, neither alone is sufficient.
+
+If a field is only present in `raw_data`, it can still be filtered via full-text predicate but cannot be grouped or aggregated efficiently. See section 4 for the cost / availability tradeoff.
+
+### 1.4 Discriminator fields are often hidden one level deep
+
+A single `event.type` value frequently bundles multiple distinct event kinds (delivery-time vs click-time, scheduled vs on-demand, inbound vs outbound). The discriminator field, often `creationMethod`, `messageType`, `triggerType`, etc., is what the parser uses internally and may or may not be promoted to the top level. Always identify and validate the discriminator before counting events. Counting "events of type X" without splitting by discriminator gives a number that conflates two semantically different things.
+
+---
+
+## 2. PowerQuery feature gaps to design around
+
+The patterns below produce HTTP 500 errors during dashboard authoring. They appear syntactically valid in language references but are not supported in current SDL builds. Avoid them in panel queries; treat them as red flags during code review. `scripts/panel_safety_check.py` scans for these automatically.
+
+| Pattern | Failure mode |
+|---|---|
+| `\| let x = if(predicate, then, else)` followed by aggregation on `x` | 500 server error |
+| `count_if(predicate)` and `countif(predicate)` aggregate functions | 500 server error |
+| `sum(if(predicate, value, 0))` inside `\| group ... by ...` | 500 server error |
+| `concat(field_a, ' literal ', field_b)` in `\| let` bindings | 500 server error |
+| `\| union (subquery)` to add synthetic rows or merge two pipelines | 500 server error |
+| `let totals = (... \| group ...)` named subquery before main pipeline | 500 server error |
+| `\| parse <field> /<regex>/` with named captures and grouping in same query | 500 server error |
+| `\| matches '<regex>'` with `\\s` / `\\d` escapes inside the regex literal | 500 server error |
+| Anything after `\| transpose` (terminal command) | "transpose can only be used as the last command" |
+| `graphStyle: "area"` panel with a `query` field (not `plots: [...]`) | Indefinite spinner, no error surfaced |
+| Hyphenated arithmetic: `total-min`, `max-min` without spaces | "Identifier is ambiguous" error |
+| `markdown` panel with `content:` field instead of `markdown:` | Renders blank tile, no error |
+
+### Patterns that DO work and should be preferred
+
+| Pattern | Use case |
+|---|---|
+| `\| group n=count() \| limit 1` | Number panel |
+| `\| group n=estimate_distinct(<field>) \| limit 1` | Cardinality number panel (HyperLogLog, fast) |
+| `\| group <metric>=count() by <key1>, <key2> \| sort -<metric> \| limit N` | Top-N table |
+| `\| group <metric>=count() by timestamp=timebucket('<window>'), <dim> \| transpose <dim> on timestamp` | Time-series stacked-bar / line |
+| `\| group <metric>=count() by <a>, <b> \| transpose <b> on <a>` | Cross-tab / per-category × action stacked-bar |
+| Long-format table: `\| group hits=count() by <category>, <action> \| sort <category>, -hits \| limit N` | When you need both dims as columns and a wide table can't be produced |
+| Index-level filter (before the first pipe) | Narrow scan to relevant events; cheaper than a post-pipe `\| filter` |
+| `\| filter <field> matches '<simple-regex>'` for selective dim filtering | Works with simple character classes; avoid `\\s` / `\\d` escapes |
+
+### Workaround for "I need totals AND breakdown in one panel"
+
+When `sum(if())`, `count_if()`, and `union` all fail, the cleanest substitute is two adjacent panels: one for the totals, one for the per-action breakdown (long-format). Lay them side-by-side at half-width so they read as a single visual unit. Trying to force a single wide table with both columns generally requires one of the unsupported patterns above.
+
+---
+
+## 3. Empty results are valid evidence (but distinguish from query errors)
+
+A query that runs successfully and returns 0 rows is a real datapoint, not a bug. Examples:
+
+- A "policy violations blocked" panel returning 0 because the policy is in monitor-only mode.
+- A "malicious URL delivered" panel returning 0 because the engine hard-blocks at a different layer.
+- A "compromised account auth" panel returning 0 because no compromise occurred this window.
+
+Rules:
+
+1. Never silently switch the query to make a panel "have data." If 0 is correct, surface it.
+2. Distinguish 0-row from 0-matchCount. A successful query with `matchCount > 0` and `rowCount = 0` means the post-pipe steps eliminated everything (often a `| filter` after `| group`). A query with `matchCount = 0` means no events matched at all. Both are valid; the former hints at refining the filter, the latter at validating coverage.
+3. In dashboards, a panel that may legitimately be 0 should have a markdown header that explains the SOC-positive interpretation. Otherwise the analyst reads "blank panel = broken dashboard."
+4. In the evidence report, every empty panel must include the underlying matchCount so the reader can tell whether the source has data at all.
+
+---
+
+## 4. Full-text predicate cost (when to use raw_data string matching)
+
+When a field needed for the panel is buried inside `raw_data` (JSON envelope) rather than parsed to a structured column, the only way to filter on it is a full-text predicate against `raw_data`. Example pattern:
+
+```
+dataSource.name='<source>' event.type='<type>' '<json-snippet>'
+```
+
+The bare-string token is interpreted as a literal substring search across `raw_data`. This works, but the cost is significant.
+
+### Cost characteristics
+
+- Full-text scan reads every event in the time window before applying the predicate. Cost is proportional to total events scanned, not to the matched subset.
+- Combined with `| group` over high-cardinality dimensions, full-text predicates frequently exceed the 60s MCP timeout. The same query in the SDL UI may run, but in dashboards it is risky.
+- Combined with `| group ... by timestamp=timebucket(...) | transpose` (timeline patterns), full-text predicates almost always time out because the engine has to scan, predicate-test, bucket, group, and transpose.
+
+### Safe full-text patterns
+
+| Use | Example | Why it works |
+|---|---|---|
+| Number panel: simple count | `<source-filter> '<token>' \| group n=count() \| limit 1` | One row, no grouping; fast even at 100k+ events |
+| Number panel: count with structured co-filter | `<source-filter> '<token>' <field>='<value>' \| group n=count() \| limit 1` | Co-filter narrows scan first |
+| Table panel: top-N with restrictive co-filter | `<source-filter> '<token>' <selective-field>='<value>' \| group ... by ... \| sort \| limit 25` | Working set is small after co-filter |
+
+### Risky full-text patterns
+
+| Use | Why it fails |
+|---|---|
+| Stacked-bar timeline with full-text + transpose | Scan + bucket + group + transpose under full-text → timeout |
+| Top-N grouping over the whole source under full-text | High-cardinality grouping under full-text → timeout |
+| Multiple full-text tokens combined | Each token is a separate scan; cost compounds |
+
+### Design rule
+
+If a panel needs a discriminator that lives in `raw_data` only, lobby the parser team to promote it to a top-level structured field. Until then, design the panel to use full-text only where the cost is acceptable (number panels, selective tables) and replace timeline / heavy-grouping panels with structured-field equivalents.
+
+---
+
+## 5. Panel naming hygiene: labels must reflect what is counted
+
+The single most common cause of misleading dashboards is a panel title that overstates what the underlying query measures.
+
+| Wrong title | Why it's wrong | Correct title |
+|---|---|---|
+| "URL clicks" | Counts both clicks and delivery-time scans | "URL events (clicks + scans)" |
+| "Phishing emails clicked" | Counts events that include a click discriminator AND those that don't | "Phishing-classified emails (events)" |
+| "Allowed malicious URLs" | Counts the rewriting policy disposition, not the user's actual click | "Malicious URL events delivered (warn)" |
+| "Distinct users compromised" | Counts users associated with a detection, not confirmed-compromise users | "Distinct users with detected events" |
+
+Rule: the panel title should be readable as an SLA / report claim. If a CISO would feel misled reading the title without the query, rename the panel.
+
+When two semantically distinct event populations exist within the same `event.type` (delivery-time vs click-time, scheduled vs on-demand), build separate sections of the dashboard for each population, with markdown headers that explain the split. A single section that mixes both populations is almost always wrong.
+
+---
+
+## 6. Cross-source disambiguation: `event.type` is not always the right key
+
+A single source can emit multiple log subtypes under the same `event.type` (policy events vs detection events, header logs vs body logs). Don't assume `event.type` partitions the source cleanly. Run a quick exploration query:
+
+```
+dataSource.name='<source>'
+| group hits=count() by event.type, <secondary-discriminator>
+| sort -hits
+| limit 50
+```
+
+If the same `event.type` row repeats with different secondary-discriminator values, that secondary field is part of the partition key. Panels should filter on both.
+
+---
+
+## 7. Validation runner pattern (mandatory for every dashboard)
+
+Every dashboard delivered comes with an evidence report that replays each panel's query against live data and captures the result. The skill's `scripts/validate_dashboard.py` automates this; the shape it implements is below.
+
+### 7.1 Runner anatomy
+
+```python
+panels = []
+for tab in dashboard["tabs"]:
+    for g in tab["graphs"]:
+        if g.get("graphStyle") != "markdown" and "query" in g:
+            panels.append({"tab": tab["tabName"], "title": g["title"], "style": g["graphStyle"], "query": g["query"]})
+
+c = SDLClient()
+c.keys["log_read_key"] = ""
+c.keys["config_read_key"] = ""
+c.keys["config_write_key"] = ""
+c.keys["log_write_key"] = ""
+
+results = {}
+for p in panels:
+    t0 = time.time()
+    try:
+        r = c.power_query(query=p["query"], start_time=start_iso, end_time=end_iso)
+        results[key] = {
+            "ok": True,
+            "elapsed_s": round(time.time() - t0, 2),
+            "row_count": len(r.get("values") or []),
+            "columns":   [c.get("name") for c in (r.get("columns") or [])],
+            "sample_rows": (r.get("values") or [])[:3],
+            "matchCount": (r.get("data") or {}).get("matchCount") or r.get("matchingEvents"),
+        }
+    except Exception as e:
+        results[key] = {"ok": False, "error": str(e)[:300], "elapsed_s": round(time.time()-t0, 2)}
+    json.dump(results, open(out_path, "w"), indent=2)  # persist after each panel for resumability
+```
+
+### 7.2 Run in batches
+
+Each panel takes 1 to 4 seconds typical. Batch into chunks of about 10 per shell invocation if shell timeouts are tight. The runner is idempotent (skip keys already in `results`) so it resumes cleanly.
+
+### 7.3 Per-panel evidence captured
+
+For each panel, record:
+- `ok`: did the query execute?
+- `elapsed_s`: wall-clock time
+- `row_count`: number of result rows
+- `columns`: column names from the response (validates the panel-type expectation)
+- `sample_rows`: first 3 rows verbatim (this is the log evidence)
+- `matchCount`: events scanned before grouping (distinguishes "no data" from "filtered out")
+- `error` (if failed): first 300 chars of the exception message
+
+### 7.4 Verdict per style
+
+| Panel style | Pass condition |
+|---|---|
+| `number` | `row_count == 1` and `len(columns) == 1`; OR `row_count == 0` (acknowledged empty) |
+| `donut` / `pie` | `row_count >= 1` and `len(columns) >= 2` (text + numeric); OR `row_count == 0` |
+| `stacked_bar` / `bar` / `line` / `area` | `row_count >= 1` and `len(columns) >= 2`; OR `row_count == 0` |
+| `table` | Always passes if `ok=True`; sample rows captured |
+
+### 7.5 Render the evidence report
+
+The runner output (a JSON keyed on `tab::title`) feeds two artefacts:
+
+1. A markdown evidence file for inline review and version control.
+2. A PDF report for distribution. Each panel section contains: title, metadata (style / exec / rows / matchCount), verdict, the exact PowerQuery body, and either a sample-data table (first 3 rows of N) or a clear amber callout *"NO LOG EVIDENCE in window"* when `row_count == 0 AND matchCount == 0`.
+
+The PDF must include an Appendix that lists every empty-result panel with its SOC-meaningful interpretation. A panel returning 0 rows without explanation is indistinguishable to the reader from a broken panel.
+
+---
+
+## 8. Deployment safety
+
+### 8.1 Always read existing version before put_file
+
+```python
+existing = c.get_file(path)
+res = c.put_file(path=path, content=body, expected_version=existing["version"])
+```
+
+The `expected_version` argument is a CAS guard against concurrent writes from the SDL UI or another script.
+
+### 8.2 Verify deployment by re-fetching
+
+```python
+verify = c.get_file(path)
+deployed_content = verify.get("content", "")
+assert verify.get("version") != cur_version, "version did not bump"
+assert "<canary-string-from-new-section>" in deployed_content, "deploy did not include new content"
+```
+
+A `put_file` response of `{"status": "success"}` does not guarantee the new content was written. Always re-fetch and grep for a known canary string from the change.
+
+### 8.3 Avoid duplicate dashboard paths
+
+The SDL UI's Save button writes to `/dashboards/id/<dashboardId>/<name>`. The file API can write to either that path OR the simpler `/dashboards/<name>`. Pick one canonical path before the first deploy and never mix. Each deploy to the alternate path creates a silent duplicate alongside the UI-saved copy. Recommend `/dashboards/<name>` for hand-authored dashboards and `/dashboards/id/<id>/<name>` only for files originally saved through the UI.
+
+### 8.4 Layout coordinates accumulate
+
+Panels are placed by `layout: {w, h, x, y}`. When appending a new section to an existing dashboard, compute the next `y` as `max(existing_y + existing_h)` across the tab, not by visual estimation. Off-by-a-few errors stack panels on top of each other and the UI will not flag this as an error.
+
+### 8.5 Test panels in the SDL UI before declaring done
+
+The SDL dashboard render engine has a longer query budget than the PowerQuery MCP. A query that times out in MCP validation may still render in the UI. Conversely, a query that returns from MCP may render slowly in the UI. The final smoke test for every dashboard is: open it in the UI, watch each tab load, confirm no panel spins indefinitely.
+
+---
+
+## 9. Discovery → author → validate → deploy workflow
+
+The end-to-end engagement shape that produces clean deliverables:
+
+1. Load every relevant skill upfront (`sentinelone-sdl-dashboard`, `sentinelone-powerquery`, `sentinelone-sdl-api`, plus `pdf` / `docx` for deliverables). Loading mid-task wastes turns.
+2. Session init in parallel: data-source enumeration query + alert / asset triage queries + `get_timestamp_range` in a single tool-call batch.
+3. Schema discovery for the target source. V1 query, dump fields to JSON, persist for the session.
+4. Identify discriminator fields. Run `group by event.type, <candidate-discriminator>` to confirm cardinality and partition behaviour.
+5. Author panel queries one at a time and validate each in isolation before committing them to the dashboard JSON. PQ-MCP timeouts at 60 seconds; SDL UI typically renders longer; choose the validation method per panel risk.
+6. Build the dashboard JSON with explicit `layout` coordinates, markdown headers explaining each section, and a clear naming convention (events vs activities, delivery vs runtime, etc.).
+7. Run `scripts/panel_safety_check.py` and resolve every flag.
+8. Deploy via `put_file` with `expected_version`, then re-fetch and grep for canaries.
+9. Run `scripts/validate_dashboard.py` and persist per-panel evidence to JSON + markdown.
+10. Render `scripts/render_validation_pdf.py`. The PDF goes to leadership; the markdown stays in the project repo.
+11. Document new gotchas back into this file. Each engagement should leave the skill better than it found it.
+
+---
+
+## 10. Open improvements for the dashboard skill
+
+Items already shipped:
+
+- A reusable `scripts/validate_dashboard.py` helper that takes a dashboard JSON path and emits a per-panel validation JSON + a markdown evidence file.
+- A reusable `scripts/render_validation_pdf.py` helper that takes the validation JSON and emits a PDF with cover page, per-tab sections, sample-data tables, and an Appendix for empty-result panels.
+- A `scripts/panel_safety_check.py` pre-flight checker that scans a dashboard JSON for known-bad patterns and warns before deploy.
+
+Items still open:
+
+- A "discriminator validation" recipe in the skill's reference docs (how to identify when one `event.type` covers multiple semantically distinct populations and the technique for splitting them in the dashboard).
+- A reference snippet for "totals + breakdown in one row" that documents the limitation and the recommended two-adjacent-panel workaround when conditional aggregates are unavailable.
+
+---
+
+## Quick reference: minimum-viable panel skeletons
+
+```text
+# Number panel: total events
+"<source-filter> | group n=count() | limit 1"
+
+# Number panel: distinct entities
+"<source-filter> | group n=estimate_distinct(<field>) | limit 1"
+
+# Donut: top-N by category
+"<source-filter> | group hits=count() by <category-field> | sort -hits | limit 10"
+
+# Stacked-bar timeline (preferred timeline pattern)
+"<source-filter> | group hits=count() by timestamp=timebucket('1h'), <action-field>
+ | transpose <action-field> on timestamp"
+
+# Stacked-bar grouped-data (cross-tab)
+"<source-filter> | group hits=count() by <category-field>, <action-field>
+ | transpose <action-field> on <category-field>"
+
+# Long-format table when transpose isn't appropriate
+"<source-filter> | group hits=count() by <category-field>, <action-field>
+ | sort <category-field>, -hits | limit 200"
+
+# Top-N table with bar column
+"<source-filter> | group hits=count() by <key-field>
+ | sort -hits | limit 25"
+```
+
+Every panel should also include a `| limit N` after `| group` (for number panels: `| limit 1`; for tables: `| limit 25` or `| limit 50`). The SDL render engine continues scanning after the answer is computed otherwise.
+
+---
+
+End of document. Treat this file as a living artefact: append new gotchas as they surface in subsequent engagements.

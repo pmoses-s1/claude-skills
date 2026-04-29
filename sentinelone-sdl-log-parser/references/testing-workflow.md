@@ -103,3 +103,63 @@ c.put_file(f"/logParsers/{PARSER_NAME}", delete=True)
 ```
 
 Ask the user before promoting a `claude_test_` parser to a canonical name — it's their tenant.
+
+## Synthesizing samples when the catalog parser ships without a `samples/` dir
+
+The vast majority of catalog parsers in `Sentinel-One/ai-siem` (none of marketplace, very few of community) ship without a `samples/` directory. When you copy a catalog parser as a starting point and want to validate, you have to synthesize a sample yourself. Approach:
+
+1. **Read the parser's `format` strings.** Reverse-engineer the shape: look for literal anchors (`THREAT,`, `[ALERT]`, `<14>`), positional commas/pipes, and field names that hint at vendor docs.
+2. **Grep the vendor's public docs** for sample lines that match. Most vendors publish at least one example log line per event subtype.
+3. **Generate one sample per format.** If the parser has 5 formats with different `id`s, your sample file should have 5 lines so each format gets exercised.
+4. **Run the validation loop** above. If a format never matches, your synthesized sample for that format is wrong; iterate.
+
+Synthesizing samples is also the right move when the user is preparing a parser for a source they don't yet have flowing in production — validate end-to-end first, then turn it on at the source.
+
+## Pre-flight check: 4 mandatory attributes and OCSF field names
+
+Before deploying, run a two-step pre-flight on every parser you're about to ship:
+
+```python
+import json5  # tolerant of // comments and unquoted keys
+parser = json5.loads(parser_body)
+
+# 1. The 4 mandatory attributes.
+#    metadata.version may also be set inside mappings via a `constant` op,
+#    so accept either location.
+attrs = parser.get("attributes", {})
+assert attrs.get("dataSource.category") == "security", \
+    "dataSource.category must be hardcoded to 'security'"
+assert attrs.get("dataSource.name"),   "dataSource.name is required"
+assert attrs.get("dataSource.vendor"), "dataSource.vendor is required"
+
+def _has_mappings_constant(parser, field):
+    for entry in parser.get("mappings", {}).get("mappings", []):
+        for t in entry.get("transformations", []):
+            if "constant" in t and t["constant"].get("field") == field:
+                return True
+    return False
+assert attrs.get("metadata.version") or _has_mappings_constant(parser, "metadata.version"), \
+    "metadata.version is required (parser-root attributes or mappings.constant)"
+
+# 2. Every OCSF field name should be discoverable in ocsf-schema-documentation.md.
+#    Grep the schema doc for each emitted field name.
+import re, pathlib
+schema_doc = pathlib.Path(
+    "/sessions/.../claude-skills/sentinelone-sdl-log-parser/references/ocsf-schema-documentation.md"
+).read_text()
+emitted_fields = set()
+def collect(obj):
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k in ("to", "field", "output") and isinstance(v, str):
+                emitted_fields.add(v)
+            collect(v)
+    elif isinstance(obj, list):
+        for x in obj: collect(x)
+collect(parser.get("mappings", {}))
+unknown = [f for f in emitted_fields if f and "." in f and f not in schema_doc]
+if unknown:
+    print(f"WARN: fields not found in OCSF schema doc: {unknown}")
+```
+
+Both checks catch >80% of "ingested but unusable downstream" failures before they reach the tenant.

@@ -2,6 +2,14 @@
 
 A `{parse=X}` directive inside a field matcher runs a secondary parser on the captured value, generating additional fields prefixed with the parent field name (e.g., a field `uri` with `{parse=uri}` generates `uriPath`, `uriQuery_*`). Use `{attrWhitelist=rx}` / `{attrBlacklist=rx}` to filter which generated subfields are kept.
 
+> **`attrWhitelist` / `attrBlacklist` scope** — these only filter the SUBFIELDS produced by the `{parse=...}` directive, not top-level fields you captured by name in the format string. To drop a top-level field you named explicitly, use `discardAttributes: ["fieldname"]` at the parser root, NOT a blacklist on the parse directive. Catalog parsers like `cisco_firewall-latest` show liberal use of blacklists to drop noisy nested arrays (`{attrBlacklist=(targetResources)}`, `{attrBlacklist=(threatsInfoMap|messageParts)}`); the same authors use `discardAttributes: ["message"]` separately to drop the raw event body.
+
+> **Pipe vs parenthesized list syntax for `attrBlacklist=`** — both work in the wild:
+> - Parenthesized: `{attrBlacklist=(field1|field2|field3)}` — common in Microsoft Eventhub parsers.
+> - Bare list: `{attrBlacklist=field1|field2|field3}` — common in FortiGate / Cisco parsers.
+> - Single field: `{attrBlacklist=tranip}` — no delimiters needed.
+> Pick one style per parser for consistency.
+
 ## URI and URL-like values
 
 | Directive | Behavior |
