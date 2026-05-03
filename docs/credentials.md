@@ -47,8 +47,8 @@ The S1 API has two token types and they are not interchangeable for all operatio
 
 | Token type | Created via | Visible in UI | Notes |
 |---|---|---|---|
-| Service User token | Settings → Users → Service Users | No — workflows/rules created with this token are invisible to human users in the UI | Use for programmatic API access |
-| Personal Console User token | Settings → Users → My User → API Token | Yes — objects created are visible and attributed to the user | Required for Hyperautomation workflows to appear in the UI |
+| Service User token | Settings → Users → Service Users | No: workflows/rules created with this token are invisible to human users in the UI | Use for programmatic API access |
+| Personal Console User token | Settings → Users → My User → API Token | Yes: objects created are visible and attributed to the user | Required for Hyperautomation workflows to appear in the UI |
 
 For most skills, a service user token is correct. If you need Hyperautomation workflows to be visible and editable in the console UI, use a personal console user token.
 
@@ -138,7 +138,7 @@ The MCP servers receive credentials via environment variables set in `~/Library/
 }
 ```
 
-> **Threat intel MCP:** Replace `your-threat-intel-mcp` with your organisation's approved threat intelligence MCP. The VirusTotal MCP (`npm install -g mcp-virustotal`) is a common example, but any MCP that provides file hash, IP, domain, and URL lookup tools works. The CLAUDE.md operating instructions require multi-source confirmation before a TRUE POSITIVE or CRITICAL verdict — they do not mandate a specific provider.
+> **Threat intel MCP:** Replace `your-threat-intel-mcp` with your organisation's approved threat intelligence MCP. The VirusTotal MCP (`npm install -g mcp-virustotal`) is a common example, but any MCP that provides file hash, IP, domain, and URL lookup tools works. The CLAUDE.md operating instructions require multi-source confirmation before a TRUE POSITIVE or CRITICAL verdict: they do not mandate a specific provider.
 
 **Prerequisites:**
 - Node.js 18+ for sentinelone-mcp (`node --version`)

@@ -6,18 +6,18 @@ Full reference for all tools exposed by `sentinelone-mcp` and `purple-mcp`. For 
 
 ## sentinelone-mcp
 
-Runs as a local Node.js process. Source: `sentinelone-mcp/index.js`. Install via `claude_desktop_config.json` — see [credentials.md](./credentials.md).
+Runs as a local Node.js process. Source: `sentinelone-mcp/index.js`. Install via `claude_desktop_config.json`: see [credentials.md](./credentials.md).
 
 ### PowerQuery tools
 
 **`powerquery_enumerate_sources`**
-Lists every `dataSource.name` active in SDL over the last 24 hours. Run this at the start of every session — never assume which sources are present. Returns unique source names, vendors, and categories.
+Lists every `dataSource.name` active in SDL over the last 24 hours. Run this at the start of every session: never assume which sources are present. Returns unique source names, vendors, and categories.
 
 **`powerquery_run`**
 Executes a PowerQuery string via the SDL Long-Running Query (LRQ) API. Polls until results are ready. Returns tabular results. Use for threat hunting, baseline queries, custom detection rule validation, and any SDL telemetry question.
 
 **`powerquery_schema_discover`**
-Runs a V1 `query` (full-event JSON) against a specific `dataSource.name` to return field names and sample values. Use this before writing any query against a source — field names drift between sessions due to parser edits and reserved-field rewrites. Returns a dict of `{field_name: [sample_values]}`.
+Runs a V1 `query` (full-event JSON) against a specific `dataSource.name` to return field names and sample values. Use this before writing any query against a source: field names drift between sessions due to parser edits and reserved-field rewrites. Returns a dict of `{field_name: [sample_values]}`.
 
 ### Management Console REST tools
 
@@ -27,10 +27,10 @@ These five tools are generic REST wrappers over the S1 Management Console API v2
 Read any resource: agents, threats, sites, alerts, detection rules, exclusions, IOCs, accounts, groups, policies, and more. Supports all query parameters as a `params` dict. Example: `GET /web/api/v2.1/agents?limit=20&siteIds=123`.
 
 **`s1_api_post`**
-Create or action: create IOC, create detection rule, isolate endpoint, add exclusion, create Hyperautomation workflow, etc. Body is passed as-is — the tool does not auto-wrap in `{"data": {...}}`. Check the swagger or SKILL.md for the correct envelope per endpoint.
+Create or action: create IOC, create detection rule, isolate endpoint, add exclusion, create Hyperautomation workflow, etc. Body is passed as-is: the tool does not auto-wrap in `{"data": {...}}`. Check the swagger or SKILL.md for the correct envelope per endpoint.
 
 **`s1_api_put`**
-Full-replace update: update detection rule, update policy, update exclusion. Requires all mandatory fields — omitting required fields returns 400.
+Full-replace update: update detection rule, update policy, update exclusion. Requires all mandatory fields: omitting required fields returns 400.
 
 **`s1_api_patch`**
 Partial update: used for endpoints that support PATCH (fewer than PUT). Rare in the S1 API.
@@ -38,7 +38,7 @@ Partial update: used for endpoints that support PATCH (fewer than PUT). Rare in 
 **`s1_api_delete`**
 Delete with filter body: delete IOCs, detection rules, exclusions. Many S1 DELETE endpoints accept a filter body (e.g. `{"filter": {"ids": [...]}}`). Pass it as the `body` param.
 
-Reference: `sentinelone-mgmt-console-api/SKILL.md` for confirmed body schemas, required fields, and gotchas per endpoint surface.
+Reference: `sentinelone-mgmt-console-api/SKILL.md` for confirmed body schemas and required fields per endpoint surface.
 
 ### UAM tools
 
@@ -95,7 +95,7 @@ Import a workflow JSON into the tenant. Requires `Hyper Automate.write` permissi
 Export all workflows as a ZIP archive.
 
 **`ha_archive_workflow`**
-Soft-delete (archive) one or more workflows. Note: returns HTTP 500 on the purple demo tenant when called with a service user token — this is likely a token permission restriction, not a body format problem.
+Soft-delete (archive) one or more workflows. Requires elevated token permissions; a personal console user token may be needed if the operation returns an error with a service user token.
 
 ---
 

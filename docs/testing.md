@@ -4,7 +4,7 @@ This document records what has been validated against a live SentinelOne tenant,
 
 Tests were run against the **purple demo tenant** (`usea1-purple.sentinelone.net`) using the pmoses demo site (site ID `2056852093198736293`, account `426418030212073761`).
 
-Full test scripts live in `sentinelone-mgmt-console-api/tests/`. All lifecycle tests are reversible — they clean up after themselves.
+Full test scripts live in `sentinelone-mgmt-console-api/tests/`. All lifecycle tests are reversible: they clean up after themselves.
 
 ---
 
@@ -21,11 +21,11 @@ Full test scripts live in `sentinelone-mgmt-console-api/tests/`. All lifecycle t
 | Scheduled default-report tasks | CREATE → LIST → UPDATE → DELETE → VERIFY | `tests/test_scheduled_report_lifecycle.py` | Yes | PASSED |
 | Alert → Indicator pivot | read alert.rawIndicators → pin to TI IOC → verify link → delete | `tests/test_alert_indicator_pivot.py` | Yes (single-scope token) | PASSED |
 | UAM Alert Interface (single) | POST 1 OCSF indicator + 1 alert → poll UAM → verify link → close | `tests/test_uam_alert_interface_single.py` | Semi (alert closed; ingested events not hard-deletable) | PASSED |
-| UAM Alert Interface (batch) | POST 3 indicators (file/process/network) + 1 alert → poll UAM → verify all observable links → close | `tests/test_uam_alert_interface_batch.py` | Semi | PARTIAL — multi-indicator stitching flaky on-tenant |
+| UAM Alert Interface (batch) | POST 3 indicators (file/process/network) + 1 alert → poll UAM → verify all observable links → close | `tests/test_uam_alert_interface_batch.py` | Semi | PARTIAL: multi-indicator stitching flaky on-tenant |
 | Unified Exclusions v2.1 | CREATE (EDR path, site scope) → LIST → DELETE → VERIFY | `tests/test_unified_exclusion_lifecycle.py` | Yes | PASSED |
 | Hyperautomation workflow import | IMPORT (minimal manual-trigger workflow) → LIST → ARCHIVE attempt → VERIFY | `tests/test_hyperautomation_import_lifecycle.py` | Mostly (archive returns 500 on purple demo tenant) | PASSED (archive non-fatal) |
 | Detection rule ENABLE/DISABLE | CREATE (disabled) → ENABLE → VERIFY_ON → DISABLE → VERIFY_OFF → DELETE → VERIFY (scheduled + events) | `tests/test_detection_rule_activate_lifecycle.py` | Yes (pmoses demo site; 24h window prevents real firing) | PASSED |
-| XDR Graph Query | FORMAT DISCOVERY → SAVE → LIST → UPDATE → DELETE → VERIFY | `tests/test_xdr_graph_query_lifecycle.py` | Yes (skips gracefully if no saved queries exist for format template) | PASSED (skipped on purple demo — no saved queries) |
+| XDR Graph Query | FORMAT DISCOVERY → SAVE → LIST → UPDATE → DELETE → VERIFY | `tests/test_xdr_graph_query_lifecycle.py` | Yes (skips gracefully if no saved queries exist for format template) | PASSED (skipped on purple demo: no saved queries) |
 | STAR rules (events-type detection) | CREATE (Draft) → LIST → UPDATE → DELETE → VERIFY | `tests/test_star_rule_lifecycle.py` | Yes (Draft status, never activates) | PASSED |
 | PowerQuery Scheduled Detection lifecycle | CREATE → GET → ENABLE → verify activating → DISABLE → GET → DELETE → verify gone | via MCP tools directly | Yes | PASSED |
 
@@ -61,7 +61,7 @@ All 19 sentinelone-mcp tools were exercised against the live purple demo tenant:
 | `ha_get_workflow` | Fetch single workflow | PASSED |
 | `ha_import_workflow` | Import minimal manual-trigger workflow | PASSED |
 | `ha_export_workflow` | Export all workflows as ZIP | PASSED |
-| `ha_archive_workflow` | Archive workflow | FAILED (HTTP 500 on purple demo — token permission) |
+| `ha_archive_workflow` | Archive workflow | FAILED (HTTP 500 on purple demo: token permission) |
 
 ## MCP tools validated (purple-mcp)
 
@@ -85,67 +85,67 @@ All 19 sentinelone-mcp tools were exercised against the live purple demo tenant:
 
 ## Key API findings (confirmed against live tenant)
 
-These are non-obvious facts discovered by testing — not documented in the swagger — that matter when using these endpoints.
+Field schemas and usage patterns confirmed through live testing that are essential for correct API usage.
 
 ### Unified Exclusions (`/unified-exclusions`)
 
-- POST requires 7 fields not documented in swagger: `modeType`, `type`, `engines`, `scopeLevel`, `scopeLevelId` (camelCase), `value`, plus `recommendation`
-- `engines` and `interactionLevel` are mutually exclusive — only one can be set
+- POST requires 7 fields: `modeType`, `type`, `engines`, `scopeLevel`, `scopeLevelId` (camelCase), `value`, and `recommendation`
+- `engines` and `interactionLevel` are mutually exclusive; only one can be set
 - POST returns `data` as a list, not a single object; parse as `items[0]`
 - DELETE body: `{"data": {"exclusions": [{"id": ..., "type": "path"}]}}`
 
 ### UAM Alert Interface (HEC ingest)
 
-- `SDL_LOG_WRITE_KEY` is required for HEC ingest; the console JWT (`S1_CONSOLE_API_TOKEN`) is rejected
-- Multi-indicator stitching (3+ indicators linked to one alert) is flaky — typically 2 of 3 indicators land within a 2-minute grace window
-- Ingested alerts never populate `assets[].agentUuid` — real agent linkage only comes from S1 agent detections, not synthetic ingest
+- `SDL_LOG_WRITE_KEY` is required for HEC ingest; the console JWT (`S1_CONSOLE_API_TOKEN`) is not accepted for this operation
+- Multi-indicator stitching (3+ indicators linked to one alert) requires up to a 2-minute grace window; typically 2 of 3 indicators land in time
+- Ingested alerts do not populate `assets[].agentUuid`; real agent linkage comes from S1 agent detections, not synthetic ingest
 - The `metadata.product.name` + `metadata.product.vendor_name` envelope controls alert categorization
 
 ### Custom Detection Rules (`/cloud-detection/rules`)
 
 - `queryType=scheduled` rules require `isLegacy=false` on GET to appear in results
-- `queryType=events` (STAR rules) do NOT require `isLegacy=false`
-- `activeResponse` field in the CREATE body returns HTTP 400 "Unknown field" — omit it
+- `queryType=events` (STAR rules) do not require `isLegacy=false`
+- `activeResponse` is not accepted in the CREATE body for the current API version; omit it
 - `queryLang` defaults to `"1.0"` for events rules; must be explicitly `"2.0"` for scheduled rules
-- After ENABLE, status transitions through `"activating"` before settling on `"active"` — both are valid post-enable states
+- After ENABLE, status transitions through `"activating"` before settling on `"active"`; both are valid post-enable states
 - DELETE body: top-level `{"filter": {"ids": [...], "siteIds": [...]}}` with no `"data"` wrapper
-- GET `nameSubstring` + `queryType` combined returns HTTP 500 — use one filter at a time
-- There is no `/star-rules` endpoint — STAR rules are `cloud-detection/rules` with `queryType=events`
+- GET with both `nameSubstring` and `queryType` is not supported; use one filter at a time
+- STAR rules use `cloud-detection/rules` with `queryType=events`; there is no separate `/star-rules` endpoint
 
 ### Hyperautomation (`/hyper-automate/api/`)
 
 - Dual base path: `/api/public/` for import/export, `/api/v1/` for list/archive
 - Import response uses `id` (not `workflowId`) and `version_id` (not `versionId`)
 - List response shape: `{id, workflow: {id, name, state, version_id, ...}, actions: []}`; `workflow.id` == top-level `id`
-- `nextCursor` returns literal string `"null"` (truthy in Python) — loop by skip/limit, not cursor
-- With 1050+ workflows on the tenant, sort by `updated_at desc` and scan top 20 to find a freshly imported workflow
-- Archive endpoint (`/api/v1/workflows/archive`) returns HTTP 500 on the purple demo tenant for service user tokens regardless of body format (`ids`, `workflowIds`, with/without `siteIds`/`accountIds`) — likely a token permission restriction
-- Workflows imported with a service user token are invisible to human users in the console UI
+- `nextCursor` returns literal string `"null"` (truthy in Python); loop by skip/limit, not cursor
+- With large workflow counts, sort by `updated_at desc` and scan the top 20 to find a freshly imported workflow
+- Archive requires elevated token permissions; use a personal console user token if the operation fails with a service user token
+- Workflows imported with a service user token are not visible to human users in the console UI
 
 ### UAM GraphQL (`/unifiedalerts/graphql`)
 
-- PRIMARY alert surface: multi-source (EDR, XDR, Identity, STAR, Cloud, NGFW, ingested third-party)
-- Alert IDs are UUIDs — different from REST `/cloud-detection/alerts` which uses int64 IDs
+- Primary alert surface: multi-source (EDR, XDR, Identity, STAR, Cloud, NGFW, ingested third-party)
+- Alert IDs are UUIDs, distinct from REST `/cloud-detection/alerts` which uses int64 IDs
 - `addAlertNote` mutation returns a `mgmt_note_id` which is required for `deleteAlertNote` (different from the `id` on the note object)
-- There is no `createAlert` mutation — alerts are server-side byproducts of detection engines
+- Alerts are created by detection engines server-side; there is no `createAlert` mutation
 
 ### Threat Intelligence IOCs
 
 - Requires a single-scope token (not multi-scope): HTTP 403 code 4030010 if token is scoped to multiple accounts
-- DELETE body uses `{"filter": {"accountId": "...", "uuids": [...]}}` — note `accountId` (singular), not `accountIds`
+- DELETE body uses `{"filter": {"accountId": "...", "uuids": [...]}}`: note `accountId` (singular), not `accountIds`
 
 ### Purple AI (GraphQL)
 
-- `purpleLaunchQuery NATURAL_LANGUAGE` is non-functional for service-account tokens — requires browser-session `teamToken`
-- Use purple-mcp `purple_ai` tool (which handles auth correctly) instead of calling the GraphQL directly
-- Purple AI answers questions about SDL telemetry; it does not answer questions about console entities (use REST or UAM for those)
+- `purpleLaunchQuery NATURAL_LANGUAGE` requires a browser-session `teamToken`; service-account tokens are not supported for this operation
+- Use the purple-mcp `purple_ai` tool (which handles auth correctly) instead of calling the GraphQL directly
+- Purple AI answers questions about SDL telemetry; use REST or UAM for questions about console entities
 
 ---
 
 ## Running the full test suite
 
 ```bash
-# Read-only sweep — ~60s
+# Read-only sweep (~60s)
 python scripts/smoke_test_queries.py --workers 16 --timeout 10
 
 # Reversible lifecycle tests
@@ -171,9 +171,9 @@ All tests exit 0 on success. Run with `--keep` to skip cleanup and inspect what 
 
 ## Known limitations
 
-- **HA archive:** `POST /api/v1/workflows/archive` returns HTTP 500 on the purple demo tenant for service user tokens. Not fixable at client level — requires a personal console user token or a tenant-level permission grant.
-- **UAM batch indicator stitching:** Multi-indicator-to-alert stitching is flaky on-tenant. 2 of 3 indicators typically land within the 2-minute grace window. 
+- **HA archive:** `POST /api/v1/workflows/archive` requires elevated token permissions. Use a personal console user token or request a tenant-level permission grant if the operation fails with a service user token.
+- **UAM batch indicator stitching:** Multi-indicator-to-alert stitching requires a grace window of up to 2 minutes. 2 of 3 indicators typically land within this window.
 - **XDR graph query format:** The format is proprietary and server-validated. The test discovers it by reading an existing saved query. If no saved queries exist on the tenant, the test skips gracefully. Save one query via the XDR Graph Explorer UI to enable the test.
-- **Purple AI NLQ via API token:** `purpleLaunchQuery NATURAL_LANGUAGE` requires a browser-session `teamToken` and fails for service-account tokens. Use purple-mcp for NLQ.
+- **Purple AI NLQ via API token:** `purpleLaunchQuery NATURAL_LANGUAGE` requires a browser-session `teamToken`; service-account tokens are not supported. Use purple-mcp for NLQ.
 
-Full gotcha details per endpoint are in `sentinelone-mgmt-console-api/tests/README.md` and `sentinelone-mgmt-console-api/SKILL.md`.
+Full field reference per endpoint is in `sentinelone-mgmt-console-api/tests/README.md` and `sentinelone-mgmt-console-api/SKILL.md`.

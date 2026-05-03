@@ -1,12 +1,12 @@
 # Skills Reference
 
-Each skill is a folder containing a `SKILL.md` that Claude reads when a relevant request triggers it. The SKILL.md encodes confirmed API schemas, gotchas, and procedural knowledge. All six skills are bundled in the `sentinelone-skills` plugin.
+Each skill is a folder containing a `SKILL.md` that Claude reads when a relevant request triggers it. The SKILL.md encodes confirmed API schemas, field requirements, and procedural knowledge. All six skills are bundled in the `sentinelone-skills` plugin.
 
 ---
 
 ## sentinelone-mgmt-console-api
 
-**Triggers on:** S1 console operations — agents, threats, alerts, sites, groups, policies, IOCs, detection rules, exclusions, RemoteOps, Deep Visibility, Hyperautomation, UAM, Purple AI.
+**Triggers on:** S1 console operations: agents, threats, alerts, sites, groups, policies, IOCs, detection rules, exclusions, RemoteOps, Deep Visibility, Hyperautomation, UAM, Purple AI.
 
 **What it provides:**
 
@@ -30,13 +30,13 @@ Each skill is a folder containing a `SKILL.md` that Claude reads when a relevant
 
 **Test coverage:** 15 lifecycle test scripts covering IOCs, UAM alerts, exclusions, detection rules (scheduled + events / STAR), Hyperautomation import, XDR graph queries, and more. See [testing.md](./testing.md).
 
-**Confirmed non-obvious requirements (examples):**
+**API field requirements validated through live testing (examples):**
 - `queryType=scheduled` detection rules require `isLegacy=false` on GET
-- Unified Exclusions POST requires 7 undocumented fields; returns `data` as a list
-- Hyperautomation: list response uses nested `workflow.id`, `nextCursor` returns string `"null"` (truthy)
+- Unified Exclusions POST requires 7 fields including `modeType`, `type`, `engines`, `scopeLevel`, `scopeLevelId`, `value`, and `recommendation`; returns `data` as a list
+- Hyperautomation: list response uses nested `workflow.id`, `nextCursor` returns string `"null"` (truthy in Python)
 - UAM `addAlertNote` returns `mgmt_note_id` required for `deleteAlertNote`
 
-Full gotcha catalogue: `sentinelone-mgmt-console-api/SKILL.md`
+Full field reference: `sentinelone-mgmt-console-api/SKILL.md`
 
 ---
 
@@ -53,21 +53,21 @@ Full gotcha catalogue: `sentinelone-mgmt-console-api/SKILL.md`
 - Behavioral baseline building blocks using `| savelookup` + `| lookup` pattern
 - Schema-safe patterns: `number()` cast for type-locked columns, `array_agg_distinct` for enumeration
 
-**Key examples:** `sentinelone-powerquery/examples/behavioral-baselines.md` — full PQ building blocks for the baseline + anomaly detection rule body pattern.
+**Key examples:** `sentinelone-powerquery/examples/behavioral-baselines.md`: full PQ building blocks for the baseline + anomaly detection rule body pattern.
 
 ---
 
 ## sentinelone-sdl-api
 
-**Triggers on:** SDL API operations — log ingest, configuration file management (parsers, dashboards, lookups, datatables), SDL query via API.
+**Triggers on:** SDL API operations: log ingest, configuration file management (parsers, dashboards, lookups, datatables), SDL query via API.
 
 **What it provides:**
 
-- SDL log ingest via HEC (`sdl_upload_logs`) — requires `SDL_LOG_WRITE_KEY`
+- SDL log ingest via HEC (`sdl_upload_logs`), requires `SDL_LOG_WRITE_KEY`
 - SDL config file CRUD (`sdl_list_files`, `sdl_get_file`, `sdl_put_file`, `sdl_delete_file`)
 - SDL V1 query (full-event JSON, used for schema discovery)
 
-**Critical auth note:** `SDL_CONFIG_WRITE_KEY` does NOT grant log read access. Force-clear scoped keys to fall through to the console JWT for V1 queries:
+**Auth note:** `SDL_CONFIG_WRITE_KEY` does not grant log read access. Force-clear scoped keys to fall through to the console JWT for V1 queries:
 
 ```python
 c.keys["log_read_key"] = ""
@@ -121,17 +121,17 @@ c.keys["config_read_key"] = ""
 
 ---
 
-## CLAUDE.md — SOC Analyst persona
+## CLAUDE.md: SOC Analyst persona
 
-`CLAUDE.md` is not a skill in the plugin sense — it is the operating persona loaded at session start.
+`CLAUDE.md` is not a skill in the plugin sense; it is the operating persona loaded at session start.
 
 It defines:
 
 - **Mandatory session init:** enumerate SDL sources, triage open alerts in parallel, discover schemas per-source before writing any query
 - **Evidence rules:** no fabrication, cite every fact to its tool call, mark every assumption explicitly
 - **Anomaly checklist:** frequency, timing, geolocation, baseline deviation, new entity, privilege, chain
-- **Classification gate:** no CRITICAL or TRUE POSITIVE verdict without independent threat intelligence confirmation (VirusTotal enrichment mandatory)
-- **Confidence language:** "confirmed" / "consistent with" / "suggests" / "possible" — calibrated to evidence weight
+- **Classification gate:** no CRITICAL or TRUE POSITIVE verdict without independent threat intelligence confirmation
+- **Confidence language:** "confirmed" / "consistent with" / "suggests" / "possible", calibrated to evidence weight
 - **Investigation workflow:** triage → enrichment → infrastructure pivot → cross-source correlation → MITRE mapping → composite risk score → report
 
 `sentinelone-mcp` exposes it as an MCP resource (`sentinelone://soc-context`) and prompt (`soc_analyst`). Edit `claude-skills/CLAUDE.md` and restart the MCP server to change Claude's operating behavior.

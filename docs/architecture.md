@@ -8,13 +8,13 @@ This document explains how the three layers of the SentinelOne AI analyst stack 
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  CLAUDE.md  — SOC Analyst persona, evidence rules, session protocol │
+│  CLAUDE.md : SOC Analyst persona, evidence rules, session protocol │
 │  Loaded as a resource via sentinelone-mcp at session start          │
 └────────────────────────────┬────────────────────────────────────────┘
                              │ instructs Claude how to investigate
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  MCP Servers  — live API access, bypasses Cowork sandbox proxy      │
+│  MCP Servers : live API access, bypasses Cowork sandbox proxy      │
 │                                                                     │
 │  sentinelone-mcp (this repo, Node.js, local process)               │
 │    19 tools: PowerQuery, SDL API, Hyperautomation, Mgmt REST, UAM  │
@@ -24,12 +24,12 @@ This document explains how the three layers of the SentinelOne AI analyst stack 
 │                                                                     │
 │  threat-intel-mcp (required; use your org's approved provider)     │
 │    external IOC enrichment; required for CRITICAL classification    │
-│    VirusTotal shown as example — any equivalent MCP works          │
+│    VirusTotal shown as example: any equivalent MCP works          │
 └────────────────────────────┬────────────────────────────────────────┘
                              │ tools Claude calls
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Skills (SKILL.md files)  — procedural knowledge Claude reads       │
+│  Skills (SKILL.md files) : procedural knowledge Claude reads       │
 │  Loaded when a relevant request triggers the skill                  │
 │                                                                     │
 │  sentinelone-mgmt-console-api   SDL query, Mgmt REST, UAM, Purple  │
@@ -77,19 +77,19 @@ Full tool reference: [mcp-tools.md](./mcp-tools.md)
 
 A separate MCP server (Python, fetched from GitHub via `uvx`) that provides the Purple AI investigation surface. It covers:
 
-- `purple_ai` — natural-language queries against SDL telemetry
-- `powerquery` — run raw PowerQuery strings via the SDL LRQ engine
-- `list_alerts`, `search_alerts`, `get_alert`, `get_alert_history`, `get_alert_notes` — UAM alert access
-- `list_inventory_items`, `search_inventory_items`, `get_inventory_item` — asset inventory
-- `list_vulnerabilities`, `get_vulnerability` — CVE and patch gap reporting
-- `list_misconfigurations`, `get_misconfiguration` — agent config hygiene
-- `uam_add_note`, `uam_set_status` — alert annotation and triage
+- `purple_ai`: natural-language queries against SDL telemetry
+- `powerquery`: run raw PowerQuery strings via the SDL LRQ engine
+- `list_alerts`, `search_alerts`, `get_alert`, `get_alert_history`, `get_alert_notes`: UAM alert access
+- `list_inventory_items`, `search_inventory_items`, `get_inventory_item`: asset inventory
+- `list_vulnerabilities`, `get_vulnerability`: CVE and patch gap reporting
+- `list_misconfigurations`, `get_misconfiguration`: agent config hygiene
+- `uam_add_note`, `uam_set_status`: alert annotation and triage
 
 purple-mcp is complementary to sentinelone-mcp. They share credentials but serve different roles:
 
 | Task | Use |
 |---|---|
-| SDL PowerQuery hunting | Either — `powerquery_run` (sentinelone-mcp) or `powerquery` (purple-mcp) |
+| SDL PowerQuery hunting | Either: `powerquery_run` (sentinelone-mcp) or `powerquery` (purple-mcp) |
 | Natural-language Purple AI queries | purple-mcp `purple_ai` only |
 | Alert triage, notes, status | purple-mcp is preferred (richer GraphQL fields); sentinelone-mcp UAM tools as fallback |
 | Management Console REST ops (agents, threats, sites, exclusions, IOCs, detection rules) | sentinelone-mcp `s1_api_*` only |
@@ -105,7 +105,7 @@ Each skill folder contains a `SKILL.md` that Claude reads when a relevant reques
 - Python script reference for running operations locally
 - MCP tool guidance (which tool to use for which operation)
 
-The skills are read-only procedural knowledge. They do not execute API calls directly when loaded — they instruct Claude on *how* to use the MCP tools and scripts to execute operations correctly.
+The skills are read-only procedural knowledge. They do not execute API calls directly when loaded: they instruct Claude on *how* to use the MCP tools and scripts to execute operations correctly.
 
 ---
 
@@ -132,7 +132,7 @@ Credential resolution order (highest priority first):
 2. `credentials.json` in the Cowork project folder (auto-discovered by the plugin's SessionStart hook)
 3. `~/.config/sentinelone/credentials.json` (terminal fallback)
 
-For the MCP servers, credentials are passed via `env` in `claude_desktop_config.json` — see [credentials.md](./credentials.md).
+For the MCP servers, credentials are passed via `env` in `claude_desktop_config.json`: see [credentials.md](./credentials.md).
 
 ---
 

@@ -1,6 +1,6 @@
-# SentinelOne AI Analyst — Claude Skills
+# SentinelOne AI Analyst: Claude Skills
 
-A full-stack AI analyst for SentinelOne, built as a set of Claude skills, two MCP servers, and an operating persona (CLAUDE.md). Install once and Claude can hunt threats, triage alerts, write detections, deploy dashboards, author parsers, and build automation workflows — entirely from natural language.
+A full-stack AI analyst for SentinelOne, built as a set of Claude skills, two MCP servers, and an operating persona (CLAUDE.md). Install once and Claude can hunt threats, triage alerts, write detections, deploy dashboards, author parsers, and build automation workflows, entirely from natural language.
 
 ---
 
@@ -19,7 +19,7 @@ MCP Servers          Live API access, outside the Cowork sandbox proxy
   virustotal-mcp     External IOC enrichment (required for CRITICAL classification)
        │
        ▼
-Skills (SKILL.md)    Procedural knowledge: confirmed API schemas, gotchas, field traps
+Skills (SKILL.md)    Procedural knowledge: confirmed API schemas, field requirements, usage patterns
   sentinelone-mgmt-console-api   Mgmt Console REST + UAM + Purple AI + HA
   sentinelone-powerquery          PowerQuery authoring and execution
   sentinelone-sdl-api             SDL log ingest and config file ops
@@ -28,7 +28,7 @@ Skills (SKILL.md)    Procedural knowledge: confirmed API schemas, gotchas, field
   sentinelone-hyperautomation     Workflow JSON authoring and import
 ```
 
-**Skills** encode confirmed API behavior — including undocumented required fields and gotchas discovered through live testing — so Claude doesn't guess field names. **MCP servers** bypass the Cowork sandbox proxy to reach `*.sentinelone.net` directly. **CLAUDE.md** defines the operating persona that instructs how to investigate, what evidence to gather, and how to classify findings.
+**Skills** encode confirmed API behavior, including field schemas and usage patterns validated against live tenants, so Claude doesn't guess field names. **MCP servers** bypass the Cowork sandbox proxy to reach `*.sentinelone.net` directly. **CLAUDE.md** defines the operating persona that instructs how to investigate, what evidence to gather, and how to classify findings.
 
 Full architecture details: [docs/architecture.md](./docs/architecture.md)
 
@@ -36,7 +36,7 @@ Full architecture details: [docs/architecture.md](./docs/architecture.md)
 
 ## What's included
 
-The plugin bundles every skill; installing it is sufficient — no individual skill setup needed.
+The plugin bundles every skill; installing it is sufficient. No individual skill setup needed.
 
 | Skill | What it does |
 |---|---|
@@ -155,9 +155,11 @@ Download the `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelo
 1. In the Claude desktop app, navigate to **Cowork** and click **New Project**
 2. Name it **PrincipalSOCAnalyst**
 3. Click **Select Folder** and choose this `claude-skills` folder (which contains `CLAUDE.md`)
-4. Under **Add files**, add both `credentials.json` and `CLAUDE.md` so Claude has access to them in every session
+4. Under **Add files**, add `CLAUDE.md` so Claude has access to it in every session
 
-   ![Adding credentials.json and CLAUDE.md when creating a new Cowork project](assets/new-project-credentials.png)
+   ![Adding CLAUDE.md when creating a new Cowork project](assets/new-project-credentials.png)
+
+   > **credentials.json:** If you are using `sentinelone-mcp` (recommended), credentials are passed via environment variables in `claude_desktop_config.json` and you do not need to add `credentials.json` to the project. If you are using the skills directly without `sentinelone-mcp`, add `credentials.json` here as well for backwards compatibility.
 
 5. Confirm that `sentinelone-skills` is listed under Personal plugins, and Purple MCP and VirusTotal are connected under MCP Servers
 6. Click **Create**
@@ -241,7 +243,7 @@ These skills turn Claude into a hands-on SentinelOne analyst and engineer. Once 
 
 **Data lake operations**: ingest custom telemetry, list and manage configuration files, deploy or update parsers and dashboards, and run arbitrary queries through the SDL API.
 
-**Behavioral baselining and anomaly detection**: build per-(principal, action) statistical baselines on any data source — Okta, FortiGate, CloudTrail, SentinelOne, Mimecast, Zeek, anything ingested into SDL — and surface deviations automatically. The skill auto-discovers the right principal field (user, host, IP, role) and action field (event.type, activity_name, action) per source so you don't hardcode field names. See [Behavioral baselining](#behavioral-baselining--anomaly-detection) below.
+**Behavioral baselining and anomaly detection**: build per-(principal, action) statistical baselines on any data source (Okta, FortiGate, CloudTrail, SentinelOne, Mimecast, Zeek, or anything else ingested into SDL) and surface deviations automatically. The skill auto-discovers the right principal field (user, host, IP, role) and action field (event.type, activity_name, action) per source so you don't hardcode field names. See [Behavioral baselining](#behavioral-baselining--anomaly-detection) below.
 
 ---
 
@@ -253,23 +255,23 @@ A source-agnostic pipeline for building behavioral baselines and surfacing stati
 
 For any `dataSource.name`, the pipeline:
 
-1. **Auto-discovers the schema** via `inspect_source.discover_schema()` and picks `principal_field` (user / host / IP / role) and `action_field` (event.type / activity_name / action) from what the source actually carries — no per-source hardcoding.
+1. **Auto-discovers the schema** via `inspect_source.discover_schema()` and picks `principal_field` (user / host / IP / role) and `action_field` (event.type / activity_name / action) from what the source actually carries, with no per-source hardcoding.
 2. **Slices the baseline window into N daily LRQ queries** (default 30 days), running 3 in parallel under the per-user 3 rps cap. Each slice produces (action, principal, count) rows for that day. Daily slicing avoids the LRQ per-call deadline that single 7d/30d aggregates routinely exceed.
 3. **Runs one 24h live slice** in the same shape.
 4. **Merges client-side** with one of two strategies:
-   - **`pooled`** — all daily samples in one bucket per (action, principal). Simple, but flags weekend silence as anomalous.
-   - **`dow`** — separate bucket per (action, principal, day-of-week). Eliminates the weekday/weekend false-positive cleanly and is the production tier.
+   - **`pooled`**: all daily samples in one bucket per (action, principal). Simple, but flags weekend silence as anomalous.
+   - **`dow`**: separate bucket per (action, principal, day-of-week). Eliminates the weekday/weekend false-positive cleanly and is the production tier.
 5. **Surfaces three anomaly classes** on every run:
-   - **Matched z-score deviations** — pair active in both windows but live count differs from baseline avg by more than `Z_THRESHOLD * stddev` (SPIKE or DROP).
-   - **Silent pairs** — pair active in baseline but with zero live events. Catches "user X went dark on a day they're normally active."
-   - **New-behavior pairs** — pair seen live but with no baseline at all. Could be a new user, fresh recon activity, or attacker noise — routes to a separate triage queue.
+   - **Matched z-score deviations**: pair active in both windows but live count differs from baseline avg by more than `Z_THRESHOLD * stddev` (SPIKE or DROP).
+   - **Silent pairs**: pair active in baseline but with zero live events. Catches "user X went dark on a day they're normally active."
+   - **New-behavior pairs**: pair seen live but with no baseline at all. Could be a new user, fresh recon activity, or attacker noise, routed to a separate triage queue.
 
 ### Why this matters
 
 Three production failure modes that a basic moving-avg baseline misses, and this pipeline catches:
 
 - **Silent pairs are dropped by the basic two-side join.** A critical user account that was active every weekday and is silent today never enters the join output. The pipeline walks the baseline keys explicitly to surface them.
-- **Pooled baselines flag every weekend.** A 30-day pooled baseline with 22 weekday + 8 weekend samples produces a high stddev — but on a Sunday, every weekday-only pair looks anomalous. Day-of-week stratification makes the comparison apples-to-apples.
+- **Pooled baselines flag every weekend.** A 30-day pooled baseline with 22 weekday + 8 weekend samples produces a high stddev, but on a Sunday every weekday-only pair looks anomalous. Day-of-week stratification makes the comparison apples-to-apples.
 - **One-size-fits-all principal field doesn't work.** Okta uses `actor.user.email_addr`. CloudTrail uses `actor.user.name` (role). FortiGate uses `device.name` or `src.ip.address`. SentinelOne uses `src.process.user`. The schema-discovery step picks the right one per source.
 
 ### How to use it
@@ -449,7 +451,9 @@ cd sentinelone-skills-plugin && bash scripts/build.sh --clean
 
 ## Configuration
 
-All skills read credentials from a single `credentials.json` file placed in your Cowork project folder. The plugin's SessionStart hook auto-discovers it and makes it available to every skill in the session.
+**If you are using `sentinelone-mcp` (recommended):** credentials are passed as environment variables in `claude_desktop_config.json` as shown in the [MCP server setup](#step-1-connect-mcp-servers) above. You do not need a `credentials.json` file in your project folder.
+
+**If you are using the skills directly without `sentinelone-mcp`** (or for backwards compatibility): the skills also read credentials from a `credentials.json` file placed in your Cowork project folder. The plugin's SessionStart hook auto-discovers it and makes it available to every skill in the session.
 
 **Setup is two commands.** Copy [`credentials.example.json`](./sentinelone-skills-plugin/credentials.example.json) from this repo into your Cowork project folder, renaming it to `credentials.json`, then edit it.
 
@@ -491,9 +495,9 @@ If you only downloaded the `.plugin` file (not the full repo), extract `credenti
 | `SDL_CONFIG_WRITE_KEY` | Deploying parsers/dashboards via `putFile` | In Singularity Data Lake → menu next to username → API Keys → Configuration Access Keys → New Key (Configuration Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
 
 Resolution order (highest priority wins):
-1. Environment variables (`S1_CONSOLE_URL`, `S1_CONSOLE_API_TOKEN`, `SDL_*`)
-2. `<project folder>/credentials.json` (auto-discovered)
-3. `~/.config/sentinelone/credentials.json` (terminal fallback when there is no project folder)
+1. Environment variables set in `claude_desktop_config.json` via `sentinelone-mcp` (recommended)
+2. `<project folder>/credentials.json` (backwards-compatible fallback for direct skill usage)
+3. `~/.config/sentinelone/credentials.json` (terminal fallback)
 
 Full credential reference including all SDL keys and MCP server config: [docs/credentials.md](./docs/credentials.md)
 
@@ -501,7 +505,7 @@ Full credential reference including all SDL keys and MCP server config: [docs/cr
 
 ## Windsurf
 
-This repo includes Windsurf workflow files in `.windsurf/workflows/`. Each workflow is a thin pointer that directs Cascade to read the canonical `SKILL.md` and reference docs in the matching skill folder — no duplicated content.
+This repo includes Windsurf workflow files in `.windsurf/workflows/`. Each workflow is a thin pointer that directs Cascade to read the canonical `SKILL.md` and reference docs in the matching skill folder, with no duplicated content.
 
 - `sentinelone-api.md`: Management Console API (agents, threats, alerts, sites, Purple AI, UAM).
 - `sentinelone-powerquery.md`: PowerQuery authoring, debugging, and detection rules.
