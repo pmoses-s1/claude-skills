@@ -22,7 +22,7 @@ This workflow is mandatory for every new or modified dashboard. Steps 0, 1, and 
    1. **PowerQuery enumeration** (`array_agg_distinct(dataSource.name)`) — run via `mcp__sentinelone-mcp__powerquery_run` directly. The sentinelone-mcp server runs locally and makes direct HTTPS calls without sandbox interference.
    2. **V1 query schema discovery** (full event JSON per source) — use `mcp__sentinelone-mcp__powerquery_schema_discover` to fetch sample events from each data source and inspect their field names and types. The MCP server runs on your local machine and bypasses the sandbox proxy entirely.
 1. **Understand the ask** — What data should the dashboard show? Who is the audience (SOC analyst, manager, customer POC)? What time range makes sense? What posture should each panel reflect (a panel that legitimately returns 0 needs a markdown header explaining the SOC-positive interpretation, see **Empty results are valid evidence**).
-2. **Design the structure** — Choose tabs (if multi-topic), then panels per tab. Match panel type to the data shape. Where one `event.type` covers multiple semantic populations (delivery-time vs click-time, scheduled vs on-demand, inbound vs outbound), build separate sections per population, not a mixed section.
+2. **Design the structure** — Choose tabs (if multi-topic), then panels per tab. Match panel type to the data shape using the guide in `references/panel-type-cheatsheet.md`. Key decisions: flows/kill-chains → `sankey`; KPI vs SLA target → `bullet`; SOC queue health → `gauge`; 3D outlier detection → `scattered_bubble`; time-based density → `heatmap`; multiple queries in one panel → tabbed table. Where one `event.type` covers multiple semantic populations (delivery-time vs click-time, scheduled vs on-demand, inbound vs outbound), build separate sections per population, not a mixed section.
 3. **Write the JSON** — Use the panel type reference below and real examples in `references/community-examples.md`. Compute explicit `x`/`y`/`w`/`h` for every panel. Apply the naming-hygiene rule from **Panel naming hygiene** so titles read as SLA-grade claims.
 4. **Validate queries** — Sample 3-5 events per source/event-ID to confirm field semantics. Test each panel query via the `sentinelone-powerquery` skill. Run the parallel load test (see **Pre-deploy validation**), acceptance thresholds: slowest panel ≤ 2s, wall-clock ≤ 5s. Run `scripts/panel_safety_check.py` against the dashboard JSON; resolve every flag before deploy.
 5. **Deploy** — Use the `sentinelone-sdl-api` skill to `put_file` to a path like `/dashboards/my-dashboard` with `expected_version` set from a prior `get_file` (CAS guard). Save a backup of the prior JSON first. Sleep 3s, then `get_file` to verify the version bumped AND grep the returned content for a canary string from your change.
@@ -425,6 +425,37 @@ Query must return at least one text column and one numeric column. Good for per-
 
 ---
 
+### Heatmap panel (2D time heatmap)
+
+`graphStyle`: `"heatmap"`
+
+Time on x-axis, category on y-axis, color intensity = event density. Distinct from `honeycomb` (static cells) — `heatmap` is always time-series. Query must use `timebucket()` + `transpose` to produce a time × category matrix. The timestamp column must be named `timestamp`.
+
+```json
+{
+  "title": "Identity Logon Activity by User [heatmap]",
+  "graphStyle": "heatmap",
+  "query": "dataSource.name='Identity' unmapped.type='Logon Success' user.name=* user.name != ''\n| group EventCount=count() by user_name=user.name, timestamp=timebucket('1h')\n| filter EventCount > 0\n| filter user_name in ('alice', 'bob', 'svc_adconnector', 'DC01$')\n| transpose user_name on timestamp",
+  "colorScheme": "red",
+  "colorSchemeOrder": "standard",
+  "numberOfRanges": 5,
+  "rangesCreation": "automatic",
+  "heatmapRangeConfig": ["-∞", "", "", "", "", "∞"],
+  "layout": { "h": 22, "w": 30, "x": 0, "y": 0 }
+}
+```
+
+**Critical `heatmapRangeConfig` rule:** `rangesCreation: "automatic"` means SDL computes the threshold boundaries from the data. The `heatmapRangeConfig` array must use empty strings `""` for all middle elements. Providing explicit values (e.g. `"10"`, `"50"`) conflicts with automatic mode and causes the panel to render blank with no error. Correct form for 5 ranges: `["-∞", "", "", "", "", "∞"]` (N+1 elements for N ranges). Do not add explicit middle values unless you also change `rangesCreation` away from `"automatic"`.
+
+**Pre-filter to top-N users before transpose:** After `transpose`, any (user, timebucket) cell with no events becomes null. To keep the heatmap readable and avoid sparse null columns, use `| filter user_name in (...)` to pin the user set to the most active accounts. Find candidates first: `| group count=count() by user.name | sort -count | limit 15 | columns user.name`.
+
+**When to use heatmap:**
+- Login activity per user over time (insider threat, off-hours spikes)
+- Hourly event volume across sources or endpoints
+- Day-of-week × hour activity patterns
+
+---
+
 ### Distribution graph
 
 `graphStyle`: `"distribution"`
@@ -478,6 +509,8 @@ preemptively when authoring panels of these shapes.
 | `transpose <field> on timestamp` hangs the renderer when field values contain hyphens (e.g. `db-prod-01`, ISO dates, UUIDs, container names) | The renderer must parse the transposed values as column names for the chart legend. The PQ parser reads `db-prod-01` as subtraction and throws `Identifier is ambiguous` — or hangs silently. The V1 API tolerates this; the renderer does not. | **Option A** — pre-process: `\| let host_safe = replace_all(host_raw, '-', '_')` then transpose on `host_safe`. **Option B (preferred for by-host charts)** — avoid transpose: use `"xAxis": "grouped_data"` with a grouping query. Loses time dimension but renders reliably. **Option C** — only use `transpose` on fields whose values are guaranteed free of hyphens (numeric codes, single-token labels like `Success`/`Failure`). |
 | Number panel, table panel, or whole dashboard slow to load on first open | "All API queries pass" ≠ "dashboard loads fast". The browser fires all panel queries in parallel; total load time ≈ slowest single panel. Serial validation in a script wildly overestimates wall-clock load time. | Run a parallel load test before every `put_file` — see **Pre-deploy validation** section below. Acceptance thresholds: slowest single panel ≤ 2s, wall-clock ≤ 5s, zero failures. |
 | `get_file` returns HTTP 404 immediately after a successful `put_file` | `put_file` is synchronous but the file propagates across replicas with eventual consistency (~2-3s). | Always `time.sleep(3)` between `put_file` and the subsequent `get_file` verification call. |
+| Heatmap panel renders blank, no error, data confirmed in PowerQuery | `rangesCreation: "automatic"` requires empty-string middles in `heatmapRangeConfig`. Providing explicit numeric strings (e.g. `"10"`, `"50"`) conflicts with automatic mode and the renderer silently returns a blank panel. | Restore to `["-∞", "", "", "", "", "∞"]`. SDL auto-calculates the middle thresholds from live data. |
+| Heatmap (or any panel) renders blank after a config change, but the query returns data | Stale SDL UI session state can persist across config deployments. The browser renderer caches the prior render state and does not always reload after a `put_file`. | Log out and log back in to the SDL console. This clears session state and forces a fresh render. Do not assume a config bug until you have ruled out a stale session. |
 | `min(timestamp)` / `max(timestamp)` displays as a giant integer like `1.777e18` | Aggregating over `timestamp` returns raw nanoseconds. The renderer has no implicit date formatter for aggregate output. | Wrap with `simpledateformat(min(timestamp), 'yyyy-MM-dd HH:mm:ss z', '<TZ>')`. For millisecond-typed fields (e.g. `time` on `dataSource.name='asset'`), multiply by 1000000 first: `simpledateformat(max(time) * 1000000, ...)`. Functions that do NOT exist: `format_timestamp`, `formatTimestamp`, `iso8601`, `date_format`. |
 | Hostname/value-list filter is slow or behaves differently in the renderer vs API | `field matches '(host-a\|host-b)'` is evaluated as a regex per event, and hyphenated literals inside alternation can interact with the parser. | Use `field in ('host-a', 'host-b', 'host-c')` for any fixed list. Faster (indexed lookup), no escaping needed, consistent across renderer and API. Fall back to `matches` only when a true regex pattern is needed. |
 | "User" panels dominated by machine accounts (e.g. `host123$`, `dc-prod-01$`) | Machine accounts carry a trailing `$` and appear in the same fields as human accounts. | Add `\| filter !(field matches '.*\\$$')` after the event filter and before the group. Verify with 5-10 sample rows that no machine accounts leak through. |
@@ -489,21 +522,87 @@ preemptively when authoring panels of these shapes.
 
 ---
 
-## Parameters (dynamic filters)
+## Parameters and filters (dynamic filtering)
 
-Parameters create dropdowns or text boxes that filter all panels. Reference them in queries with `#name#`.
+SDL has two distinct filtering mechanisms that look similar but behave very differently depending on dashboard type.
+
+### `filters[]` — use this in TABBED dashboards (actually works)
+
+`filters[]` declared inside a tab object creates a live facet-based filter widget. Selecting a value from the dropdown applies that filter to **all panels in the tab** in real time. This is the correct filtering mechanism for `configType: "TABBED"` dashboards. Confirmed working.
+
+```json
+{
+  "tabName": "Investigation",
+  "filters": [
+    { "facet": "metadata.product.name", "name": "Alert Product" },
+    { "facet": "endpoint.name", "name": "Endpoint" }
+  ],
+  "graphs": [...]
+}
+```
+
+The dropdown options are populated dynamically from live field values in the current time range. No query changes needed — SDL injects the filter automatically.
+
+### `#VarName#` substitution — only works in FLAT (non-TABBED) dashboards
+
+`#VarName#` query injection works **only** when the dashboard has no `configType` and no `tabs` — i.e. a flat single-view dashboard with top-level `parameters` and `graphs`. Confirmed working in `parameter_examples-v1.0.json`.
+
+In a `configType: "TABBED"` dashboard, `#VarName#` is passed literally to the query engine, which throws `Don't understand [#] — try enclosing it in quotes`. Moving `parameters` to the top level of a TABBED dashboard does not fix this.
+
+Flat dashboard example (the only context where `#VarName#` works):
 
 ```json
 {
   "parameters": [
-    { "name": "site", "values": ["us-east", "us-west", "eu-central"] },
-    { "name": "endpoint", "defaultValue": "" }
+    {
+      "name": "Specified Tag",
+      "values": [
+        { "label": "All", "value": "*" },
+        { "label": "Log Volumes", "value": "'logVolume'" }
+      ],
+      "defaultValue": "*"
+    }
   ],
   "graphs": [
     {
-      "title": "Threats on #site# / #endpoint#",
-      "graphStyle": "table",
-      "query": "event.category='indicators' site.name='#site#' endpoint.name='#endpoint#' | group count=count() by indicator.name | sort -count"
+      "query": "tag=#Specified Tag# | group count=count() by serverHost",
+      "title": "Count by Tag"
+    }
+  ]
+}
+```
+
+Pre-quoting rule: if the field requires string matching, embed single quotes in the value string: `"'logVolume'"` so substitution produces `tag='logVolume'`. Use `"*"` (no inner quotes) for wildcard presence filter.
+
+### `parameters[]` in TABBED dashboards — UI-only chrome
+
+`parameters[]` declared inside a tab (with `facet` or `values`) renders a dropdown in the tab header but does NOT apply any filter to panel queries. It is purely decorative UI. The `filters[]` mechanism described above is the functional equivalent.
+
+```json
+{
+  "parameters": [
+    {
+      "name": "Product",
+      "label": "Alert Product",
+      "values": [
+        { "label": "STAR", "value": "STAR" },
+        { "label": "CWS", "value": "CWS" },
+        { "label": "EDR", "value": "EDR" }
+      ],
+      "defaultValue": "STAR"
+    }
+  ]
+}
+```
+
+```json
+{
+  "parameters": [
+    {
+      "name": "Site",
+      "label": "Site",
+      "facet": "s1_detection_metadata.site_name",
+      "defaultValue": "*"
     }
   ]
 }
@@ -519,7 +618,7 @@ For user-friendly dropdown labels:
 }
 ```
 
-Hide a parameter from the UI (use as a constant):
+Hide a parameter from the UI (declared but not displayed):
 ```json
 { "name": "base_search", "options": { "display": "hidden" }, "defaultValue": "dataSource.name='MySource'" }
 ```
@@ -751,7 +850,51 @@ Unbounded tables force a full scan. Always cap results:
 - Aggregated top-N tables: `| limit 20` or `| limit 25`
 - Donut/pie panels: `| sort -count | limit 10`
 
-### 4. Use `event.category = *` not `event.category != ''`
+### 4. Use `field=*` to drop nulls — never `field != null`
+
+`field=*` is the correct SDL null-check predicate. It matches any event where the field is present and non-null. `field != null` is parsed as a literal comparison to the string `"null"` in the old-style filter syntax and returns wrong results or an error. Apply this anywhere you want to exclude missing values:
+
+```
+// Good — presence check
+dataSource.name='alert' severity_id=*
+| group count=count() by severity_id
+
+// Bad — != null does not mean what you think in SDL filter syntax
+dataSource.name='alert' severity_id != null
+```
+
+This applies in the initial filter predicate (before the first `|`) and in `| filter` commands equally.
+
+### 5. Use `| filter count > 0` to suppress zero rows
+
+After a `| group count=count() by ...`, SDL may produce rows with `count=0` for sparse buckets (especially after `transpose` or when grouping over a large key space). These zero rows render as empty cells in heatmaps and false entries in tables. Filter them out:
+
+```
+| group EventCount=count() by user_name=user.name, timestamp=timebucket('1h')
+| filter EventCount > 0
+```
+
+Apply the same pattern to any aggregated numeric field you're visualising: `| filter bytes > 0`, `| filter value > 0`.
+
+### 6. `| sort` must come before `| columns` — field projection is destructive
+
+`| columns` removes every field not listed. Any `| sort` placed after `| columns` that references a field not in the projected set is operating on a non-existent field and silently fails or hangs the panel (bullet panels are especially prone to this):
+
+```
+// Wrong — severity_id is gone after | columns, sort fails silently
+| group value=count(), target=..., label=... by severity_id
+| columns value, target, label
+| sort -severity_id          ← severity_id no longer exists
+
+// Correct — sort while severity_id is still in scope
+| group value=count(), target=..., label=... by severity_id
+| sort -severity_id
+| columns value, target, label
+```
+
+This affects any pipeline that projects away the sort key: bullet panels, donut panels with a custom label column, and any query that renames fields via `| columns alias=field`.
+
+### 7. Use `event.category = *` not `event.category != ''`
 
 `!= ''` requires evaluating the field value as a string comparison. `= *` is a cheaper is-not-null predicate:
 ```
@@ -916,7 +1059,8 @@ This is the same V1-query schema-discovery pattern from the `sentinelone-sdl-api
 
 ## Escalation ladder when a deployed dashboard hangs
 
-1. **Hard refresh** (`Ctrl+Shift+R` / `Cmd+Shift+R`). Eliminates cached state from a previous broken version. Resolves ~10% of "still hung" reports.
+1. **Log out and log back in.** The SDL UI caches panel render state in the session. After a `put_file`, the browser can serve a stale render from the prior version even though the underlying config changed. A fresh login clears session state completely. Try this before any config investigation when the query is confirmed to return data.
+2. **Hard refresh** (`Ctrl+Shift+R` / `Cmd+Shift+R`). Eliminates cached state from a previous broken version. Resolves ~10% of "still hung" reports.
 2. **Check dev-tools network tab.** If panel queries are NOT being fired, the renderer is stuck before any HTTP call. Cause is structural (layout/options/JSON parse), not query performance. If queries ARE firing, record the slowest and move to step 3.
 3. **Run the slow panel's query in isolation via the V1 API.** If it returns fast, the issue is renderer-side (column names, `transpose`, panel options). If it is slow, optimise the query.
 4. **Reduce panel count by 50%.** If the dashboard now loads, the issue was concurrency or memory in the renderer. Add panels back 25% at a time until a regression isolates the offender.

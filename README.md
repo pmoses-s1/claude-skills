@@ -43,7 +43,7 @@ The plugin bundles every skill; installing it is sufficient. No individual skill
 | sentinelone-mgmt-console-api | Query and act on the Management Console: threats, alerts, agents, sites, RemoteOps, Deep Visibility, Hyperautomation, Purple AI, UAM. Includes the source-agnostic behavioral baselining + anomaly detection pipeline (`baseline_anomaly.py`) |
 | sentinelone-powerquery | Write, debug, and run PowerQuery for threat hunting, STAR detection rules, SDL dashboards, and statistical baseline / anomaly detection rule bodies |
 | sentinelone-sdl-api | Ingest events, run queries, and manage configuration files (parsers, dashboards, lookups) via the Singularity Data Lake API |
-| sentinelone-sdl-dashboard | Design, author, and deploy SDL dashboards: panels, tabs, parameters, and full dashboard JSON |
+| sentinelone-sdl-dashboard | Design, author, and deploy SDL dashboards: panels, tabs, parameters, and full dashboard JSON. See [docs/sdl-dashboard.md](./docs/sdl-dashboard.md) for all supported panel types |
 | sentinelone-sdl-log-parser | Author and validate SDL log parsers for any log format, with OCSF field mapping by default |
 | sentinelone-hyperautomation | Design and generate Hyperautomation workflow JSON, with optional live console import |
 
@@ -522,5 +522,6 @@ This repo includes Windsurf workflow files in `.windsurf/workflows/`. Each workf
 | [docs/mcp-tools.md](./docs/mcp-tools.md) | All sentinelone-mcp and purple-mcp tools with usage notes and which to use when |
 | [docs/credentials.md](./docs/credentials.md) | Every credential key, where to find it, full `claude_desktop_config.json` reference |
 | [docs/testing.md](./docs/testing.md) | Full test coverage matrix, MCP tool validation results, and confirmed API field requirements |
+| [docs/sdl-dashboard.md](./docs/sdl-dashboard.md) | All supported panel types and dashboard features with confirmed JSON examples |
 | [sentinelone-mgmt-console-api/SKILL.md](./sentinelone-mgmt-console-api/SKILL.md) | Deep reference: confirmed field schemas and required API parameters per endpoint |
 | [sentinelone-mgmt-console-api/tests/README.md](./sentinelone-mgmt-console-api/tests/README.md) | Reversible lifecycle test patterns and per-test field notes |
