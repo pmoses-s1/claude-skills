@@ -161,7 +161,7 @@ Download the `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelo
 
    > **credentials.json:** If you are using `sentinelone-mcp` (recommended), credentials are passed via environment variables in `claude_desktop_config.json` and you do not need to add `credentials.json` to the project. If you are using the skills directly without `sentinelone-mcp`, add `credentials.json` here as well for backwards compatibility.
 
-5. Confirm that `sentinelone-skills` is listed under Personal plugins, and Purple MCP and your threat intel MCP are connected under MCP Servers, then click **Create**
+5. Confirm that `sentinelone-skills` is listed under Personal plugins, and Purple MCP and your threat intel MCP are connected under MCP Servers
 
 **Step 4: Start a session**
 
