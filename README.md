@@ -16,7 +16,7 @@ CLAUDE.md            SOC Analyst persona: session protocol, evidence rules,
 MCP Servers          Live API access, outside the Cowork sandbox proxy
   sentinelone-mcp    19 tools: PowerQuery, SDL, Mgmt Console REST, UAM, Hyperautomation
   purple-mcp         Alert triage, Purple AI NLQ, Deep Visibility, assets, vulnerabilities
-  virustotal-mcp     External IOC enrichment (required for CRITICAL classification)
+  threat-intel-mcp   External IOC enrichment (required for CRITICAL classification)
        │
        ▼
 Skills (SKILL.md)    Procedural knowledge: confirmed API schemas, field requirements, usage patterns
@@ -161,8 +161,7 @@ Download the `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelo
 
    > **credentials.json:** If you are using `sentinelone-mcp` (recommended), credentials are passed via environment variables in `claude_desktop_config.json` and you do not need to add `credentials.json` to the project. If you are using the skills directly without `sentinelone-mcp`, add `credentials.json` here as well for backwards compatibility.
 
-5. Confirm that `sentinelone-skills` is listed under Personal plugins, and Purple MCP and VirusTotal are connected under MCP Servers
-6. Click **Create**
+5. Confirm that `sentinelone-skills` is listed under Personal plugins, and Purple MCP and your threat intel MCP are connected under MCP Servers, then click **Create**
 
 **Step 4: Start a session**
 
@@ -282,7 +281,7 @@ Three production failure modes that a basic moving-avg baseline misses, and this
 # Auto-discover principal/action, 30-day DoW-stratified baseline, default Z=2.0
 python sentinelone-mgmt-console-api/scripts/baseline_anomaly.py --source "Okta"
 
-# Network source — auto-discover picks device.name + event.type
+# Network source: auto-discover picks device.name + event.type
 python sentinelone-mgmt-console-api/scripts/baseline_anomaly.py --source "FortiGate" --days 14
 
 # Override fields if you know better
@@ -303,7 +302,7 @@ Just ask. The PowerQuery skill delegates to the mgmt-console-api skill automatic
 ```
 Build a 30-day behavioral baseline for Okta and show me anomalies for today.
 Find users behaving differently from their typical pattern across all SaaS sources.
-Run anomaly detection on FortiGate — which devices have unusual traffic today vs the last two weeks?
+Run anomaly detection on FortiGate: which devices have unusual traffic today vs the last two weeks?
 Which CloudTrail roles are silent today that were active every day last week?
 ```
 
@@ -519,9 +518,9 @@ This repo includes Windsurf workflow files in `.windsurf/workflows/`. Each workf
 | Doc | Contents |
 |---|---|
 | [docs/architecture.md](./docs/architecture.md) | How the three layers fit together, data flow, auth patterns, sandbox proxy explanation |
-| [docs/skills.md](./docs/skills.md) | Per-skill capability reference, key scripts, confirmed gotchas |
+| [docs/skills.md](./docs/skills.md) | Per-skill capability reference, key scripts, and field requirements |
 | [docs/mcp-tools.md](./docs/mcp-tools.md) | All sentinelone-mcp and purple-mcp tools with usage notes and which to use when |
 | [docs/credentials.md](./docs/credentials.md) | Every credential key, where to find it, full `claude_desktop_config.json` reference |
-| [docs/testing.md](./docs/testing.md) | Full test coverage matrix, MCP tool validation results, confirmed API gotchas per surface |
-| [sentinelone-mgmt-console-api/SKILL.md](./sentinelone-mgmt-console-api/SKILL.md) | Deep reference: confirmed field schemas, non-obvious requirements, gotcha catalogue per endpoint |
-| [sentinelone-mgmt-console-api/tests/README.md](./sentinelone-mgmt-console-api/tests/README.md) | Reversible lifecycle test patterns and per-test gotchas |
+| [docs/testing.md](./docs/testing.md) | Full test coverage matrix, MCP tool validation results, and confirmed API field requirements |
+| [sentinelone-mgmt-console-api/SKILL.md](./sentinelone-mgmt-console-api/SKILL.md) | Deep reference: confirmed field schemas and required API parameters per endpoint |
+| [sentinelone-mgmt-console-api/tests/README.md](./sentinelone-mgmt-console-api/tests/README.md) | Reversible lifecycle test patterns and per-test field notes |
