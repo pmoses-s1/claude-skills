@@ -23,7 +23,7 @@ cp -r sentinelone-hyperautomation ~/.claude/skills/
 
 ## Configure
 
-For API submission to a live console, drop a `credentials.json` directly into your Cowork project folder. The plugin's SessionStart hook auto-discovers it at the start of every session.
+Set credentials as environment variables in `claude_desktop_config.json` inside the `sentinelone-mcp` server entry (recommended), or drop a `credentials.json` into your Cowork project folder for direct skill use:
 
 ```json
 {
@@ -33,11 +33,9 @@ For API submission to a live console, drop a `credentials.json` directly into yo
 }
 ```
 
-Use a **Console User (personal) API token** — not a Service User token. Workflows imported with a Service User token are owned by that service account and invisible to human users in the console UI.
+Use a **Console User (personal) API token**, not a Service User token. Workflows imported with a Service User token are owned by that service account and invisible to human users in the console UI.
 
-`S1_HEC_INGEST_URL` is the SentinelOne HEC ingest host (region-specific — see [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961)). It is not used by this Hyperautomation skill, but is shown here so the credentials file is consistent across all skills in this plugin (the mgmt-console skill's UAM Alert Interface uses it for OCSF alert/indicator ingest).
-
-Environment variables `S1_CONSOLE_URL`, `S1_CONSOLE_API_TOKEN`, and `S1_HEC_INGEST_URL` override the credentials file if set.
+`S1_HEC_INGEST_URL` is the SentinelOne HEC ingest host (region-specific: see [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961)). It is not used by this Hyperautomation skill, but is shown here so the credentials file is consistent across all skills in this plugin (the mgmt-console skill's UAM Alert Interface uses it for OCSF alert/indicator ingest).
 
 ## Usage
 
@@ -51,12 +49,12 @@ Claude will ask clarifying questions if needed, warn about any integrations that
 
 ## Layout
 
-- `SKILL.md` — instructions Claude reads when the skill triggers
-- `references/workflow-schema.md` — envelope and action structure
-- `references/building-blocks.md` — exact shape of every action type
-- `references/functions-reference.md` — `{{Function.X()}}` syntax and PowerQuery patterns
-- `references/validation-rules.md` — pre-output checklist
-- `references/api-integration.md` — Hyperautomation API reference (import, activate, trigger, list)
+- `SKILL.md`: instructions Claude reads when the skill triggers
+- `references/workflow-schema.md`: envelope and action structure
+- `references/building-blocks.md`: exact shape of every action type
+- `references/functions-reference.md`: `{{Function.X()}}` syntax and PowerQuery patterns
+- `references/validation-rules.md`: pre-output checklist
+- `references/api-integration.md`: Hyperautomation API reference (import, activate, trigger, list)
 
 ## Credit
 

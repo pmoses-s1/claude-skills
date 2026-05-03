@@ -1,6 +1,6 @@
 # sentinelone-mgmt-console-api (Claude skill)
 
-A Claude skill wrapping the SentinelOne Management Console API (Swagger 2.1, 781 operations, 113 tags) plus the two GraphQL surfaces the console exposes: **Unified Alert Management** (documented, for modern multi-source alert triage and bulk actions) and **Purple AI** (undocumented, for natural-language SDL queries).
+A Claude skill wrapping the SentinelOne Management Console API (Swagger 2.1, 781 operations, 113 tags) plus two GraphQL surfaces: **Unified Alert Management** (modern multi-source alert triage and bulk actions) and **Purple AI** (natural-language SDL queries).
 
 ## Install
 
@@ -18,7 +18,21 @@ In Cowork/Claude Code, the path is:
 
 ## Configure
 
-Drop a `credentials.json` file directly into your Cowork project folder (see [`../credentials.example.json`](../credentials.example.json) for all available keys):
+### With sentinelone-mcp (recommended)
+
+Set credentials as environment variables in `claude_desktop_config.json` inside the `sentinelone-mcp` server entry. No `credentials.json` file is needed:
+
+```json
+"env": {
+  "S1_CONSOLE_URL":       "https://usea1-acme.sentinelone.net",
+  "S1_CONSOLE_API_TOKEN": "eyJ...your-api-token...",
+  "S1_HEC_INGEST_URL":    "https://ingest.us1.sentinelone.net"
+}
+```
+
+### Without sentinelone-mcp (direct skill use)
+
+Drop a `credentials.json` file into your Cowork project folder (see [`../credentials.example.json`](../credentials.example.json) for all available keys). The plugin's SessionStart hook auto-discovers it. To trigger a manual refresh: `bash scripts/bootstrap_creds.sh`.
 
 ```json
 {
@@ -28,13 +42,9 @@ Drop a `credentials.json` file directly into your Cowork project folder (see [`.
 }
 ```
 
-The plugin's SessionStart hook auto-discovers it and makes it available to the client with no preflight. To trigger a manual refresh: `bash scripts/bootstrap_creds.sh`.
-
-Create the API token in the S1 console → Settings → Users → Service Users → Generate API Token. Scope it to the minimum permissions needed.
+Create the API token in the S1 console: Settings → Users → Service Users → Generate API Token. Scope it to the minimum permissions needed.
 
 `S1_HEC_INGEST_URL` is the SentinelOne HEC ingest host, used by the UAM Alert Interface for OCSF alert/indicator ingest (and for log ingest via HEC). It is region-specific; look up your region's URL in [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961). Only required if you push alerts/indicators into UAM via `UAMAlertInterfaceClient`; the read-side UAM GraphQL works without it.
-
-Environment variables (`S1_CONSOLE_URL`, `S1_CONSOLE_API_TOKEN`, `S1_HEC_INGEST_URL`) override the file if set.
 
 ## Quick test
 
@@ -52,7 +62,7 @@ Should print the first 5 accounts, then fan out 4 parallel GETs.
 python scripts/smoke_test_queries.py --workers 12
 ```
 
-Enumerates every GET plus a curated allow-list of read-only query POSTs, writes `references/tenant_capabilities.{json,md}`. Read-only — no writes, no agent actions. After the sweep you can filter searches to only confirmed-working endpoints:
+Enumerates every GET plus a curated allow-list of read-only query POSTs, writes `references/tenant_capabilities.{json,md}`. Read-only: no writes, no agent actions. After the sweep you can filter searches to only confirmed-working endpoints:
 
 ```bash
 python scripts/search_endpoints.py "threats" --only-works
@@ -60,9 +70,9 @@ python scripts/search_endpoints.py "threats" --only-works
 
 ## Orientation
 
-- `references/CAPABILITY_MAP.md` — per-tag verb+resource summary ("I want to…" lookup).
-- `references/WORKFLOWS.md` — ready-to-adapt multi-step recipes.
-- `references/TAG_INDEX.md` — full 113-tag directory with per-tag reference files.
+- `references/CAPABILITY_MAP.md`: per-tag verb+resource summary ("I want to…" lookup).
+- `references/WORKFLOWS.md`: ready-to-adapt multi-step recipes.
+- `references/TAG_INDEX.md`: full 113-tag directory with per-tag reference files.
 
 Unified Alert Management:
 
@@ -77,20 +87,20 @@ Purple AI natural-language query (requires tenant entitlement for Purple AI):
 python scripts/call_purple.py "show powershell.exe outbound connections in the last 24h, top 10"
 ```
 
-Purple AI answers questions about SDL telemetry (process/network/file events, indicators, ingested logs). It does *not* answer questions about console entities (alerts, threats, agents) — those go through the REST endpoints or Unified Alert Management.
+Purple AI answers questions about SDL telemetry (process/network/file events, indicators, ingested logs). It does *not* answer questions about console entities (alerts, threats, agents): those go through the REST endpoints or Unified Alert Management.
 
 ## Layout
 
-- `SKILL.md` — instructions Claude reads when the skill triggers
-- `<project folder>/credentials.json` — credentials (set `S1_CONSOLE_URL` and `S1_CONSOLE_API_TOKEN`); auto-discovered by the plugin's SessionStart hook
-- `scripts/bootstrap_creds.sh` — idempotent helper to copy workspace creds into the sandbox-local path
-- `scripts/s1_client.py` — REST client (auth, pooled HTTP, retries, cursor pagination, parallel `get_many()`, optional cache)
-- `scripts/call_endpoint.py` — REST CLI wrapper
-- `scripts/search_endpoints.py` — ranked keyword search over the endpoint index (verb-aware, `--only-works` filter)
-- `scripts/smoke_test_queries.py` — non-destructive sweep of every GET + safe query POST
-- `scripts/purple_ai.py` — Purple AI GraphQL wrapper (`purple_query()`, `PurpleAIError`)
-- `scripts/call_purple.py` — Purple AI CLI wrapper
-- `scripts/unified_alerts.py` — Unified Alert Management GraphQL wrapper (queries, mutations, triage helpers)
-- `scripts/call_unified_alerts.py` — UAM CLI wrapper
-- `references/` — endpoint index + per-tag reference docs; `UNIFIED_ALERTS.md` covers the GraphQL UAM surface
-- `spec/` — the original Swagger JSON
+- `SKILL.md`: instructions Claude reads when the skill triggers
+- `<project folder>/credentials.json` (optional): credentials for direct skill use; auto-discovered by the plugin's SessionStart hook
+- `scripts/bootstrap_creds.sh`: idempotent helper to copy workspace creds into the sandbox-local path
+- `scripts/s1_client.py`: REST client (auth, pooled HTTP, retries, cursor pagination, parallel `get_many()`, optional cache)
+- `scripts/call_endpoint.py`: REST CLI wrapper
+- `scripts/search_endpoints.py`: ranked keyword search over the endpoint index (verb-aware, `--only-works` filter)
+- `scripts/smoke_test_queries.py`: non-destructive sweep of every GET + safe query POST
+- `scripts/purple_ai.py`: Purple AI GraphQL wrapper (`purple_query()`, `PurpleAIError`)
+- `scripts/call_purple.py`: Purple AI CLI wrapper
+- `scripts/unified_alerts.py`: Unified Alert Management GraphQL wrapper (queries, mutations, triage helpers)
+- `scripts/call_unified_alerts.py`: UAM CLI wrapper
+- `references/`: endpoint index + per-tag reference docs; `UNIFIED_ALERTS.md` covers the GraphQL UAM surface
+- `spec/`: the original Swagger JSON

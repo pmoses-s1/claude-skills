@@ -1,6 +1,6 @@
 # SentinelOne MCP Server
 
-A Model Context Protocol (MCP) server that orchestrates all six SentinelOne skills and their APIs. Built in Node.js with zero external dependencies — pure Node.js 18+.
+A Model Context Protocol (MCP) server that orchestrates all six SentinelOne skills and their APIs. Built in pure Node.js 18+ with zero external dependencies.
 
 ## What this exposes
 
@@ -29,35 +29,34 @@ A Model Context Protocol (MCP) server that orchestrates all six SentinelOne skil
 | Hyperautomation | `ha_export_workflow` | sentinelone-hyperautomation |
 
 **2 resources:**
-- `sentinelone://soc-context` — CLAUDE.md (full SOC analyst operating instructions)
-- `sentinelone://credentials-status` — Which credentials are configured
+- `sentinelone://soc-context`: CLAUDE.md (full SOC analyst operating instructions)
+- `sentinelone://credentials-status`: Which credentials are configured
 
 **2 prompts:**
-- `soc_analyst` — Embeds CLAUDE.md as a system prompt; call at session start
-- `session_init` — Structured initialization: enumerate sources + triage alerts in parallel
+- `soc_analyst`: Embeds CLAUDE.md as a system prompt; call at session start
+- `session_init`: Structured initialization: enumerate sources + triage alerts in parallel
 
 ## Prerequisites
 
 - Node.js 18 or later
-- `credentials.json` in the `claude-skills/` folder (or any parent directory)
-- No `npm install` needed — zero external dependencies
+- No `npm install` needed: zero external dependencies
 
 ## Credentials
 
-The server auto-discovers `credentials.json` by searching from the working directory upward. Drop the file directly into the `claude-skills/` folder:
-
-```json
-{
-  "S1_CONSOLE_URL": "https://usea1-yourorg.sentinelone.net",
-  "S1_CONSOLE_API_TOKEN": "eyJ...your-api-token...",
-  "S1_HEC_INGEST_URL": "https://ingest.us1.sentinelone.net",
-  "SDL_XDR_URL": "https://xdr.us1.sentinelone.net",
-  "SDL_LOG_WRITE_KEY": "0Z1Fy0...",
-  "SDL_CONFIG_WRITE_KEY": "0mXas6PD..."
-}
-```
+Credentials are passed as environment variables in `claude_desktop_config.json` (see Installation below). The server also auto-discovers a `credentials.json` file by searching from the working directory upward as a backwards-compatible fallback for direct-skill users.
 
 `S1_CONSOLE_URL` and `S1_CONSOLE_API_TOKEN` are sufficient for most tools. Add the SDL keys only if you need `sdl_upload_logs` (requires `SDL_LOG_WRITE_KEY`) or `sdl_put_file` (requires `SDL_CONFIG_WRITE_KEY`).
+
+| Variable | Description |
+|----------|-------------|
+| `S1_CONSOLE_URL` | Your console URL, e.g. `https://usea1-acme.sentinelone.net` |
+| `S1_CONSOLE_API_TOKEN` | Management Console API token (Settings → Users → Service Users) |
+| `S1_HEC_INGEST_URL` | HEC ingest host, e.g. `https://ingest.us1.sentinelone.net` |
+| `SDL_XDR_URL` | SDL tenant URL, e.g. `https://xdr.us1.sentinelone.net` |
+| `SDL_LOG_WRITE_KEY` | SDL Log Write key (required for `sdl_upload_logs` only) |
+| `SDL_LOG_READ_KEY` | SDL Log Read key (required for SDL query operations) |
+| `SDL_CONFIG_WRITE_KEY` | SDL Config Write key (required for `sdl_put_file`) |
+| `SDL_CONFIG_READ_KEY` | SDL Config Read key (required for `sdl_list_files`, `sdl_get_file`) |
 
 ## Run the server
 
@@ -71,40 +70,53 @@ node /path/to/claude-skills/sentinelone-mcp/index.js
 
 The Claude sandbox proxy blocks outbound HTTPS to `*.sentinelone.net` by default. There are two ways to fix this:
 
-**Option A — Install sentinelone-mcp (recommended).** The MCP server runs as a local process on your machine outside the sandbox. All API calls go directly from your machine to SentinelOne — the sandbox proxy is bypassed entirely. No allowlist changes needed.
+**Option A: Install sentinelone-mcp (recommended).** The MCP server runs as a local process on your machine outside the sandbox. All API calls go directly from your machine to SentinelOne, bypassing the sandbox proxy entirely. No allowlist changes needed.
 
-**Option B — Add `*.sentinelone.net` to the Claude sandbox allowlist.** In Claude Desktop go to Settings → Claude Code → Network Access and add `*.sentinelone.net` to the allowed domains. This lets the skills' Python scripts reach the API directly from inside the sandbox. Use this if you prefer to keep everything running in the sandbox rather than install a local server.
+**Option B: Add `*.sentinelone.net` to the Claude sandbox allowlist.** In Claude Desktop go to Settings → Claude Code → Network Access and add `*.sentinelone.net` to the allowed domains. This lets the skills' Python scripts reach the API directly from inside the sandbox. Use this if you prefer to keep everything running in the sandbox rather than install a local server.
 
-Most users should use Option A — it requires no admin changes and keeps credentials out of the sandbox environment.
+Most users should use Option A: it requires no admin changes and keeps credentials out of the sandbox environment.
 
 ### Option A: Add to Claude Desktop
 
-In `~/Library/Application Support/Claude/claude_desktop_config.json`, add the `sentinelone-mcp` entry to your `mcpServers` block:
+In `~/Library/Application Support/Claude/claude_desktop_config.json`, add the `sentinelone-mcp` entry to your `mcpServers` block. Credentials go in the `env` section:
 
 ```json
 {
   "mcpServers": {
     "sentinelone-mcp": {
       "command": "node",
-      "args": ["/Users/yourname/Documents/Claude/Projects/Prithvi/claude-skills/sentinelone-mcp/index.js"],
-      "env": {}
+      "args": ["/Users/yourname/Documents/Claude/Projects/claude-skills/sentinelone-mcp/index.js"],
+      "env": {
+        "S1_CONSOLE_URL":        "https://usea1-yourorg.sentinelone.net",
+        "S1_CONSOLE_API_TOKEN":  "eyJ...your-api-token...",
+        "S1_HEC_INGEST_URL":     "https://ingest.us1.sentinelone.net",
+        "SDL_XDR_URL":           "https://xdr.us1.sentinelone.net",
+        "SDL_LOG_WRITE_KEY":     "0Z1Fy0...",
+        "SDL_LOG_READ_KEY":      "0tzj...",
+        "SDL_CONFIG_WRITE_KEY":  "0mXas6PD...",
+        "SDL_CONFIG_READ_KEY":   "0MQTx..."
+      }
     }
   }
 }
 ```
 
-Restart Claude Desktop after saving. The server auto-discovers `credentials.json` from the `claude-skills/` folder — no further configuration needed.
+Restart Claude Desktop after saving. `S1_CONSOLE_URL` and `S1_CONSOLE_API_TOKEN` are the minimum required for most tools. Include the SDL keys only if you need log ingest or parser/dashboard deploy.
 
 ### Option A: Add to Claude Code
 
-In `.mcp.json` at your project root, or `~/.mcp.json` globally:
+In `.mcp.json` at your project root, or `~/.mcp.json` globally. Add the same `env` block as above, or rely on environment variables already set in your shell:
 
 ```json
 {
   "mcpServers": {
     "sentinelone-mcp": {
       "command": "node",
-      "args": ["/Users/yourname/Documents/Claude/Projects/Prithvi/claude-skills/sentinelone-mcp/index.js"]
+      "args": ["/Users/yourname/Documents/Claude/Projects/claude-skills/sentinelone-mcp/index.js"],
+      "env": {
+        "S1_CONSOLE_URL":       "https://usea1-yourorg.sentinelone.net",
+        "S1_CONSOLE_API_TOKEN": "eyJ...your-api-token..."
+      }
     }
   }
 }
@@ -125,7 +137,7 @@ The skills' Python scripts (`s1_client.py`, `sdl_client.py`, etc.) will then rea
 When connecting to this MCP server, start every session with:
 
 1. Read the `soc_analyst` prompt (or the `sentinelone://soc-context` resource) to load operating instructions from CLAUDE.md.
-2. Call `powerquery_enumerate_sources` to discover active SDL data sources (mandatory — never assume sources from a prior session).
+2. Call `powerquery_enumerate_sources` to discover active SDL data sources (mandatory: never assume sources from a prior session).
 3. In parallel, call `uam_list_alerts` with `filter="status=OPEN"` to pull active alerts.
 
 The `session_init` prompt automates steps 2-3 as a structured prompt.
@@ -160,4 +172,4 @@ sentinelone-mcp/
 
 ## Updating CLAUDE.md
 
-The `sentinelone://soc-context` resource and `soc_analyst` prompt load from `../CLAUDE.md` (the `claude-skills/CLAUDE.md` file) at server startup. Edit that file and restart the server to pick up changes — no code change needed.
+The `sentinelone://soc-context` resource and `soc_analyst` prompt load from `../CLAUDE.md` (the `claude-skills/CLAUDE.md` file) at server startup. Edit that file and restart the server to pick up changes.

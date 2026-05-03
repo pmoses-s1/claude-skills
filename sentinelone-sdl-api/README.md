@@ -1,6 +1,6 @@
 # sentinelone-sdl-api (Claude skill)
 
-A Claude skill wrapping the SentinelOne **Singularity Data Lake (SDL) API** — ingest, query, and manage configuration files on a Scalyr/SDL/XDR tenant. Covers all 10 SDL methods with a Python client, a CLI, and per-method reference docs.
+A Claude skill wrapping the SentinelOne **Singularity Data Lake (SDL) API** for ingest, query, and configuration file management on a Scalyr/SDL/XDR tenant. Covers all 10 SDL methods with a Python client, a CLI, and per-method reference docs.
 
 ## Install
 
@@ -18,16 +18,33 @@ In Cowork/Claude Code, the path is:
 
 ## Configure
 
-The SDL API has four scoped key types plus (optionally) the same management-console API token used by `sentinelone-mgmt-console-api` (`S1_CONSOLE_API_TOKEN`). Drop a `credentials.json` directly into your Cowork project folder with the keys you need (see [`credentials.example.json`](../credentials.example.json) for all available keys). The plugin's SessionStart hook auto-discovers it; run `bash scripts/bootstrap_creds.sh` to refresh manually:
+### With sentinelone-mcp (recommended)
+
+Set credentials as environment variables in `claude_desktop_config.json` inside the `sentinelone-mcp` server entry. No `credentials.json` file is needed:
+
+```json
+"env": {
+  "SDL_XDR_URL":          "https://xdr.us1.sentinelone.net",
+  "S1_CONSOLE_API_TOKEN": "eyJ...your-token...",
+  "SDL_LOG_WRITE_KEY":    "0Z1Fy0...",
+  "SDL_LOG_READ_KEY":     "0tzj...",
+  "SDL_CONFIG_READ_KEY":  "0MQTx...",
+  "SDL_CONFIG_WRITE_KEY": "0mXas6PD..."
+}
+```
+
+### Without sentinelone-mcp (direct skill use)
+
+The SDL API has four scoped key types plus (optionally) the same management-console API token used by `sentinelone-mgmt-console-api` (`S1_CONSOLE_API_TOKEN`). Drop a `credentials.json` into your Cowork project folder with the keys you need (see [`credentials.example.json`](../credentials.example.json) for all available keys). The plugin's SessionStart hook auto-discovers it; run `bash scripts/bootstrap_creds.sh` to refresh manually:
 
 ```json
 {
   "SDL_XDR_URL":          "https://xdr.us1.sentinelone.net",
-  "S1_CONSOLE_API_TOKEN":          "eyJ...your-token...",
-  "SDL_LOG_WRITE_KEY":     "0Z1Fy0...",
-  "SDL_LOG_READ_KEY":      "0tzj/CPYT...",
-  "SDL_CONFIG_READ_KEY":   "0MQTxgj...",
-  "SDL_CONFIG_WRITE_KEY":  "0mXas6PD..."
+  "S1_CONSOLE_API_TOKEN": "eyJ...your-token...",
+  "SDL_LOG_WRITE_KEY":    "0Z1Fy0...",
+  "SDL_LOG_READ_KEY":     "0tzj/CPYT...",
+  "SDL_CONFIG_READ_KEY":  "0MQTxgj...",
+  "SDL_CONFIG_WRITE_KEY": "0mXas6PD..."
 }
 ```
 
@@ -43,8 +60,8 @@ Generate SDL keys in SDL Console → your-user menu → **API Keys**. Scope-spec
 
 ### Which fields do I need?
 
-- **`base_url`** — always required.
-- **SDL keys** — fill in only the ones that match what you want the skill to do. Ingesting? `log_write_key`. Running queries? `log_read_key`. Reading parsers/dashboards? `config_read_key`. Editing/deleting them? `config_write_key`. If you only ever need to query, you can skip the other three.
+- **`base_url`**: always required.
+- **SDL keys**: fill in only the ones that match what you want the skill to do. Ingesting? `log_write_key`. Running queries? `log_read_key`. Reading parsers/dashboards? `config_read_key`. Editing/deleting them? `config_write_key`. If you only ever need to query, you can skip the other three.
 - **`S1_CONSOLE_API_TOKEN`**: optional alternative to SDL keys. The same management-console JWT used by `sentinelone-mgmt-console-api` works for every SDL method **except** `uploadLogs`. Useful if you already have a console token and don't want to generate a second set of keys. Leave blank if you're using the scoped SDL keys. (Legacy alias `SDL_CONSOLE_API_TOKEN` is still recognised but emits a deprecation warning.)
 - **`SDL_S1_SCOPE`**: only relevant when `S1_CONSOLE_API_TOKEN` is set **and** that user has access to multiple sites or accounts. Format: `<accountId>:<siteId>` for site scope, `<accountId>` for account scope. Ignored when SDL keys are used.
 
@@ -52,14 +69,14 @@ The client picks the narrowest matching key per method (principle of least privi
 
 | Key | Primary method(s) in the client |
 |---|---|
-| `log_write_key`    | `uploadLogs` (required — console tokens rejected here), `addEvents` |
+| `log_write_key`    | `uploadLogs` (required: console tokens rejected here), `addEvents` |
 | `log_read_key`     | `query`, `numericQuery`, `facetQuery`, `timeseriesQuery`, `powerQuery` |
 | `config_read_key`  | `listFiles`, `getFile` |
 | `config_write_key` | `putFile` |
 
 `console_api_token` is only used as a fallback for any of the above (except `uploadLogs`) when the matching SDL key is blank.
 
-Environment variables (`SDL_XDR_URL`, `SDL_LOG_WRITE_KEY`, etc.) override the credentials file if set.
+When using `sentinelone-mcp`, environment variables set in `claude_desktop_config.json` take priority. When using skills directly, environment variables set in your shell override the credentials file.
 
 ## Quick test
 
@@ -106,7 +123,7 @@ r = c.power_query("status >= 100 status <= 599 | group count() by status", start
 for m in c.iter_query(filter="tag='ingestionFailure'", start_time="24h", max_total=500):
     ...
 
-# Structured ingest — one session for the life of the process
+# Structured ingest: one session for the life of the process
 sess = c.new_session_id()
 c.add_events(
     session=sess,
@@ -114,7 +131,7 @@ c.add_events(
     events=[{"ts": c.now_ns(), "attrs": {"message": "user login", "latencyMs": 42}}],
 )
 
-# Plain-text ingest — requires a real Log Write Access key (console tokens rejected)
+# Plain-text ingest: requires a real Log Write Access key (console tokens rejected)
 c.upload_logs("hello\nworld", parser="my-parser", server_host="dev-box")
 
 # Configuration files
@@ -127,16 +144,16 @@ The client picks the right key per method automatically, retries on 429/5xx/`err
 
 ## Layout
 
-- `SKILL.md` — instructions Claude reads when the skill triggers
-- `<project folder>/credentials.json` — credentials (set `SDL_XDR_URL` and the keys you need); auto-discovered by the plugin's SessionStart hook
-- `scripts/bootstrap_creds.sh` — idempotent helper to copy workspace creds into the sandbox-local path
-- `scripts/sdl_client.py` — `SDLClient` (auto key selection across 4 scoped keys + console token, `Bearer` auth, retries, `iter_query` pagination)
-- `scripts/sdl_cli.py` — shell CLI covering every method
-- `references/methods.md` — per-method reference (params, defaults, response shape, gotchas)
-- `references/auth_and_limits.md` — key matrix, console-token + S1-Scope rules, CPU leaky-bucket model, daily caps, 2026-03-19 8 QPS cap
-- `references/integration_patterns.md` — `addEvents` session discipline, structured vs unstructured events, the official binary-exponential-backoff loop with `discardBuffer` handling
-- `tests/smoke_test.py` — end-to-end test that hits every method
+- `SKILL.md`: instructions Claude reads when the skill triggers
+- `<project folder>/credentials.json`: credentials (set `SDL_XDR_URL` and the keys you need); auto-discovered by the plugin's SessionStart hook
+- `scripts/bootstrap_creds.sh`: idempotent helper to copy workspace creds into the sandbox-local path
+- `scripts/sdl_client.py`: `SDLClient` (auto key selection across 4 scoped keys + console token, `Bearer` auth, retries, `iter_query` pagination)
+- `scripts/sdl_cli.py`: shell CLI covering every method
+- `references/methods.md`: per-method reference (params, defaults, response shape, field requirements)
+- `references/auth_and_limits.md`: key matrix, console-token + S1-Scope rules, CPU leaky-bucket model, daily caps, 2026-03-19 8 QPS cap
+- `references/integration_patterns.md`: `addEvents` session discipline, structured vs unstructured events, the official binary-exponential-backoff loop with `discardBuffer` handling
+- `tests/smoke_test.py`: end-to-end test that hits every method
 
 ## Why this is separate from `sentinelone-mgmt-console-api`
 
-The SDL API is a different surface: JSON over `Bearer` (not `ApiToken`), a different URL namespace (`/api/...` not `/web/api/v2.1/...`), and its own key system. It's the only path for ingesting custom telemetry, running PowerQueries against SDL, and editing parsers/dashboards/alerts/lookups programmatically. For agents, threats, sites, Mgmt Console resources — use `sentinelone-mgmt-console-api`. For authoring PQ query bodies — use `sentinelone-powerquery`.
+The SDL API is a different surface: JSON over `Bearer` (not `ApiToken`), a different URL namespace (`/api/...` not `/web/api/v2.1/...`), and its own key system. It's the only path for ingesting custom telemetry, running PowerQueries against SDL, and editing parsers/dashboards/alerts/lookups programmatically. For agents, threats, sites, Mgmt Console resources: use `sentinelone-mgmt-console-api`. For authoring PQ query bodies: use `sentinelone-powerquery`.
