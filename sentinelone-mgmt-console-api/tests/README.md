@@ -25,6 +25,11 @@ every GET + curated safe POSTs.
 | Alert → Indicator pivot | read alert.rawIndicators → pin to TI IOC → verify link → delete | `tests/test_alert_indicator_pivot.py` | Yes (requires single-scope token) |
 | UAM Alert Interface (single) | POST /v1/indicators + /v1/alerts (1 indicator, 1 alert) → poll UAM → verify link → close | `tests/test_uam_alert_interface_single.py` | Semi (closes alert; ingested events are not hard-deletable) |
 | UAM Alert Interface (batch, multi-observable) | batched POST of 3 indicators (file+process+network, OCSF 1001/1007/4001) each with 3+ observables, 1 alert referencing all 3 on a single device -> poll UAM -> assert every metadata.uid + observable surfaces in alert.rawIndicators -> close | `tests/test_uam_alert_interface_batch.py` | Semi (closes alert; ingested events are not hard-deletable). PARTIAL: multi-indicator stitching is flaky on-tenant (2 of 3 indicators typically land inside a 2-minute grace window). See "Known limitations" below. |
+| Unified Exclusions v2.1 | CREATE (EDR path, site scope) → LIST → DELETE → VERIFY | `tests/test_unified_exclusion_lifecycle.py` | Yes (scoped to one site, fictional path) |
+| Hyperautomation workflow import | IMPORT (minimal manual-trigger workflow) → LIST (recent 20) → ARCHIVE attempt → VERIFY | `tests/test_hyperautomation_import_lifecycle.py` | Mostly (archive returns 500 on purple demo tenant — likely token permissions; workflow left in draft). See gotchas below. |
+| Detection rule ENABLE/DISABLE | CREATE (disabled) → ENABLE → VERIFY_ON (accepts activating) → DISABLE → VERIFY_OFF → DELETE → VERIFY (scheduled + events both exercised) | `tests/test_detection_rule_activate_lifecycle.py` | Yes (pmoses demo site; 24h window prevents real firing) |
+| XDR Graph Query | FORMAT DISCOVERY → SAVE → LIST → UPDATE → DELETE → VERIFY | `tests/test_xdr_graph_query_lifecycle.py` | Yes (skips gracefully if no saved queries exist on tenant to use as format template) |
+| STAR rules (events-type detection) | CREATE (Draft) → LIST → UPDATE → DELETE → VERIFY | `tests/test_star_rule_lifecycle.py` | Yes (Draft status, never activates; fictional process name in query) |
 
 Every lifecycle test embeds a unique `run_tag` in names and filters so
 parallel runs never collide and cleanup only touches what the current run
@@ -387,6 +392,43 @@ delta is the payload shape.
 
 ---
 
+## 11. PowerQuery scheduled detection lifecycle — inline (2026-05-03)
+
+Proves the full lifecycle for `queryType=scheduled` rules (PowerQuery-based detections) on the pmoses demo site (`siteId=2056852093198736293`). No separate test script exists yet — the lifecycle was confirmed via an inline Python session. See the schema gotchas below before writing a script.
+
+```
+CREATE  POST  /web/api/v2.1/cloud-detection/rules
+        data: {name, queryType="scheduled", queryLang="2.0", severity, expirationMode,
+               status="Disabled", scheduledParams: {query, runIntervalMinutes, lookbackWindowMinutes, threshold}}
+        filter: {siteIds: [...]}
+LIST    GET   /web/api/v2.1/cloud-detection/rules?isLegacy=false&siteIds=...&name__contains=...
+UPDATE  PUT   /web/api/v2.1/cloud-detection/rules/{rule_id}
+        data: {name, queryType, queryLang, severity, expirationMode, status, scheduledParams}
+        filter: {siteIds: [...]}     ← required by live API; swagger incorrectly marks as optional
+ENABLE  PUT   /web/api/v2.1/cloud-detection/rules/enable   filter: {ids, siteIds}
+DISABLE PUT   /web/api/v2.1/cloud-detection/rules/disable  filter: {ids, siteIds}
+DELETE  DELETE /web/api/v2.1/cloud-detection/rules         json_body: {filter: {ids, accountIds}}
+VERIFY  GET   /web/api/v2.1/cloud-detection/rules?ids=...&siteIds=...&isLegacy=false  (expect 0 hits)
+```
+
+**Critical gotchas discovered (confirmed on live tenant 2026-05-03):**
+
+1. `isLegacy=false` is mandatory on every GET for scheduled rules. Without it the list endpoint returns 0 results even though the rules exist and are visible in the console UI. The flag selects the PowerQuery 2.0 rule schema; the legacy schema (default) does not include scheduled rules.
+
+2. `queryLang: "2.0"` is required on POST and PUT. Omitting it or setting `"1.0"` returns HTTP 400 `"query lang must be 2.0"`.
+
+3. PUT requires `filter.siteIds` in the body even though the swagger marks `filter` as optional. The live API returns HTTP 400 `"filter: Missing data for required field"` if omitted.
+
+4. PUT requires all five fields in `data`: `name`, `queryType`, `severity`, `expirationMode`, `status`. Any missing field returns HTTP 400.
+
+5. DELETE body must be passed as `json_body=` keyword argument in s1_client (not as the second positional arg, which is query params). The correct call: `client.delete(path, json_body={"filter": {...}})`.
+
+6. VERIFY via GET (hits=0), not a second DELETE. A second DELETE on an already-deleted rule returns HTTP 400 `"Could not find rule with id: ..."` rather than `affected=0`.
+
+7. `scheduledParams.alertPerRow` and `scheduledParams.disableStreaksLogic` are returned by the API in POST/PUT responses but are not required fields on input.
+
+---
+
 ## What's tested by layer
 
 **Confirmed works via lifecycle tests (reversible CRUD proven):**
@@ -401,6 +443,7 @@ delta is the payload shape.
 - Scheduled default-report tasks — CREATE / LIST / UPDATE / DELETE / VERIFY
 - Alert → IOC pinning pivot — rawIndicator read + pinned IOC CRUD
 - UAM Alert Interface `/v1/indicators` + `/v1/alerts` -- push OCSF indicators + alert into UAM (single + batched 3-indicator / multi-observable across OCSF 1001/1007/4001), verify stitching, close via bulk-ops
+- PowerQuery Scheduled Detections (`queryType=scheduled`) — CREATE / LIST / UPDATE / ENABLE / DISABLE / DELETE / VERIFY on pmoses demo site (2026-05-03)
 
 **Confirmed reachable via read-only smoke sweep** (see
 `references/tenant_capabilities.md` for the current tenant's full rollup):
@@ -432,14 +475,108 @@ delta is the payload shape.
 - Deep-Visibility query cancellation mid-flight
 - Cloud Funnel log-collection configuration changes
 - Tags create/delete (reversible in theory but depends on tenant-wide taxonomy)
-- Activating a Custom Detection Rule (would fire live — creating disabled is covered in #5)
 
-**Untested but eligible for future reversible coverage** (not yet written):
+**Untested but eligible for future reversible coverage:**
 
-- XDR saved graph queries — CREATE/UPDATE/DELETE; the tenant-specific query DSL is the only gap
-- Exclusion create/delete on a scoped path (low blast radius at site scope)
-- Hyperautomation workflow CREATE → disable → DELETE
-- STAR rule via the `star-rules` endpoint family (separate from Custom Detection Rules)
+- XDR Graph Query full cycle — `test_xdr_graph_query_lifecycle.py` exists and will run once any user saves a query via the Graph Explorer UI (provides the format template). Currently skips on tenants with no saved queries.
+
+**Finding: no separate STAR rules endpoint.** The earlier note about a `/star-rules` endpoint family was incorrect. Confirmed against the live API (2026-05) and the swagger: no such path exists (returns 404). STAR rules are `cloud-detection/rules` with `queryType=events`. They are now covered by `test_star_rule_lifecycle.py`.
+
+---
+
+## 12. Unified Exclusion lifecycle (2026-05-03)
+
+```
+CREATE  POST  /web/api/v2.1/unified-exclusions
+        data: {exclusionName, threatType="EDR", osType="linux",
+               type="path", value=<path>, pathExclusionType="file",
+               modeType="suppression", engines="suppress",
+               reason="internal_testing", recommendation="NONE"}
+        filter: {siteIds: [...], scopeLevel="site", scopeLevelId=<siteId>}
+LIST    GET   /web/api/v2.1/unified-exclusions?siteIds=...&exclusionName__contains=...
+DELETE  DELETE /web/api/v2.1/unified-exclusions
+        body: {data: {exclusions: [{id: <id>, type: "path"}]}}
+VERIFY  GET   (expect 0 hits)
+```
+
+**Gotchas confirmed vs. live API:**
+- `modeType` and `type` are required — swagger marks them optional but API rejects without them.
+- `engines` is required when `modeType=suppression`.
+- `engines` and `interactionLevel` are mutually exclusive — passing both returns HTTP 400.
+- `pathExclusionType` valid values: `file`, `folder`, `subfolders`. `suppress` is not valid.
+- Path value goes in `value`, not `pathValue`.
+- `filter.scopeLevel` is required (despite swagger). For site scope: `scopeLevel="site"` + `scopeLevelId=<siteId>` (camelCase).
+- POST returns `data` as a list, not a single object — read `response["data"][0]["id"]`.
+
+## 13. Hyperautomation workflow import lifecycle (2026-05-03)
+
+```
+IMPORT  POST  /web/api/v2.1/hyper-automate/api/public/workflow-import-export/import
+        body: {data: {name, description, actions: [...]}, filter: {accountIds: [...]}}
+        response: top-level "id" and "version_id" (NOT "workflowId"/"versionId")
+LIST    GET   /web/api/v2.1/hyper-automate/api/public/workflows
+        ?accountIds=...&limit=20&skip=0&sortBy=updated_at&sortOrder=desc
+        items: {id: <uuid>, workflow: {id: same_uuid, name, state, ...}, actions: [...]}
+ARCHIVE POST  /web/api/v2.1/hyper-automate/api/v1/workflows/archive
+        body: {"ids": [<uuid>]}   # UI DevTools capture; "workflowIds" also 500
+```
+
+**Gotchas confirmed vs. live API:**
+- Public import response key is `id` not `workflowId`; `version_id` not `versionId`.
+- `/api/public/workflows` and `/api/v1/workflows` return the same nested format: `{id, workflow: {...}, actions: []}`. The `workflow.id` == top-level `id`.
+- Tenant had 1050+ workflows. `nextCursor` returns literal string `"null"` (truthy in Python) — loop by skip/limit, not cursor. Sort by `updated_at desc` and scan first 20 to find a newly imported workflow without paginating 1050 rows.
+- Archive (`/api/v1/workflows/archive`) is NOT in the swagger. Tested body formats: `{"ids": [...]}`, `{"ids": [...], "siteIds": [...]}`, `{"ids": [...], "accountIds": [...]}`, `{"workflowIds": [...]}` — all return HTTP 500 on the purple demo tenant via API token. UI DevTools capture suggests the UI sends `{"ids": [...]}`. The consistent 500 regardless of body shape points to a token-level restriction (service user vs. personal console user) rather than a body format problem. The test tries `ids` first then `workflowIds` and treats archive failure as non-fatal.
+
+## 14. Detection rule ENABLE/DISABLE lifecycle (2026-05-03)
+
+```
+CREATE   POST  /web/api/v2.1/cloud-detection/rules  (see Section 11 for scheduled schema)
+ENABLE   PUT   /web/api/v2.1/cloud-detection/rules/enable
+         body: {filter: {ids: [<ruleId>], siteIds: [<siteId>]}}
+DISABLE  PUT   /web/api/v2.1/cloud-detection/rules/disable
+         body: {filter: {ids: [<ruleId>], siteIds: [<siteId>]}}
+DELETE   DELETE /web/api/v2.1/cloud-detection/rules
+         body: {filter: {ids: [...], accountIds: [...]}}
+```
+
+**Gotchas confirmed vs. live API:**
+- After ENABLE, `status` transitions through `"activating"` before settling on `"active"`. Both are valid post-enable states — accept both in assertions.
+- Tested with both `queryType=scheduled` (requires `isLegacy=false` on GET) and `queryType=events`. Both use the same enable/disable endpoints.
+- Tested on pmoses demo (site 2056852093198736293). Scheduled rule used `runIntervalMinutes=1440` and `threshold.value=9999` so it cannot fire within the test lifetime even when briefly enabled.
+
+---
+
+## 15. STAR rule lifecycle (2026-05-03)
+
+STAR rules ("streaming threat assessment rules") are product marketing terminology for
+real-time event detection rules. The API has no `/star-rules` path — they are
+`cloud-detection/rules` with `queryType=events`. The `/star-rules` path returns 404.
+
+```
+CREATE  POST   /web/api/v2.1/cloud-detection/rules
+        body: {data: {name, description, queryType="events", s1ql, severity,
+                      expirationMode, status="Draft", treatAsThreat, networkQuarantine},
+               filter: {siteIds: [...]}}
+        response: top-level "data" object with id, queryLang="1.0", status="Draft"
+LIST    GET    /web/api/v2.1/cloud-detection/rules?ids=<id>&siteIds=<id>
+UPDATE  PUT    /web/api/v2.1/cloud-detection/rules/{rule_id}
+        body: same shape as CREATE; all 5 required fields must be re-supplied
+DELETE  DELETE /web/api/v2.1/cloud-detection/rules
+        body: {filter: {ids: [...], siteIds: [...]}}   # top-level filter, no "data" wrapper
+        response: {data: {affected: N}}
+VERIFY  GET    ids=<id> → data=[]
+```
+
+**Gotchas confirmed vs. live API:**
+- No `/star-rules` path — use `cloud-detection/rules` with `queryType=events`.
+- `"activeResponse"` in the CREATE body returns HTTP 400 "Unknown field" — omit it.
+- `queryLang` defaults to `"1.0"` for events rules; do not set it explicitly.
+- `treatAsThreat="UNDEFINED"` is accepted on input but stored as `null` in the response.
+- GET `nameSubstring` + `queryType` together returns HTTP 500 — use only one filter per
+  request, or use `ids` for precise lookup after creation.
+- Draft status = rule never fires even if agent telemetry matches the query.
+- `isLegacy=false` is NOT required for events rules (only needed for scheduled).
+- DELETE body uses top-level `filter` (no `"data"` wrapper) — same as exclusion delete.
 
 ---
 
@@ -457,8 +594,13 @@ python tests/test_custom_rule_lifecycle.py          # Custom Detection Rules
 python tests/test_alert_mutation_lifecycle.py       # status + verdict round-trip
 python tests/test_scheduled_report_lifecycle.py     # default-report tasks
 python tests/test_alert_indicator_pivot.py          # alert→IOC pivot (single-scope)
-python tests/test_uam_alert_interface_single.py   # POST 1 OCSF indicator + 1 alert, verify in UAM, close
-python tests/test_uam_alert_interface_batch.py    # batched POST of 3 multi-observable indicators + 1 alert referencing all 3, verify in UAM, close
+python tests/test_uam_alert_interface_single.py     # POST 1 OCSF indicator + 1 alert, verify in UAM, close
+python tests/test_uam_alert_interface_batch.py      # batched POST of 3 multi-observable indicators + 1 alert referencing all 3, verify in UAM, close
+python tests/test_unified_exclusion_lifecycle.py    # EDR path exclusion CREATE/LIST/DELETE
+python tests/test_hyperautomation_import_lifecycle.py  # workflow IMPORT/LIST/ARCHIVE
+python tests/test_detection_rule_activate_lifecycle.py  # ENABLE/DISABLE scheduled + events rules
+python tests/test_xdr_graph_query_lifecycle.py      # graph query SAVE/LIST/UPDATE/DELETE (skips if no saved queries)
+python tests/test_star_rule_lifecycle.py            # STAR rule (events) CREATE/LIST/UPDATE/DELETE
 ```
 
 All tests exit 0 on success and non-zero on any step failure, with the

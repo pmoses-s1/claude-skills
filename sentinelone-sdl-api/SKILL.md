@@ -10,6 +10,8 @@ Wraps the Singularity Data Lake API (10 methods across log ingestion, query, and
 
 The SDL API is distinct from the Management Console API. It speaks JSON over `Bearer` tokens (not `ApiToken`) and is the canonical path for ingesting custom telemetry and editing parsers/dashboards/alerts/lookups directly.
 
+> **Sandbox proxy blocked?** If calls to `*.sentinelone.net` (SDL host or console host) fail with a connection or proxy error inside the Claude sandbox, use the `sentinelone-mcp` server instead. It runs locally via `node` and bypasses the sandbox proxy entirely. Setup: add it to `claude_desktop_config.json` (see `claude-skills/sentinelone-mcp/README.md`). The MCP server exposes `sdl_list_files`, `sdl_get_file`, `sdl_put_file`, `sdl_delete_file`, and `sdl_upload_logs` — running directly from your machine against the SDL API.
+
 ## IMPORTANT: query methods are deprecated — and LRQ is NOT available here
 
 The query methods on this skill (`query`, `powerQuery`, `facetQuery`, `timeseriesQuery`, `numericQuery`) wrap the V1 SDL endpoints (`/api/query`, `/api/powerQuery`, etc.) at the centralized host `xdr.us1.sentinelone.net`. Those endpoints are **deprecated and sunset on 2027-02-15** (also applies to the Deep Visibility `/web/api/v2.1/dv/events/pq` endpoint).
@@ -76,6 +78,13 @@ will query — including the S1 internal sources `alert`, `vulnerability`,
 and every third-party source. Documented schemas drift between sessions due to
 parser edits, reserved-field rewrites, and ingestion changes.
 
+**`asset` and `ActivityFeed` — confirmed live schemas (126 and 41 fields respectively):**
+
+- `dataSource.name='asset'` — **126 fields of rich device inventory** (OCSF class_uid 3004, category_name = 'Discovery'). Key fields: `device.agent.uuid`, `device.name`, `device.os.{name,version,type}`, `device.agent.{network_status,network_status_title,network_quarantine_enabled,is_active,is_decommissioned,is_uninstalled,scan_status,version,last_logged_in_user_name}`, `device.ip_external`, `device.hw_info.*`, `device.network_interfaces[N].*`, `severity_id`, `severity_`, `operation` (= OPERATION_UPSERT), `s1_metadata.{site_id,site_name,group_id,group_name}`. Use this for endpoint inventory panels and asset state tracking. Fields that do **not** exist: `entity.uid`, `entity_result.*`, `agent.health.online`, `agent.uuid` (use `device.agent.uuid`).
+- `dataSource.name='ActivityFeed'` — **41 fields of Hyperautomation/management activity audit log** (`sca:RetentionType = 'ACTIVITY_LOG'`). Key fields: `activity_type` (numeric, NOT a string — e.g. 9207 = workflow execution event), `activity_uuid`, `primary_description`, `secondary_description`, `data.workflow_{id,name,execution_url}`, `data.{scope_id,scope_level,scope_name,site_name,user_id}`, `created_at`, `updated_at`, `account.{id,name}`, `site_id`, `context`. Useful for Hyperautomation workflow audit and compliance tracking. Not useful for threat hunting.
+
+**The actual ingestion pipeline metrics source is `finding`** (`dataSource.category='metrics'`, `tag='ingestionHealth'`, fields: `batchCt`, `eventLatency.*`, `processor`, etc.) — do not confuse it with `asset` or `ActivityFeed`.
+
 **Why PowerQuery is the wrong tool for this:** PowerQuery's default projection
 returns `timestamp + message` only. Naive `dataSource.name='alert' | limit 1`
 hides the actual fields. `| columns *` returns HTTP 500. You can probe specific
@@ -117,6 +126,34 @@ import json, datetime
 out = f"outputs/sdl_schemas_{datetime.date.today().isoformat()}.json"
 json.dump(schemas, open(out, "w"), indent=2)
 ```
+
+**Direct MCP tools bypass sandbox proxy entirely.**
+
+The Cowork sandboxed shell blocks all outbound HTTPS to `xdr.us1.sentinelone.net`. Use the
+sentinelone-mcp MCP tools instead, which run locally and bypass the proxy:
+
+| Operation | sentinelone-mcp tool |
+|---|---|
+| PowerQuery | `mcp__sentinelone-mcp__powerquery_run` or `mcp__sentinelone-mcp__powerquery_schema_discover` |
+| `put_file` / `get_file` / `list_files` | `mcp__sentinelone-mcp__sdl_put_file`, `mcp__sentinelone-mcp__sdl_get_file`, `mcp__sentinelone-mcp__sdl_list_files` |
+| Upload logs | `mcp__sentinelone-mcp__sdl_upload_logs` |
+
+All of these tools run on your local machine and make direct HTTPS calls to `xdr.us1.sentinelone.net`
+without sandbox proxy interference. No fallback or workaround needed.
+
+```python
+# Example: use sdl_get_file MCP tool directly instead
+import sys, subprocess, json
+result = subprocess.run(["mdfind", "-name", "sdl_client.py"], capture_output=True, text=True)
+sdk_dir = [p for p in result.stdout.strip().split("\n") if "claude-skills" in p][0].rsplit("/", 1)[0]
+sys.path.insert(0, sdk_dir)
+from sdl_client import SDLClient
+c = SDLClient()
+c.keys["log_read_key"] = c.keys["config_read_key"] = c.keys["config_write_key"] = c.keys["log_write_key"] = ""
+# SDLClient.query(...) / put_file(...) / get_file(...) here
+```
+
+A proxy error treated as an empty result produces a fabricated schema, causing every downstream panel to silently query non-existent fields.
 
 The `attributes` dict exposes nested arrays as flattened keys like
 `resources[0].name` and `vulnerabilities[0].cve.uid`. Those flattened keys are
@@ -244,21 +281,17 @@ There is no undo. Configuration files are versioned but accidental deletes still
 For complex hunts and detection authoring use the `sentinelone-powerquery` skill for the query body, then call `c.power_query()` from this skill to execute it. For Mgmt Console resources (agents, threats, sites) use `sentinelone-mgmt-console-api`.
 
 
-## Sandbox proxy blocked? Use Desktop Commander
+## Using sentinelone-mcp tools for direct SDL operations
 
-If any script raises `SandboxProxyBlockedError`, `SDLAPIError` mentioning "proxy", or
-`OSError: Tunnel connection failed: 403 Forbidden`, the Cowork sandbox proxy is blocking
-direct HTTPS to `*.sentinelone.net`. The fix is to run the script on the host Mac via
-Desktop Commander, which has unrestricted network access.
+If a direct bash call to sdl_client.py fails with a proxy error, use the sentinelone-mcp MCP
+tools instead. They run on your local machine and bypass the sandbox proxy entirely:
 
-1. Re-run via `mcp__Desktop_Commander__start_process`:
-   ```
-   cd <PROJECT_ROOT>/claude-skills/sentinelone-sdl-api
-   python3 scripts/<script>.py <args>
-   ```
-   To locate the skill root: `mdfind -name "sdl_client.py" | grep claude-skills | head -1`
-2. `credentials.json` is at the project root folder (the folder you selected in Cowork).
-3. For inline Python, write to `/tmp/` via `mcp__Desktop_Commander__write_file`,
-   then execute with `mcp__Desktop_Commander__start_process`.
+- `mcp__sentinelone-mcp__sdl_get_file` for reading SDL configuration files
+- `mcp__sentinelone-mcp__sdl_put_file` for deploying parsers, dashboards, alerts, lookups
+- `mcp__sentinelone-mcp__sdl_list_files` for listing SDL configuration inventory
+- `mcp__sentinelone-mcp__sdl_upload_logs` for uploading raw log events
+- `mcp__sentinelone-mcp__powerquery_run` for executing PowerQueries against the Singularity Data Lake
+
+No Desktop Commander workaround is necessary when you use these tools.
 
 This is not a credential issue. Do not widen time windows or change query logic to debug this.

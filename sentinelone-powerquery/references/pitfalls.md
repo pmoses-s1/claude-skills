@@ -7,19 +7,43 @@ Curated failure modes. When a PowerQuery is misbehaving, check this list before 
 ### `*` alone as a filter returns 500
 
 ```
-*                           ← NOT a valid initial filter on many tenants
+*                           ← NOT a valid initial filter — HTTP 500 ("Don't understand [*]")
 * | limit 5                 ← same
 ```
 
-Fix: start with an empty filter (just `|`) or use a non-empty filter.
+There are three distinct `*` idioms in PowerQuery. They look similar but mean different things:
+
+**1. Field presence / attribute wildcard: `field=*`**
+
+Means "field is present and non-null". Use as a query-opener when you want all events that have a given field, or as the starting predicate for aggregations. Confirmed working on live tenant.
 
 ```
-| limit 5                                    // "all events, first 5"
-event.type = *  | limit 5                    // "events with a type"
-event.type = 'Process Creation' | limit 5
+dataSource.name=* | group count=count() by dataSource.name | sort -count | limit 10
+event.type=* | limit 5
 ```
 
-`* contains "x"` and `* matches "regex"` ARE valid but only as the *initial* filter (before the first `|`) and only in Event Search / PowerQuery, not in Alerts.
+This is NOT an all-column text search — it checks whether a specific attribute is present.
+
+**2. All-column text search: `* contains 'value'` or `* matches 'regex'`**
+
+Searches ALL indexed fields across the event. Use when you need to find a specific string anywhere in the event — what users describe as "search all logs for X", "all column search", "find this text anywhere". Only valid as the **initial filter** (before the first `|`). Not valid in `| filter …` after a pipe, and not valid in Alerts.
+
+```
+dataSource.name='MySource' * contains 'evil.com'      // string in any field on a source
+* contains 'suspicious_domain.com' | limit 50          // all sources, any field
+* matches '\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}' | limit 20  // IP pattern anywhere
+```
+
+Much faster than `message contains 'value'` because it scans indexed fields, not a raw blob.
+
+**3. Empty initial filter: start with `|`**
+
+Use when you want all events with no initial predicate.
+
+```
+| limit 5                   // "all events, first 5"
+| group ct=count() by event.type
+```
 
 ### `join` without a leading pipe
 

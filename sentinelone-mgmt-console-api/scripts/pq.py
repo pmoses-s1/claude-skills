@@ -153,9 +153,9 @@ def _request_with_retry(
                 raise PQError(
                     f"Sandbox proxy blocked {method} {url}. "
                     f"The Cowork sandbox egress proxy returns 403 on HTTPS CONNECT "
-                    f"to sentinelone.net. Re-run via Desktop Commander on the host Mac "
-                    f"using mcp__Desktop_Commander__start_process. "
-                    f"This is not a credential issue."
+                    f"to sentinelone.net. Use sentinelone-mcp MCP tools instead "
+                    f"(powerquery_run, powerquery_schema_discover), which run locally "
+                    f"and bypass the sandbox proxy. This is not a credential issue."
                 ) from e
             last_exc = e
             if attempt == max_attempts:

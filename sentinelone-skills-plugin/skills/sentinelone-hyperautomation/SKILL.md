@@ -16,6 +16,8 @@ description: >
 This skill enables Claude to design and generate valid SentinelOne Hyperautomation workflow
 JSON, explain the logic behind workflows, and optionally submit them to a live console via API.
 
+> **Sandbox proxy blocked?** If import/export API calls to `*.sentinelone.net` fail with a connection or proxy error inside the Claude sandbox, use the `sentinelone-mcp` server instead. It runs locally via `node` and bypasses the sandbox proxy entirely. Setup: add it to `claude_desktop_config.json` (see `claude-skills/sentinelone-mcp/README.md`). The MCP server exposes `ha_list_workflows`, `ha_get_workflow`, `ha_import_workflow`, and `ha_export_workflow` — all running from your machine against the Hyperautomation API.
+
 ## How to use this skill
 
 When a user asks to build a workflow, follow this process:
@@ -171,15 +173,10 @@ Use this when the workflow contains integration-backed actions:
   ✅ Always use a personal Console User API token for `S1_CONSOLE_API_TOKEN`.
 
 
-## Sandbox proxy blocked? Use Desktop Commander
+## Workflow import via sentinelone-mcp
 
-Workflow import uses `s1_client.py` from the `sentinelone-mgmt-console-api` skill,
-which makes direct HTTPS calls to `*.sentinelone.net`. If you see
-`SandboxProxyBlockedError` or `OSError: Tunnel connection failed: 403 Forbidden`, the
-Cowork sandbox proxy is blocking those calls.
-
-The fix: write the workflow JSON to `/tmp/` via `mcp__Desktop_Commander__write_file`,
-then import with `mcp__Desktop_Commander__start_process` running `s1_client.py` on the
-host Mac. `credentials.json` is at the project root folder
-(the folder you selected in Cowork). See the `sentinelone-mgmt-console-api` skill
-for full Desktop Commander fallback instructions.
+Workflow import, export, and listing use the `sentinelone-mcp` MCP server, which bypasses the
+Cowork sandbox proxy entirely. Use `ha_list_workflows`, `ha_get_workflow`, `ha_import_workflow`,
+and `ha_export_workflow` directly instead of falling back to the `sentinelone-mgmt-console-api`
+skill scripts. The MCP server runs locally on your machine and makes direct HTTPS calls to
+`*.sentinelone.net` without proxy interference.

@@ -265,15 +265,14 @@ class SandboxProxyBlockedError(RuntimeError):
     """Raised when the Cowork sandbox proxy blocks HTTPS to sentinelone.net.
 
     The sandbox egress proxy returns 403 on CONNECT, so no S1 API call can
-    succeed from inside the sandbox. Fix: re-run the script on the host Mac
-    via Desktop Commander, which has unrestricted network access.
+    succeed from inside the sandbox. Fix: use sentinelone-mcp MCP tools instead,
+    which run on your local machine and bypass the sandbox proxy entirely.
 
     Recovery steps:
-      1. Use mcp__Desktop_Commander__start_process to run the script on the Mac.
-      2. credentials.json is at the project root folder (the folder you selected in Cowork).
-      3. Skill root: <PROJECT_ROOT>/claude-skills/sentinelone-mgmt-console-api
-         (use mdfind -name "s1_client.py" | grep claude-skills to locate it)
-      4. This is not a credential issue. Do not change query logic to debug it.
+      1. Use sentinelone-mcp MCP tools (s1_api_get, s1_api_post, uam_list_alerts, etc.)
+         instead of running this script.
+      2. These tools run locally and make direct HTTPS calls without proxy interference.
+      3. This is not a credential issue. Do not change query logic to debug it.
     """
     pass
 
@@ -496,10 +495,9 @@ class S1Client:
             except requests.exceptions.ProxyError as exc:
                 raise SandboxProxyBlockedError(
                     f"Sandbox proxy blocked HTTPS to {self.base_url}. "
-                    f"Re-run via Desktop Commander on the host Mac using "
-                    f"mcp__Desktop_Commander__start_process with skill root at "
-                    f"sentinelone-mgmt-console-api (use mdfind -name s1_client.py | grep claude-skills "
-                    f"to locate it). This is not a credential issue."
+                    f"Use sentinelone-mcp MCP tools instead (s1_api_get, s1_api_post, "
+                    f"uam_list_alerts, etc.), which run locally and bypass the sandbox proxy. "
+                    f"This is not a credential issue."
                 ) from exc
             if resp.status_code < 400:
                 if resp.content:

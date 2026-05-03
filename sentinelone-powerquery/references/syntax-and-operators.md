@@ -72,18 +72,28 @@ indicator.name !=*                       // never valid; use !(x=*) for is-null
 
 ### Wildcards
 
+There are three distinct `*` idioms — they look similar but mean different things:
+
 ```
-indicator.category = *                   // field is present (non-null, any value)
-!(indicator.category = *)                // field is null / missing
-* contains 'something'                   // search all parsed fields (INITIAL FILTER ONLY)
-* matches 'regex'                        // regex across all fields (INITIAL FILTER ONLY)
-$"regex"                                 // shorthand for message matches "regex"
+// 1. FIELD PRESENCE / ATTRIBUTE WILDCARD
+dataSource.name = *                      // "field is present/non-null" — use as query opener or filter
+indicator.category = *                   // same pattern; works for any field
+!(indicator.category = *)               // field is null / missing
+
+// 2. ALL-COLUMN TEXT SEARCH (initial filter only)
+* contains 'evil.com'                    // find text in ANY indexed field — initial filter only
+* matches 'regex'                        // regex across all indexed fields — initial filter only
+$"regex"                                 // shorthand for message matches "regex" (initial filter only)
+
+// 3. EMPTY INITIAL FILTER (all events)
+| group ct=count() by event.type         // start with | — no initial predicate means all events
 ```
 
 Key facts about `*`:
-- `*` by itself is NOT a valid filter. `*` alone returns a 500 error on many tenants. Use an empty initial filter (start the query with `|`) if you want "all events".
-- `* contains` and `* matches` only work as the initial filter, not in `| filter …` later in the pipeline, not in Alerts, and not optimized for dashboards.
-- `field = *` is how you write "field is present".
+- `*` by itself is NOT a valid filter. `*` alone returns HTTP 500 ("Don't understand [*]"). Never use `*` as the only initial token.
+- **`field = *`** (attribute wildcard) checks whether a specific field is present/non-null. Use `dataSource.name=*` as a query-opener for aggregations over all events that have that field. Confirmed working on live tenant.
+- **`* contains` / `* matches`** (all-column search) searches across ALL indexed fields. Only works in the **initial filter** (before the first `|`). Not valid in `| filter …` after a pipe, not in Alerts, not in dashboards. Much faster than `message contains` on JSON-blob sources.
+- These two idioms are NOT interchangeable: `dataSource.name=*` checks a specific field for null; `* contains 'value'` searches all fields for a substring.
 
 ### Phrasebook: natural-language asks to canonical operator
 
@@ -91,8 +101,9 @@ When a user describes the search in English, the phrasing usually maps to one of
 
 | User asks for | Canonical PQ |
 |---|---|
-| "all column search" / "search all fields" / "search all data" / "anywhere in the event" / "wherever it appears" | `* contains 'value'` (initial filter) |
-| "regex across every field" / "pattern match anywhere" | `* matches 'regex'` (initial filter) |
+| "all column search" / "search all fields" / "search everything for X" / "anywhere in the event" / "wherever it appears" | `* contains 'value'` (initial filter only) |
+| "regex across every field" / "pattern match anywhere" | `* matches 'regex'` (initial filter only) |
+| "query all events for a source" / "aggregate over all logs" / "group by field across everything" | `dataSource.name=* \| group count=count() by dataSource.name` — field presence as opener |
 | "is this field set" / "rows where X is populated" | `field = *` |
 | "field is missing / null / empty" | `!(field = *)` |
 | "field equals one of these values" (case-sensitive) | `field in ('a','b','c')` |
@@ -102,10 +113,11 @@ When a user describes the search in English, the phrasing usually maps to one of
 | "OR over several substrings on one field" | `field contains ('a','b','c')` |
 | "all events" / "no filter" | start the query with `|` (empty initial filter); never use `*` alone |
 
-Two common mistakes the phrasebook prevents:
+Three common mistakes the phrasebook prevents:
 
 - "Search all data" sounds like a scope instruction (every site, all time) but is almost always a field-coverage instruction (every column). Map to `* contains`, not to a wider time range or `tenant=true` request body.
 - Reaching for `message contains 'value'` for value-anywhere lookups is a performance cliff on JSON-blob sources. `* contains 'value'` indexes across parsed fields and is dramatically faster. See `references/pitfalls.md` → "Reaching for `message contains` on a JSON-blob source".
+- Confusing `field=*` (attribute wildcard / field-is-present check) with `* contains 'value'` (all-column text search). They are different operators: `dataSource.name=*` is a null check on one field; `* contains 'value'` searches all fields for a substring.
 
 ---
 

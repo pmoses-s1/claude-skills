@@ -251,6 +251,8 @@ csv = uam.export_alerts_csv(c, filters=[
 | `Autocomplete requires minimum 3 characters` | `searchText` too short. | Send ≥ 3 chars. |
 | `Alert Note with ID ... does not have mgmt_note_id set, unable to [edit\|delete], try again later!` | Note freshly created; management-side id hasn't propagated. | Retry after 30–120s. The wrapper does this automatically. |
 | No actions returned from `alertAvailableActions` | Called it with no filter or with a filter that matches nothing. | Pass a non-empty `or_filter(...)` (e.g. by alert id). |
+| **0 results with no error** when filtering `status="OPEN"` | `"OPEN"` is not a valid UAM status enum value. Returns 0 results silently — no GraphQL error is raised. Confirmed on live tenant. | Use `"NEW"` instead. Valid status values are `NEW`, `IN_PROGRESS`, `RESOLVED` only. |
+| **0 results with no error** when filtering `status="FALSE_POSITIVE"` | `"FALSE_POSITIVE"` is an `analystVerdict` value, not a `status` value. Silently returns 0 results. | To filter by analyst verdict, use `fieldId="analystVerdict"` with `stringEqual {value: "FALSE_POSITIVE_USER_ERROR"}` (or whichever verdict value). Status and analystVerdict are separate fields. |
 
 ---
 

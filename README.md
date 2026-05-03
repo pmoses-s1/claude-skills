@@ -1,29 +1,53 @@
-# claude-skills
+# SentinelOne AI Analyst — Claude Skills
 
-SentinelOne skills for Claude. Install the plugin to get everything; no individual skill setup needed.
+A full-stack AI analyst for SentinelOne, built as a set of Claude skills, two MCP servers, and an operating persona (CLAUDE.md). Install once and Claude can hunt threats, triage alerts, write detections, deploy dashboards, author parsers, and build automation workflows — entirely from natural language.
 
-## Quick start
+---
 
-1. Download the latest `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/)
-2. In the Claude desktop app, go to the **Cowork** tab, click **Customize** in the left sidebar, then click **Browse plugins**. In the plugins window, find the upload option and select the `.plugin` file
-3. When creating your Cowork project, add both `credentials.json` and `CLAUDE.md` under **Add files** so Claude has access to them in every session. See [Configuration](#configuration) below for the credential keys.
+## Architecture overview
 
-   ![Adding credentials.json and CLAUDE.md when creating a new Cowork project](assets/new-project-credentials.png)
+Three layers work together in every session:
 
-That's it. The plugin's SessionStart hook auto-discovers the credentials file and makes it available to every skill in the session.
+```
+CLAUDE.md            SOC Analyst persona: session protocol, evidence rules,
+                     investigation workflow, classification gates
+       │
+       ▼
+MCP Servers          Live API access, outside the Cowork sandbox proxy
+  sentinelone-mcp    19 tools: PowerQuery, SDL, Mgmt Console REST, UAM, Hyperautomation
+  purple-mcp         Alert triage, Purple AI NLQ, Deep Visibility, assets, vulnerabilities
+  virustotal-mcp     External IOC enrichment (required for CRITICAL classification)
+       │
+       ▼
+Skills (SKILL.md)    Procedural knowledge: confirmed API schemas, gotchas, field traps
+  sentinelone-mgmt-console-api   Mgmt Console REST + UAM + Purple AI + HA
+  sentinelone-powerquery          PowerQuery authoring and execution
+  sentinelone-sdl-api             SDL log ingest and config file ops
+  sentinelone-sdl-dashboard       Dashboard JSON authoring and deployment
+  sentinelone-sdl-log-parser      Parser authoring and validation
+  sentinelone-hyperautomation     Workflow JSON authoring and import
+```
+
+**Skills** encode confirmed API behavior — including undocumented required fields and gotchas discovered through live testing — so Claude doesn't guess field names. **MCP servers** bypass the Cowork sandbox proxy to reach `*.sentinelone.net` directly. **CLAUDE.md** defines the operating persona that instructs how to investigate, what evidence to gather, and how to classify findings.
+
+Full architecture details: [docs/architecture.md](./docs/architecture.md)
+
+---
 
 ## What's included
 
-The plugin bundles every skill in this repo; installing the plugin is sufficient, there is no need to install skills individually.
+The plugin bundles every skill; installing it is sufficient — no individual skill setup needed.
 
 | Skill | What it does |
-|-------|-------------|
+|---|---|
 | sentinelone-mgmt-console-api | Query and act on the Management Console: threats, alerts, agents, sites, RemoteOps, Deep Visibility, Hyperautomation, Purple AI, UAM. Includes the source-agnostic behavioral baselining + anomaly detection pipeline (`baseline_anomaly.py`) |
 | sentinelone-powerquery | Write, debug, and run PowerQuery for threat hunting, STAR detection rules, SDL dashboards, and statistical baseline / anomaly detection rule bodies |
 | sentinelone-sdl-api | Ingest events, run queries, and manage configuration files (parsers, dashboards, lookups) via the Singularity Data Lake API |
 | sentinelone-sdl-dashboard | Design, author, and deploy SDL dashboards: panels, tabs, parameters, and full dashboard JSON |
 | sentinelone-sdl-log-parser | Author and validate SDL log parsers for any log format, with OCSF field mapping by default |
 | sentinelone-hyperautomation | Design and generate Hyperautomation workflow JSON, with optional live console import |
+
+---
 
 ## PrincipalSOCAnalyst Project
 
@@ -32,11 +56,11 @@ The plugin bundles every skill in this repo; installing the plugin is sufficient
 ### What it delivers
 
 | Outcome | How |
-|---------|-----|
+|---|---|
 | **Reduce L1 SOC workload by 70%+** | Automated triage, mandatory VirusTotal enrichment, and verdict generation eliminate repetitive alert investigation. L1 analysts focus on exceptions, not routine. |
 | **Elevate every analyst to principal grade** | Junior analysts get the same structured investigation framework, enrichment depth, and analytical reasoning that only senior staff possess today. |
 | **External threat intelligence on every IOC** | Mandatory VirusTotal enrichment on every IP, domain, hash, and URL, with 70+ AV engines, threat actor attribution, and full infrastructure mapping on every finding. |
-| **Mean investigation time under 5 minutes** | Investigation workflows that take 45–60 minutes manually compress to under 5 minutes. Continuous hunting catches threats between analyst shifts. |
+| **Mean investigation time under 5 minutes** | Investigation workflows that take 45-60 minutes manually compress to under 5 minutes. Continuous hunting catches threats between analyst shifts. |
 | **Full data estate coverage** | Queries OCSF-normalised logs, non-OCSF vendor logs, and raw syslog. Discovers field schemas dynamically at session start, with no hardcoded assumptions about what sources are present. |
 | **Fast-track detection creation** | Natural language detection authoring across any data source. Recommends new STAR rules and custom detections as threats are identified during investigation. |
 | **Deliver the capability today** | Purple AI becomes even more powerful when orchestrated through this multi-layer architecture, combining deep enrichment, cross-source correlation, and external threat intelligence in every investigation. |
@@ -46,50 +70,109 @@ The plugin bundles every skill in this repo; installing the plugin is sufficient
 
 ---
 
-### Setting up the PrincipalSOCAnalyst project in Cowork
+### Setting up the PrincipalSOCAnalyst project
 
 **Prerequisites**
 
-The full investigation workflow requires three components to be installed and connected. All three are needed: the skills handle SDL and Management Console operations, Purple MCP provides the live investigation and hunting interface, and the threat intel MCP provides the external validation that makes true positive classification reliable.
+All three components are needed: the skills handle SDL and Management Console operations, Purple MCP provides the live investigation and hunting interface, and the threat intel MCP provides the external validation that makes true positive classification reliable.
 
 | Component | Purpose | Install |
-|-----------|---------|---------|
+|---|---|---|
 | `sentinelone-skills` plugin | SDL queries, Management Console API, dashboards, parsers, Hyperautomation | See [Installing](#installing) below |
 | **Purple MCP** | Live alert triage, Purple AI hunting, Deep Visibility, UAM, asset and vulnerability context | [github.com/Sentinel-One/purple-mcp](https://github.com/Sentinel-One/purple-mcp) |
-| **Threat intel MCP** (e.g. VirusTotal) | External IOC enrichment, mandatory for true positive classification; no finding is classified CRITICAL without independent TI confirmation | Install via your MCP marketplace or connect directly |
+| **Threat intelligence MCP** | External IOC enrichment, mandatory for true positive classification | Use your organisation's approved threat intel MCP (see note below) |
 
-> **Why all three?** The CLAUDE.md operating instructions enforce a rule: no alert may be classified CRITICAL or TRUE POSITIVE based on a SentinelOne detection alone. Purple MCP provides the investigation surface; the threat intel MCP provides the independent confirmation that makes verdicts trustworthy.
+> **Threat intel MCP:** The CLAUDE.md operating instructions enforce a rule: no alert may be classified CRITICAL or TRUE POSITIVE based on a SentinelOne detection alone. A threat intelligence MCP provides the independent confirmation that makes verdicts trustworthy. **Use whichever threat intel MCP your organisation has approved.** VirusTotal (`npm install -g mcp-virustotal`) is shown in the config example below as a concrete reference, but substitute any MCP that exposes file hash, IP, domain, and URL lookup tools. The CLAUDE.md instructions are vendor-neutral: they require enrichment and multi-source confirmation, not a specific provider.
 
-**Step 1: Create the project**
+**Step 1: Connect MCP servers**
 
-> **Important:** This project must be created in **Cowork**, not in Claude.ai chat. Cowork is a mode inside the Claude desktop app: open the Claude desktop app and navigate to **Cowork** from the sidebar. The project folder, credentials file, and skill plugin are Cowork features and are not available in the web chat interface.
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+The config below uses VirusTotal as a concrete example of a threat intel MCP. Replace it with your organisation's approved threat intel MCP.
+
+```json
+{
+  "mcpServers": {
+    "virustotal": {
+      "command": "mcp-virustotal",
+      "env": {
+        "VIRUSTOTAL_API_KEY": "your-virustotal-api-key"
+      }
+    },
+    "purple-mcp": {
+      "command": "/Users/yourname/.local/bin/uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/Sentinel-One/purple-mcp.git",
+        "purple-mcp",
+        "--mode",
+        "stdio"
+      ],
+      "env": {
+        "PURPLEMCP_CONSOLE_TOKEN": "eyJ...your-api-token...",
+        "PURPLEMCP_CONSOLE_BASE_URL": "https://usea1-yourorg.sentinelone.net"
+      }
+    },
+    "sentinelone-mcp": {
+      "command": "node",
+      "args": [
+        "/Users/yourname/Documents/Claude/Projects/claude-skills/sentinelone-mcp/index.js"
+      ],
+      "env": {
+        "S1_CONSOLE_URL": "https://usea1-yourorg.sentinelone.net",
+        "S1_CONSOLE_API_TOKEN": "eyJ...your-api-token...",
+        "S1_HEC_INGEST_URL": "https://ingest.us1.sentinelone.net",
+        "SDL_XDR_URL": "https://xdr.us1.sentinelone.net",
+        "SDL_LOG_WRITE_KEY": "your-log-write-key",
+        "SDL_LOG_READ_KEY": "your-log-read-key",
+        "SDL_CONFIG_WRITE_KEY": "your-config-write-key",
+        "SDL_CONFIG_READ_KEY": "your-config-read-key"
+      }
+    }
+  },
+  "preferences": {
+    "localAgentModeTrustedFolders": [
+      "/Users/yourname/Documents/Claude/Projects/MyProject"
+    ],
+    "coworkScheduledTasksEnabled": true,
+    "coworkWebSearchEnabled": true
+  }
+}
+```
+
+Prerequisites: Node.js 18+ for sentinelone-mcp (`node --version`), and `uv` for purple-mcp (`curl -LsSf https://astral.sh/uv/install.sh | sh`). Find your `uvx` path with `which uvx`. Restart Claude Desktop after saving.
+
+Full credential reference and all SDL key locations: [docs/credentials.md](./docs/credentials.md)
+
+**Step 2: Install the plugin**
+
+Download the `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/). In the Claude desktop app: Cowork tab → Customize → Browse plugins → upload. All six skills install in one step.
+
+**Step 3: Create the project**
+
+> **Important:** Create this project in Cowork, not Claude.ai chat. Open the Claude desktop app and navigate to Cowork from the sidebar.
 
 1. In the Claude desktop app, navigate to **Cowork** and click **New Project**
 2. Name it **PrincipalSOCAnalyst**
 3. Click **Select Folder** and choose this `claude-skills` folder (which contains `CLAUDE.md`)
-4. Under **Add files**, add both `credentials.json` and `CLAUDE.md` to the project so Claude has access to them in every session
-5. Click **Create**
+4. Under **Add files**, add both `credentials.json` and `CLAUDE.md` so Claude has access to them in every session
 
-**Step 2: Verify all components are active**
+   ![Adding credentials.json and CLAUDE.md when creating a new Cowork project](assets/new-project-credentials.png)
 
-In the Claude desktop app, go to the **Cowork** tab, click **Customize** in the left sidebar, then **Browse plugins**, and confirm:
-- `sentinelone-skills` is listed under Personal plugins
-- Purple MCP is connected under MCP Servers
-- Your threat intel MCP (e.g. VirusTotal) is connected under MCP Servers
+5. Confirm that `sentinelone-skills` is listed under Personal plugins, and Purple MCP and VirusTotal are connected under MCP Servers
+6. Click **Create**
 
-**Step 3: Start a session**
+**Step 4: Start a session**
 
 Open the **PrincipalSOCAnalyst** project and start a new chat. Claude reads `CLAUDE.md` automatically and immediately runs:
 - Data source enumeration: discovers every log source present in your SDL
 - Alert triage: pulls open alerts in parallel while enumeration runs
 
-From this point the session operates as a Principal SOC Analyst for its full duration.
-
 > **Tip:** Keep a `reports/` subfolder inside your project folder. When Claude generates a SOC report, save it there so it persists across sessions.
 
 ---
 
-### How to activate it in other environments
+### How to activate in other environments
 
 **Claude Code (terminal)**
 ```bash
@@ -99,7 +182,7 @@ claude                        # CLAUDE.md is read automatically on startup
 
 **Any Claude session**
 
-Copy the contents of `CLAUDE.md` into **Settings → Custom Instructions** (or equivalent system prompt field) of any Claude session that has the plugin installed.
+Copy the contents of `CLAUDE.md` into Settings → Custom Instructions (or equivalent system prompt field) of any Claude session that has the plugin installed.
 
 ---
 
@@ -158,7 +241,7 @@ These skills turn Claude into a hands-on SentinelOne analyst and engineer. Once 
 
 **Data lake operations**: ingest custom telemetry, list and manage configuration files, deploy or update parsers and dashboards, and run arbitrary queries through the SDL API.
 
-**Behavioral baselining and anomaly detection**: build per-(principal, action) statistical baselines on any data source — Okta, FortiGate, CloudTrail, SentinelOne, Mimecast, Zeek, anything ingested into SDL — and surface deviations automatically. The skill auto-discovers the right principal field (user, host, IP, role) and action field (event.type, activity_name, action) per source so you don't hardcode field names. See [Behavioral baselining + anomaly detection](#behavioral-baselining--anomaly-detection) below.
+**Behavioral baselining and anomaly detection**: build per-(principal, action) statistical baselines on any data source — Okta, FortiGate, CloudTrail, SentinelOne, Mimecast, Zeek, anything ingested into SDL — and surface deviations automatically. The skill auto-discovers the right principal field (user, host, IP, role) and action field (event.type, activity_name, action) per source so you don't hardcode field names. See [Behavioral baselining](#behavioral-baselining--anomaly-detection) below.
 
 ---
 
@@ -178,12 +261,12 @@ For any `dataSource.name`, the pipeline:
    - **`dow`** — separate bucket per (action, principal, day-of-week). Eliminates the weekday/weekend false-positive cleanly and is the production tier.
 5. **Surfaces three anomaly classes** on every run:
    - **Matched z-score deviations** — pair active in both windows but live count differs from baseline avg by more than `Z_THRESHOLD * stddev` (SPIKE or DROP).
-   - **Silent pairs** — pair active in baseline but with zero live events (`live_count = 0` and `baseline_avg/stddev >= Z_THRESHOLD`). Catches "user X went dark on a day they're normally active."
-   - **New-behavior pairs** — pair seen live but with no baseline at all. Could be a new user, a fresh role being audited, recon activity, or attacker noise — routes to a separate triage queue.
+   - **Silent pairs** — pair active in baseline but with zero live events. Catches "user X went dark on a day they're normally active."
+   - **New-behavior pairs** — pair seen live but with no baseline at all. Could be a new user, fresh recon activity, or attacker noise — routes to a separate triage queue.
 
 ### Why this matters
 
-Three production failure modes Method 1 (basic moving-avg + stddev from a Confluence-style baseline doc) misses, and this pipeline catches:
+Three production failure modes that a basic moving-avg baseline misses, and this pipeline catches:
 
 - **Silent pairs are dropped by the basic two-side join.** A critical user account that was active every weekday and is silent today never enters the join output. The pipeline walks the baseline keys explicitly to surface them.
 - **Pooled baselines flag every weekend.** A 30-day pooled baseline with 22 weekday + 8 weekend samples produces a high stddev — but on a Sunday, every weekday-only pair looks anomalous. Day-of-week stratification makes the comparison apples-to-apples.
@@ -209,22 +292,16 @@ python sentinelone-mgmt-console-api/scripts/baseline_anomaly.py --source "CloudT
     --stratify pooled --z 3.0
 ```
 
-State is checkpointed to `<plugin>/baselines/baseline_anomaly_<slug>_state.json` so the script is fully resumable across short shell budgets — re-invoke until it reports `all phases complete`. Final results land in `baseline_anomaly_<slug>_result.json`.
+State is checkpointed to `<plugin>/baselines/baseline_anomaly_<slug>_state.json` so the script is resumable across short shell budgets. Final results land in `baseline_anomaly_<slug>_result.json`.
 
 **In a Cowork chat session:**
 
-Just ask. The PowerQuery skill knows to delegate to the mgmt-console-api skill for these requests.
+Just ask. The PowerQuery skill delegates to the mgmt-console-api skill automatically.
 
 ```
 Build a 30-day behavioral baseline for Okta and show me anomalies for today.
-```
-```
 Find users behaving differently from their typical pattern across all SaaS sources.
-```
-```
 Run anomaly detection on FortiGate — which devices have unusual traffic today vs the last two weeks?
-```
-```
 Which CloudTrail roles are silent today that were active every day last week?
 ```
 
@@ -285,7 +362,6 @@ These are real questions you can ask. Claude will pick the right skill automatic
 - *"Write an SDL parser for this Palo Alto syslog sample: `<paste log>`"*
 - *"I have a CEF log from CrowdStrike: create a parser with OCSF field mapping"*
 - *"My FortiGate parser isn't extracting the destination IP correctly, here's the JSON: `<paste parser>`"*
-- *"Check the ai-siem catalog and see if there's already a parser for Okta logs"*
 - *"Validate my parser and ingest a test event to confirm the fields look right"*
 
 ### Data lake operations
@@ -295,13 +371,12 @@ These are real questions you can ask. Claude will pick the right skill automatic
 - *"Run this PowerQuery against my tenant and return the results as a table: `<query>`"*
 - *"Download the current version of my `/logParsers/fortinet-fortigate` parser"*
 
-### SOC investigation and triage (SOC Analyst Mode)
+### SOC investigation and triage
 
 - *"Start a new investigation session: enumerate live data sources and pull today's open alerts"*
 - *"Triage alert ID `abc123`: get the full details, check notes and history, enrich any IOCs in VirusTotal, and give me a verdict"*
 - *"Enrich this file hash `aabbccdd...`: detection ratio, behavioral analysis, C2 infrastructure, and threat actor attribution"*
 - *"Pivot on IP `1.2.3.4`: what malware communicates with it, what domains resolve to it, and is it associated with any APT group?"*
-- *"A suspicious domain `evil-update.com` appeared in DNS logs: do a full domain report including subdomains, sibling domains, SSL certificate history, and threat actor links"*
 - *"Cross-correlate this IOC across all connected data sources: check firewall, Okta, Zeek, and CloudTrail for any trace of `1.2.3.4`"*
 - *"Check endpoint `DESKTOP-XYZ` for anomalies: run the full anomaly checklist across process, network, and identity data"*
 - *"Apply the MITRE ATT&CK framework to what we've found so far: what techniques are mapped and where are the detection gaps?"*
@@ -312,9 +387,7 @@ These are real questions you can ask. Claude will pick the right skill automatic
 - *"Write a SOC Leader report for this investigation as a Word document: executive summary, incident timeline, IOC table with VT verdicts, MITRE mapping, root cause, and recommendations"*
 - *"Generate a weekly threat summary for SOC leadership covering alerts triaged, true positives confirmed, top IOCs, and any active campaigns"*
 - *"Produce an IOC table for all indicators found in the last 24 hours, including VirusTotal verdict, detection ratio, and threat actor attribution"*
-- *"Write up the root cause analysis for the PowerShell alert on `HOST-001`: trace the execution chain and map it to the kill chain"*
 - *"Give me an executive-level summary of the firewall beaconing pattern we found: one paragraph, business risk focus, no jargon"*
-- *"Create a threat actor profile for the group attributed in the last investigation, including TTPs, typical targets, and known tooling"*
 
 ### Hyperautomation workflows
 
@@ -327,27 +400,56 @@ These are real questions you can ask. Claude will pick the right skill automatic
 
 ## Installing
 
-**Plugin (recommended)**: download from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/), then in the Claude desktop app go to the **Cowork** tab, click **Customize** in the left sidebar, click **Browse plugins**, and select the `.plugin` file from the upload option in the plugins window. All six skills are installed in one step.
+**Plugin (recommended)**: download `sentinelone-skills-vX.Y.Z.plugin` from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/), then in the Claude desktop app: Cowork tab → Customize → Browse plugins → upload. All six skills install in one step.
 
-**Individual skills (for development only)**: drop a skill folder into `~/.claude/skills/`. Claude will pick it up on next session.
+**Installing skills individually (if plugin upload fails)**: each skill is also distributed as a standalone `.skill` file in the same [`dist/`](./sentinelone-skills-plugin/dist/) folder. Install them one of two ways:
 
-## Updating to a new plugin version
+- **Double-click**: double-click any `.skill` file in Finder (macOS) or Explorer (Windows). Claude Desktop opens and prompts you to install it.
+- **Manual upload**: in the Claude desktop app, go to Cowork tab → Customize → Browse plugins, and upload each `.skill` file individually using the same upload option.
 
-When a newer `sentinelone-skills-vX.Y.Z.plugin` is published in [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/), update in place by replacing the existing plugin:
+The six skill files are:
+- `sentinelone-mgmt-console-api.skill`
+- `sentinelone-powerquery.skill`
+- `sentinelone-sdl-api.skill`
+- `sentinelone-sdl-dashboard.skill`
+- `sentinelone-sdl-log-parser.skill`
+- `sentinelone-hyperautomation.skill`
 
-1. **Download** the new `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/) (latest version, e.g. `sentinelone-skills-v1.0.12.plugin`).
-2. In the Claude desktop app go to the **Cowork** tab.
+**Individual skills (development only)**: drop a skill folder into `~/.claude/skills/`. Claude will pick it up on next session.
+
+---
+
+## Updating
+
+When a newer `sentinelone-skills-vX.Y.Z.plugin` is published in [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/):
+
+1. Download the new `.plugin` file from [`sentinelone-skills-plugin/dist/`](./sentinelone-skills-plugin/dist/).
+2. In the Claude desktop app, go to the **Cowork** tab.
 3. Click **Customize** in the left sidebar.
 4. Click **Browse plugins**.
 5. Use the upload option in the plugins window and select the newly-downloaded `.plugin` file.
 6. When prompted that a plugin with the same name (`sentinelone-skills`) is already installed, click **Replace**.
-7. All six skills are upgraded in one step. Existing `credentials.json` and project-folder configuration are untouched.
+7. All six skills upgrade in one step. Existing `credentials.json` and project-folder configuration are untouched.
 
-To verify the new version is active, ask Claude `which version of sentinelone-skills is installed?` or check the plugin entry in the Cowork plugins window — it should show the version you just uploaded.
+To verify the new version is active, ask Claude `which version of sentinelone-skills is installed?` or check the plugin entry in the Cowork plugins window.
+
+To rebuild from source after local changes:
+
+```bash
+cd sentinelone-skills-plugin && bash scripts/build.sh
+```
+
+To rebuild from scratch (removes old dist files first):
+
+```bash
+cd sentinelone-skills-plugin && bash scripts/build.sh --clean
+```
+
+---
 
 ## Configuration
 
-All skills read credentials from a single JSON file: `credentials.json` dropped directly in your Cowork project folder. The plugin's SessionStart hook auto-discovers it and makes it available to every skill in the session.
+All skills read credentials from a single `credentials.json` file placed in your Cowork project folder. The plugin's SessionStart hook auto-discovers it and makes it available to every skill in the session.
 
 **Setup is two commands.** Copy [`credentials.example.json`](./sentinelone-skills-plugin/credentials.example.json) from this repo into your Cowork project folder, renaming it to `credentials.json`, then edit it.
 
@@ -379,47 +481,43 @@ notepad "$projectDir\credentials.json"
 
 If you only downloaded the `.plugin` file (not the full repo), extract `credentials.example.json` from the plugin zip with any unzip tool, or grab it directly from the repo at [`sentinelone-skills-plugin/credentials.example.json`](./sentinelone-skills-plugin/credentials.example.json).
 
+| Credential key | Required for | How to get it |
+|---|---|---|
+| `S1_CONSOLE_URL` | All management console skills | Your console URL, e.g. `https://usea1-acme.sentinelone.net` |
+| `S1_CONSOLE_API_TOKEN` | `sentinelone-mgmt-console-api`, `sentinelone-powerquery`, plus SDL query and config methods (not `uploadLogs`) | Settings → Users → Service Users → Create New Service User → copy the API token. The same JWT works for the SDL API from Management version Z SP5+. See [Creating service users](https://community.sentinelone.com/s/article/000005291) and [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+| `S1_HEC_INGEST_URL` | UAM alert/indicator ingest and log ingest via HEC | The SentinelOne HEC ingest host for your region, e.g. `https://ingest.us1.sentinelone.net`. Look up your region's URL in [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
+| `SDL_XDR_URL` | `sentinelone-sdl-api`, `sentinelone-sdl-dashboard`, `sentinelone-sdl-log-parser` | Your SDL tenant URL, e.g. `https://xdr.us1.sentinelone.net`. Region-specific; see [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
+| `SDL_LOG_WRITE_KEY` | `uploadLogs` only | In Singularity Data Lake → menu next to username → API Keys → Log Access Keys → New Key (Log Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+| `SDL_CONFIG_WRITE_KEY` | Deploying parsers/dashboards via `putFile` | In Singularity Data Lake → menu next to username → API Keys → Configuration Access Keys → New Key (Configuration Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+
 Resolution order (highest priority wins):
 1. Environment variables (`S1_CONSOLE_URL`, `S1_CONSOLE_API_TOKEN`, `SDL_*`)
 2. `<project folder>/credentials.json` (auto-discovered)
 3. `~/.config/sentinelone/credentials.json` (terminal fallback when there is no project folder)
 
-A fully annotated example with all optional keys is in [`sentinelone-skills-plugin/credentials.example.json`](./sentinelone-skills-plugin/credentials.example.json).
+Full credential reference including all SDL keys and MCP server config: [docs/credentials.md](./docs/credentials.md)
 
-| Credential key | Required for | How to get it |
-|---|---|---|
-| `S1_CONSOLE_URL` | All management console skills | Your console URL, e.g. `https://usea1-acme.sentinelone.net` |
-| `S1_CONSOLE_API_TOKEN` | `sentinelone-mgmt-console-api`, `sentinelone-powerquery`, plus SDL query and config methods (not `uploadLogs`) | Settings → Users → Service Users → Create New Service User → copy the API token. The same JWT works for the SDL API from Management version Z SP5+. See [Creating service users](https://community.sentinelone.com/s/article/000005291) and [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
-| `S1_HEC_INGEST_URL` | UAM alert/indicator ingest and log ingest via HEC (used by `sentinelone-mgmt-console-api` UAM Alert Interface) | The SentinelOne HEC ingest host for your region, e.g. `https://ingest.us1.sentinelone.net`. Look up your region's URL in [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
-| `SDL_XDR_URL` | `sentinelone-sdl-api`, `sentinelone-sdl-dashboard`, `sentinelone-sdl-log-parser` | Your SDL tenant URL, e.g. `https://xdr.us1.sentinelone.net`. Region-specific; see [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
-| `SDL_LOG_WRITE_KEY` | `uploadLogs` only | In Singularity Data Lake → menu next to username → API Keys → Log Access Keys → New Key (Log Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
-| `SDL_CONFIG_WRITE_KEY` | Deploying parsers/dashboards via `putFile` | In Singularity Data Lake → menu next to username → API Keys → Configuration Access Keys → New Key (Configuration Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
-
-Environment variables override the credentials file if set.
-
-## sentinelone-skills-plugin
-
-The [`sentinelone-skills-plugin/`](./sentinelone-skills-plugin/) directory contains the distributable Claude plugin that bundles all six skills (including `sentinelone-hyperautomation` by Marco Rottigni). The built `.plugin` file lives in `sentinelone-skills-plugin/dist/`.
-
-To rebuild after syncing skill changes:
-
-```bash
-cd sentinelone-skills-plugin
-bash scripts/build.sh
-```
-
-To rebuild from scratch (removes old dist files first):
-
-```bash
-cd sentinelone-skills-plugin
-bash scripts/build.sh --clean
-```
+---
 
 ## Windsurf
 
-This repo includes Windsurf workflow files in `.windsurf/workflows/`. Each workflow is a thin pointer that directs Cascade to read the canonical `SKILL.md` and reference docs in the matching skill folder; no duplicated content.
+This repo includes Windsurf workflow files in `.windsurf/workflows/`. Each workflow is a thin pointer that directs Cascade to read the canonical `SKILL.md` and reference docs in the matching skill folder — no duplicated content.
 
 - `sentinelone-api.md`: Management Console API (agents, threats, alerts, sites, Purple AI, UAM).
 - `sentinelone-powerquery.md`: PowerQuery authoring, debugging, and detection rules.
 - `sentinelone-sdl-api.md`: Singularity Data Lake API (ingest, query, config files).
 - `sentinelone-sdl-log-parser.md`: SDL log parser authoring with OCSF mapping.
+
+---
+
+## Documentation
+
+| Doc | Contents |
+|---|---|
+| [docs/architecture.md](./docs/architecture.md) | How the three layers fit together, data flow, auth patterns, sandbox proxy explanation |
+| [docs/skills.md](./docs/skills.md) | Per-skill capability reference, key scripts, confirmed gotchas |
+| [docs/mcp-tools.md](./docs/mcp-tools.md) | All sentinelone-mcp and purple-mcp tools with usage notes and which to use when |
+| [docs/credentials.md](./docs/credentials.md) | Every credential key, where to find it, full `claude_desktop_config.json` reference |
+| [docs/testing.md](./docs/testing.md) | Full test coverage matrix, MCP tool validation results, confirmed API gotchas per surface |
+| [sentinelone-mgmt-console-api/SKILL.md](./sentinelone-mgmt-console-api/SKILL.md) | Deep reference: confirmed field schemas, non-obvious requirements, gotcha catalogue per endpoint |
+| [sentinelone-mgmt-console-api/tests/README.md](./sentinelone-mgmt-console-api/tests/README.md) | Reversible lifecycle test patterns and per-test gotchas |

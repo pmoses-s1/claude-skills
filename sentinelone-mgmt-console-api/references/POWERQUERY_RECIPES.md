@@ -168,10 +168,11 @@ r = c.powerQuery(
 )
 ```
 
-From this skill's Purple AI entry point, use
-`purple_query(client, "<natural language>")` -- it returns a
-PowerQuery body you can execute. Re-run the returned query verbatim;
-don't rewrite it blindly.
+For natural-language query generation, use the Purple MCP
+(`mcp__purple-mcp__purple_ai`). The `purple_query()` Python helper is
+non-functional for API tokens (requires browser-session teamToken;
+confirmed SERVICE_ERROR 2026-05-03). The Purple MCP handles both the
+NL-to-PQ step and execution.
 
 ## Field reference quick-glance
 
@@ -188,6 +189,67 @@ For the full schema, see the `sentinelone-powerquery` skill's
 - `tgt.file.path` / `tgt.file.sha256`
 - `message` -- free-form, always searchable with `$"regex"` shorthand
   in the initial filter
+
+## `| group` syntax reference
+
+The `| group` pipe aggregates rows. All grouping fields must be inside
+an aggregation function — bare field names after `by` are NOT valid
+and return a parse error ("Field must be enclosed in a grouping function").
+
+### Forms
+
+```
+| group function(expression), function2(expression2)
+| group function(expression) by expression3, expression4, …
+| group name=function(expression) by name3=expression3, name4=expression4, …
+```
+
+### Supported aggregation functions
+
+| Function | Notes |
+|---|---|
+| `count()` | row count |
+| `sum(x)` | sum of x |
+| `avg(x)` | arithmetic mean |
+| `min(x)` / `max(x)` | extremes |
+| `median(x)` | 50th percentile |
+| `pct(x, N)` | Nth percentile (0-100) |
+| `p10(x)` / `p50(x)` / `p90(x)` / `p99(x)` / `p999(x)` | fixed percentile shortcuts |
+| `stddev(x)` | standard deviation |
+| `any(x)` | any non-null value of x |
+| `any_true(x)` | true if any x is truthy |
+| `all_true(x)` | true if all x are truthy |
+| `estimate_distinct(x)` | HLL cardinality estimate |
+| `first(x)` / `last(x)` | first/last by arrival order |
+| `oldest(x)` / `newest(x)` | first/last by timestamp |
+| `max_by(x, y)` / `min_by(x, y)` | value of x at the row where y is max/min |
+| `array_agg(x, N)` | collect up to N values of x |
+| `array_agg_distinct(x, N)` | collect up to N distinct values of x |
+
+### Examples
+
+```
+| group count() by event.type
+| group hits=count() by event.type
+| group hits=count(), last=max(timestamp) by event.type
+| group hits=count() by day=timebucket('1d'), event.type
+| group endpoints=estimate_distinct(endpoint.name) by indicator.name
+| group ct=count(), cmdlines=array_agg_distinct(src.process.cmdline, 10) by endpoint.name
+```
+
+### What NOT to do
+
+```
+# Wrong — bare field after by without aggregation wrapper:
+| group count = count() by event.type | sort count desc   ← alias collision
+| group event.type by count()                              ← reversed
+```
+
+Sort references must use the output column name (the alias you gave it):
+```
+| group hits=count() by event.type | sort -hits   ← correct
+| group count() by event.type | sort -count       ← correct (implicit alias = function name)
+```
 
 ## Common pitfalls
 

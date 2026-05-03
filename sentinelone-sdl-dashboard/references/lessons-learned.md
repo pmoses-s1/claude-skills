@@ -345,3 +345,141 @@ Every panel should also include a `| limit N` after `| group` (for number panels
 ---
 
 End of document. Treat this file as a living artefact: append new gotchas as they surface in subsequent engagements.
+
+---
+
+## 11. S1-internal SDL sources `asset` and `ActivityFeed` — corrected live schemas
+
+**Confirmed 2026-05-01 (GRC dashboard engagement). Root cause: sandbox proxy block misread as empty source.**
+
+**Core rule: use sentinelone-mcp tools for all SDL operations.**
+
+| Operation | sentinelone-mcp tool |
+|---|---|
+| PowerQuery | `mcp__sentinelone-mcp__powerquery_run` |
+| V1 `query` (full event JSON for schema discovery) | `mcp__sentinelone-mcp__powerquery_schema_discover` |
+| `put_file` / `get_file` (dashboard deploy) | `mcp__sentinelone-mcp__sdl_put_file`, `mcp__sentinelone-mcp__sdl_get_file` |
+
+These tools run locally and bypass the sandbox proxy entirely. Do not fall back to any other approach.
+
+An earlier attempt at schema discovery in the same session ran inside the sandboxed Bash shell, which blocks all outbound HTTPS to `xdr.us1.sentinelone.net`. The V1 query calls returned a proxy error. Because the error was not recognized as a sandbox-specific block, the empty output was interpreted as the source having no useful fields, and a plausible-looking but entirely fabricated field list was deployed into the GRC dashboard panels.
+
+The fabrication was only caught when the user asked to re-verify the schemas, at which point the operation was re-run using the sentinelone-mcp tools and returned the real data: 126 fields for `asset`, 41 fields for `ActivityFeed`.
+
+**Prevention:** Always use sentinelone-mcp tools for SDL operations. They bypass the sandbox proxy and succeed where direct bash calls would fail.
+
+### `dataSource.name='asset'` — 126-field rich endpoint inventory (OCSF class_uid 3004)
+
+This is the full endpoint device inventory, not pipeline metrics. Key confirmed fields:
+
+```
+device.agent.uuid              device.name                   device.os.{name,version,type}
+device.agent.network_status    device.agent.network_quarantine_enabled
+device.agent.is_active         device.agent.is_decommissioned   device.agent.is_uninstalled
+device.agent.scan_status       device.agent.version            device.agent.last_logged_in_user_name
+device.ip_external             device.hw_info.{model_name,ram_size,cpu_type,serial_number}
+device.network_interfaces[N].{ip,mac,name,subnet}
+severity_id                    severity_                        operation (= OPERATION_UPSERT)
+s1_metadata.{site_id,site_name,group_id,group_name}
+```
+
+Fields that do NOT exist in this source: `entity.uid`, `entity_result.*`, `agent.health.online`, `agent.uuid` (use `device.agent.uuid`).
+
+### `dataSource.name='ActivityFeed'` — 41-field Hyperautomation/management activity audit log
+
+This is the management console activity and Hyperautomation workflow execution log (`sca:RetentionType = 'ACTIVITY_LOG'`), not pipeline metrics. Key confirmed fields:
+
+```
+activity_type        (numeric — e.g. 9207 = workflow execution event; NOT a string)
+activity_uuid        primary_description      secondary_description
+data.workflow_id     data.workflow_name       data.workflow_execution_url
+data.scope_id        data.scope_level         data.scope_name
+data.site_name       data.user_id             data.system_user
+created_at           updated_at               context
+account.id           account.name             site_id
+```
+
+Useful for Hyperautomation workflow audit trails and compliance tracking. Not useful for threat hunting.
+
+**The actual ingestion pipeline metrics source is `finding`** (fields: `batchCt`, `eventLatency.*`, `processor`, `tag`, `dataSource.category='metrics'`, `tag='ingestionHealth'`). Do not confuse it with `asset` or `ActivityFeed`.
+
+---
+
+## 12. Long-running scripts: always background-and-poll to avoid MCP timeout
+
+The MCP tool call layer imposes a hard ~2-minute timeout on any `start_process` call. Two operations that exceed this in typical engagements:
+
+- **Schema discovery across many sources** — V1 `query` calls take 5-10s each. For 15+ sources that is 2+ minutes.
+- **`validate_dashboard.py` on large dashboards** — 63 panels at 8-25s each = 10-30 minutes.
+
+**Pattern: background the process, poll the output file with fast separate calls.**
+
+```bash
+# 1. Start in background — returns immediately with PID
+python3 /tmp/my_script.py > /tmp/out.txt 2>&1 &
+echo "PID: $!"
+
+# 2. Poll in a separate fast start_process call (keep each call under 90s)
+python3 -c "
+import json, subprocess, time
+for _ in range(N):
+    time.sleep(15)
+    # read output file and check for completion sentinel
+    r = subprocess.run(['ps','aux'], capture_output=True, text=True)
+    alive = 'my_script' in r.stdout
+    print(f'n={...} running={alive}', flush=True)
+    if not alive: break
+"
+```
+
+Key rules:
+- Never put `sleep N` inside a `start_process` call where `N * iterations > 90s` — the MCP layer will time out the whole call.
+- Write completion sentinels to the output file (`print("DONE: ...", flush=True)`) so polling can detect finish without relying on process exit alone.
+- Use `flush=True` on every progress `print()` so the output file is readable while the script is still running.
+- The output file is idempotent if the script persists results incrementally (as `validate_dashboard.py` does). A cancelled poll does not lose work.
+
+---
+
+## 13. Large sources: index-level filters outperform post-pipe `number()` for KPI panels
+
+`number()` is the right defensive pattern when a field might be string-typed and you need arithmetic. However, for high-cardinality sources (tens of thousands of events in the window), `number()` forces a full scan-and-convert before the filter applies. On the `misconfiguration` source with 21k+ records this exceeded the V1 API's 30s hard timeout.
+
+**Slow (times out on large sources):**
+
+```
+dataSource.name='misconfiguration' severity_id=*
+| let sev = number(severity_id)
+| filter sev >= 4
+| group count()
+| limit 1
+```
+
+**Fast (index-level predicate):**
+
+```
+dataSource.name='misconfiguration' severity_id >= 4
+| group count()
+| limit 1
+```
+
+The initial filter before the first `|` is evaluated as an index predicate. For severity_id values 1-5, string-ordered comparison (`>= 4`) is numerically correct, so this is safe without `number()`.
+
+**Rule:** use `number()` when you need arithmetic or when severity values could be multi-digit or non-numeric. For simple threshold filters on 1-5 range fields against large sources, push the filter to the index predicate level and drop the `number()` wrapper. If the field is genuinely string-typed at index level the predicate still works correctly for single-digit ranges.
+
+This also applies to the dashboard renderer: the V1 API has a 30s hard cap; the browser renderer has a longer budget. A KPI panel that times out in validation but uses index-level filters will almost always render in the browser.
+
+---
+
+## 14. `transpose` panels consistently return 0 rows via the V1 validation API — this is not a real empty result
+
+During validation of stacked-bar panels using `| transpose <field> on timestamp`, the V1 `power_query` endpoint frequently returns 0 rows even when the underlying data exists and the KPI panels for the same source confirm thousands of matching events. This is an artefact of the deprecated V1 API's execution path, not a problem with the query or the dashboard.
+
+**Confirmed example (2026-05-01 GRC engagement):**
+
+- `Critical + High Alerts` number panel returned `448` events via V1 API — confirmed data exists.
+- `High + Critical Alerts per Day` stacked-bar panel using `| group count=count() by timestamp=timebucket('1d'), severity_id | transpose severity_id on timestamp` returned 0 rows via the same V1 API.
+- The browser renderer executed the same query without issue.
+
+**Rule:** when `validate_dashboard.py` marks a stacked-bar or line chart panel as empty (`row_count=0`), check whether the corresponding number panel for the same source shows data. If the number panel has data and the trend panel is empty, the empty result is a V1-API artefact, not a broken query. Document it as such in the evidence report Appendix with the note: `"0 rows via deprecated V1 API — confirmed live data from corresponding KPI panel; expect correct render in browser."`
+
+Do not remove or rewrite trend panels based on V1 validation empty results alone. The final authority is the browser renderer.

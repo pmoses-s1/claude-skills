@@ -8,6 +8,8 @@ description: Use whenever the user wants to author, edit, debug, validate, or ex
 
 This skill turns raw log samples into deployed, validated SDL parser definitions. A parser is an *augmented-JSON* file at `/logParsers/<name>` on the SDL tenant that extracts fields from each ingested line. The parser editor and the `Test Parser` button in the console run the parser client-side in JavaScript; this skill mirrors that workflow programmatically and finishes by ingesting a sample through the deployed parser to confirm the actual ingest path works.
 
+> **Sandbox proxy blocked?** If `putFile` or `uploadLogs` calls to `*.sentinelone.net` fail with a connection or proxy error inside the Claude sandbox, use the `sentinelone-mcp` server instead. It runs locally via `node` and bypasses the sandbox proxy entirely. Setup: add it to `claude_desktop_config.json` (see `claude-skills/sentinelone-mcp/README.md`). Use `sdl_put_file` to deploy the parser and `sdl_upload_logs` to run the ingest validation step — both execute from your machine, not the sandbox.
+
 ## Two hard rules (every parser, every time)
 
 These two rules apply to every parser you write or edit, regardless of source, regardless of whether you're starting from scratch or copying from the catalog. Violating either produces a non-conformant parser even if extraction works.
@@ -392,15 +394,10 @@ Annotated, runnable parser definitions. Copy and adapt rather than starting from
 When a user pastes a log and asks you to parse it, you owe them: (1) a parser file written against the SDL augmented-JSON DSL, (2) proof it actually extracts the right fields when ingested through the live SDL pipeline (not just the editor preview), (3) a clean handoff (final path, fields, sample query). The bundled references and examples exist so you don't have to hold the entire DSL in your head — load them as needed and reach for the templates first.
 
 
-## Sandbox proxy blocked? Use Desktop Commander
+## Parser deployment via sentinelone-mcp
 
-Parser validation uses `sdl_client.py` from the `sentinelone-sdl-api` skill, which
-makes direct HTTPS calls to `*.sentinelone.net`. If you see `SandboxProxyBlockedError`
-or `OSError: Tunnel connection failed: 403 Forbidden`, the Cowork sandbox proxy is
-blocking those calls.
-
-The fix: write the parser JSON and any test log files to `/tmp/` via
-`mcp__Desktop_Commander__write_file`, then validate with `mcp__Desktop_Commander__start_process`
-running `sdl_client.py` on the host Mac. `credentials.json` is at the project root
-folder (the folder you selected in Cowork). See the `sentinelone-sdl-api` skill
-for full Desktop Commander fallback instructions.
+Parser deployment and validation use the `sentinelone-mcp` MCP tools, which bypass the
+Cowork sandbox proxy entirely. Use `sdl_put_file`, `sdl_get_file`, `sdl_list_files`,
+and `sdl_upload_logs` directly instead of falling back to the `sentinelone-sdl-api`
+skill scripts. The MCP tools run locally on your machine and make direct HTTPS calls
+to `*.sentinelone.net` without proxy interference.

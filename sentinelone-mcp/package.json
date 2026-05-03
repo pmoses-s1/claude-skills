@@ -1,0 +1,17 @@
+{
+  "name": "sentinelone-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server orchestrating SentinelOne skills, APIs, and SOC analyst context",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "sentinelone-mcp": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -10,6 +10,8 @@ PowerQuery (PQ) is SentinelOne's pipeline query language for the Singularity Dat
 
 Use this skill to write correct, efficient, runnable PowerQueries for threat hunting, investigations, detection rule bodies, and dashboards.
 
+> **Sandbox proxy blocked?** If the LRQ API at `POST /sdl/v2/api/queries` on your console host fails with a connection or proxy error inside the Claude sandbox, use the `sentinelone-mcp` server instead. It runs locally via `node` and bypasses the sandbox proxy entirely. Setup: add it to `claude_desktop_config.json` (see `claude-skills/sentinelone-mcp/README.md`). The MCP server exposes `powerquery_run`, `powerquery_enumerate_sources`, and `powerquery_schema_discover` — all running through the LRQ API on your machine.
+
 ## Workflow
 
 When the user asks you to write or investigate with a PowerQuery:
@@ -69,7 +71,10 @@ Strings need quotes (`'foo'` or `"foo"`); numbers and booleans don't. Underscore
 
 These are where queries go wrong. Internalize them before writing.
 
-1. **`*` is NOT a valid standalone initial filter.** `* | limit 5` returns a 500 error on many tenants. Use `| limit 5` (empty initial filter, start with a pipe) or target a real field like `event.type=*`. The `*` wildcard only works as `field = *` (not-null), `* contains '…'`, or `* matches '…'`.
+1. **`*` alone is NOT a valid initial filter.** `* | limit 5` returns a 500 error ("Don't understand [*]"). There are three distinct `*` idioms — pick the right one for your intent:
+   - **Field presence / attribute wildcard:** `dataSource.name=*` means "field is present/non-null". Use as a query-opener for aggregations, e.g. `dataSource.name=* | group count=count() by dataSource.name`. This is NOT an all-column search.
+   - **All-column text search:** `* contains 'evil.com'` or `* matches 'regex'` in the **initial filter** (before the first `|`) searches ALL indexed fields — use when you need to find text anywhere in the event. Dramatically faster than `message contains`. Only works before the first `|`; not valid in `| filter …` after a pipe, and not valid in Alerts.
+   - **Empty filter (all events):** start the query with `|`, e.g. `| group ct=count() by event.type`.
 2. **Double-escape regex almost everywhere.** `src.process.cmdline matches "\\d+"`, `tgt.file.path matches '^C:\\\\Windows\\\\Temp\\\\[a-z]{8}\\.tmp$'`. The only place you don't double-escape is the `$"…"` shorthand (searches `message`).
 3. **After `columns` or `group`, previous fields are gone.** These commands create an entirely new record set. If you'll need a field later, carry it through: `group ct=count(), host=any(endpoint.name) by src.process.storyline.id` — don't expect `endpoint.name` to still be addressable after that `group` unless you aggregate it.
 4. **Subqueries can't go after `group`, `sort`, or `limit`.** And the subquery must itself produce the column named in the `in (...)` expression (via `columns` or `group`). `user in (action='login' | group 1 by user)` is valid; `user in (action='login')` is not.
@@ -238,21 +243,9 @@ src.process.name contains 'powershell' dst.ip.address = *
 Notice: filter early (`dst.ip.address = *` prunes events without a destination IP), `net_rfc1918` is the right way to split internal vs external (don't hand-roll CIDRs), `array_agg_distinct` caps the array so the row stays small, `any(src.process.cmdline)` grabs a representative cmdline since we're collapsing per storyline.
 
 
-## Sandbox proxy blocked? Use Desktop Commander
+## PowerQuery execution via sentinelone-mcp
 
-If any script raises `SandboxProxyBlockedError`, `PQError` mentioning "proxy", or
-`OSError: Tunnel connection failed: 403 Forbidden`, the Cowork sandbox proxy is blocking
-direct HTTPS to `*.sentinelone.net`. The fix is to run the script on the host Mac via
-Desktop Commander, which has unrestricted network access.
-
-1. Re-run via `mcp__Desktop_Commander__start_process`:
-   ```
-   cd <PROJECT_ROOT>/claude-skills/sentinelone-mgmt-console-api
-   python3 scripts/pq.py <args>
-   ```
-   To locate the skill root: `mdfind -name "pq.py" | grep claude-skills | head -1`
-2. `credentials.json` is at the project root folder (the folder you selected in Cowork).
-3. For inline Python, write to `/tmp/` via `mcp__Desktop_Commander__write_file`,
-   then execute with `mcp__Desktop_Commander__start_process`.
-
-This is not a credential issue. Do not widen time windows or change query logic to debug this.
+PowerQuery execution uses the `sentinelone-mcp` MCP tools, which bypass the Cowork sandbox
+proxy entirely. Use `powerquery_run` and `powerquery_schema_discover` directly instead of
+falling back to the `sentinelone-mgmt-console-api` skill scripts. The MCP tools run locally
+on your machine and make direct HTTPS calls to `*.sentinelone.net` without proxy interference.

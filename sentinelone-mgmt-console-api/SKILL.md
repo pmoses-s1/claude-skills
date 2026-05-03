@@ -8,6 +8,8 @@ description: Use whenever the user wants to query, update, create, or act on a S
 
 Wraps the SentinelOne Management Console API (Swagger 2.0, spec version 2.1, 781 operations) with a pre-built Python client, a compact endpoint index, and per-tag reference files.
 
+> **Sandbox proxy blocked?** If calls to `*.sentinelone.net` fail with a connection or proxy error inside the Claude sandbox, use the `sentinelone-mcp` server instead. It runs locally on your machine via `node` and bypasses the sandbox proxy entirely. Setup: add it to `claude_desktop_config.json` (see `claude-skills/sentinelone-mcp/README.md`). The MCP server exposes all the tools in this skill — `s1_api_get`, `s1_api_post`, `purple_ai_alert_summary`, `uam_list_alerts`, `uam_get_alert`, `uam_add_note`, `uam_set_status` — with schemas validated against the live API. For natural-language Purple AI queries and AI investigations, use the Purple MCP (`mcp__purple-mcp__purple_ai`) directly — those operations require a browser-session teamToken that API tokens never obtain.
+
 ## Setup — configure credentials first
 
 Drop a `credentials.json` file directly into your Cowork project folder with the required fields:
@@ -45,6 +47,184 @@ When the user asks for something involving the S1 API, follow this pattern:
 4. **Paginate correctly.** S1 list endpoints use cursor-based pagination. The client's `paginate()` and `iter_items()` handle this automatically — prefer them over manual `skip`/`limit` math, which caps at 1000 items.
 5. **Summarize the result for the user.** Don't dump raw JSON unless asked. Prefer a short prose summary plus a table or CSV/XLSX if the volume warrants.
 
+## GET vs POST: the rule you must follow
+
+The S1 API uses **GET for every read operation** — listing, counting, and exporting. POST is only for actions and mutations. Violating this produces HTTP 404, not a permissions error, because the path simply does not exist.
+
+**Read (always GET):**
+| Intent | Correct endpoint |
+|---|---|
+| List agents | `GET /web/api/v2.1/agents` |
+| Count agents | `GET /web/api/v2.1/agents/count` → `{"data":{"total":N}}` |
+| List threats | `GET /web/api/v2.1/threats` |
+| Count threats | `GET /web/api/v2.1/threats?countOnly=true` or check `pagination.totalItems` from any list call |
+| Export threats to CSV | `GET /web/api/v2.1/threats/export` (no extra params required) |
+| List sites / accounts / groups | `GET /web/api/v2.1/{sites,accounts,groups}` |
+| Get system info | `GET /web/api/v2.1/system/info` |
+
+**Write / action (POST/PUT/DELETE):**
+- Agent actions (isolate, reconnect, uninstall, scan): `POST /web/api/v2.1/agents/actions/<action>`
+- Threat actions (mitigate, verdict, fetch-file): `POST /web/api/v2.1/threats/<action>`
+- Mutations (notes, exclusions, IOCs, custom rules): POST/PUT/DELETE on the relevant resource path
+
+**Paths that do not exist — never call these:**
+
+These paths return HTTP 404 and have never existed in the v2.1 spec. They are plausible-sounding guesses that are consistently wrong:
+
+| Wrong path | Why you might guess it | Correct alternative |
+|---|---|---|
+| `POST /web/api/v2.1/agents/ids` | "query agents by IDs" | `GET /web/api/v2.1/agents?ids=<id1>,<id2>` |
+| `POST /web/api/v2.1/threats/summary` | "get a threat summary/count" | `GET /web/api/v2.1/threats?countOnly=true` |
+| `POST /web/api/v2.1/export/threats` | "export threats" | `GET /web/api/v2.1/threats/export` |
+| `POST /web/api/v2.1/threats/count` | "count threats via POST" | `GET /web/api/v2.1/threats?countOnly=true` |
+| `POST /web/api/v2.1/agents/summary` | "agent summary" | `GET /web/api/v2.1/agents/count` + `GET /web/api/v2.1/agents` |
+
+If you are about to call `s1_api_post` for a read/count/export operation, stop and switch to `s1_api_get`. Before any `s1_api_post` call, confirm the path exists: `python3 scripts/search_endpoints.py "<keyword>"` — if the path does not appear, it does not exist.
+
+## Schema gotchas — confirmed on live tenant
+
+These are fields where the obvious guess is wrong. All verified against the live tenant.
+
+### Custom Detection Rules and STAR Rules — POST /cloud-detection/rules
+
+**STAR rules** ("streaming threat assessment rules") are the product name for real-time
+detection rules that evaluate every matching event as it arrives. There is no separate
+`/star-rules` API path — that path returns 404. STAR rules are `cloud-detection/rules`
+with `queryType=events`, the same endpoint as all other Custom Detection Rules.
+
+`queryType` enum (from swagger): `events`, `scheduled`, `correlation`, `uebafirstseen`.
+
+`expirationMode` valid values: `"Permanent"` or `"Temporary"`. `"Never"` is not valid and returns 400.
+
+**Events (STAR) rule — confirmed CREATE body (live API, 2026-05):**
+
+```json
+{
+  "data": {
+    "name": "my-star-rule",
+    "description": "optional",
+    "severity": "Low",
+    "expirationMode": "Permanent",
+    "queryType": "events",
+    "status": "Draft",
+    "s1ql": "EventType = \"Process Creation\" AND ProcessName = \"suspicious.exe\"",
+    "treatAsThreat": "UNDEFINED",
+    "networkQuarantine": false
+  },
+  "filter": {"siteIds": ["<siteId>"]}
+}
+```
+
+Events rule gotchas confirmed against live API:
+- `"activeResponse"` in the body returns HTTP 400 "Unknown field" — omit it.
+- `queryLang` defaults to `"1.0"` for events rules; do not set it explicitly (unlike scheduled rules which require `"2.0"`).
+- `treatAsThreat="UNDEFINED"` is accepted on input but stored as `null` in the response.
+- `status="Draft"` creates a rule that never fires even if live telemetry matches.
+- GET `nameSubstring` + `queryType` combined returns HTTP 500 — use one filter at a time.
+- DELETE body is top-level `{filter: {ids: [...], siteIds: [...]}}` with no `"data"` wrapper.
+- `isLegacy=false` is NOT needed for events rules (only required for scheduled rules).
+
+`status` valid values: `"Draft"`, `"Activating"`, `"Active"`, `"Disabling"`, `"Disabled"`. Use `"Disabled"` to create a non-firing rule; the API returns `"Draft"` in the response for a rule that has never been activated.
+
+**PUT /cloud-detection/rules/{id}** — `status` is required in the PUT body even though it is read-only in practice. Omitting it returns 400 "Missing data for required field."
+
+### Saved Filters — POST /filters
+
+The body field for filter criteria is `filterFields`, not `filters`:
+
+```json
+{
+  "data": {
+    "name": "my-filter",
+    "filterFields": {"infected": true, "networkStatuses": ["connected"]}
+  },
+  "filter": {"accountIds": ["<accountId>"]}
+}
+```
+
+**PUT /filters/{id}** — does NOT accept a top-level `filter` scope wrapper. Pass only `{"data": {...}}`:
+
+```json
+{"data": {"name": "updated-name", "filterFields": {"infected": false}}}
+```
+
+### PowerQuery Scheduled Detections — POST/PUT/GET/DELETE /cloud-detection/rules
+
+`queryType: "scheduled"` rules are PowerQuery-based detections. They use a different schema from `events` and `correlation` rules and have several non-obvious requirements confirmed against the live API (2026-05-03).
+
+**CREATE — POST /web/api/v2.1/cloud-detection/rules**
+
+All five `data` fields are required. `queryLang: "2.0"` is mandatory; omitting it returns HTTP 400 "query lang must be 2.0":
+
+```json
+{
+  "data": {
+    "name": "My Scheduled Detection",
+    "queryType": "scheduled",
+    "queryLang": "2.0",
+    "severity": "Medium",
+    "expirationMode": "Permanent",
+    "status": "Disabled",
+    "scheduledParams": {
+      "query": "dataSource.name = 'EndpointSecurityWin' | group count = count() by AgentName | filter count > 0",
+      "runIntervalMinutes": 60,
+      "lookbackWindowMinutes": 60,
+      "threshold": {"value": 0, "operator": "Greater"}
+    }
+  },
+  "filter": {"siteIds": ["<siteId>"]}
+}
+```
+
+**GET requires `isLegacy=false`** — without this query parameter, the list endpoint returns 0 results for scheduled rules even though they exist and are visible in the console UI. Always include it:
+
+```
+GET /web/api/v2.1/cloud-detection/rules?siteIds=<id>&queryType=scheduled&isLegacy=false
+GET /web/api/v2.1/cloud-detection/rules?ids=<ruleId>&siteIds=<id>&isLegacy=false
+```
+
+**PUT requires `filter.siteIds`** in the body even though swagger marks `filter` as optional. Also requires all five data fields (name, queryType, severity, expirationMode, status):
+
+```json
+{
+  "data": {"name": "...", "queryType": "scheduled", "severity": "High", "expirationMode": "Permanent", "status": "Disabled", "scheduledParams": {...}},
+  "filter": {"siteIds": ["<siteId>"]}
+}
+```
+
+**ENABLE/DISABLE** — dedicated PUT endpoints, both require `ids` and `siteIds` in filter:
+
+```
+PUT /web/api/v2.1/cloud-detection/rules/enable   body: {"filter": {"ids": ["<ruleId>"], "siteIds": ["<siteId>"]}}
+PUT /web/api/v2.1/cloud-detection/rules/disable  body: {"filter": {"ids": ["<ruleId>"], "siteIds": ["<siteId>"]}}
+```
+
+**DELETE body — use `json_body=` keyword arg in s1_client.py.** The method signature is `delete(path, params=None, json_body=None)`. Passing the filter dict positionally sends it as query params and returns HTTP 400:
+
+```python
+# Correct
+client.delete("/web/api/v2.1/cloud-detection/rules",
+    json_body={"filter": {"ids": [rule_id], "accountIds": [acct_id]}})
+
+# Wrong — sends filter as query string
+client.delete("/web/api/v2.1/cloud-detection/rules",
+    {"filter": {"ids": [rule_id], "accountIds": [acct_id]}})
+```
+
+**Verify deletion with GET (expect 0 hits), not a second DELETE.** A second DELETE returns HTTP 400 "Could not find rule with id: ..." rather than `affected: 0`.
+
+### Alert notes — UAM GraphQL
+
+`deleteAlertNote` has a 30–90 second propagation window after creation before it can be deleted. The mutation uses `alertNoteId`, not `noteId`:
+
+```graphql
+mutation del($nid: ID!) {
+  deleteAlertNote(alertNoteId: $nid) { data { id } }
+}
+```
+
+If you call this immediately after creating a note you will get "Alert Note with ID ... does not have mgmt_note_id set". Retry with backoff; the `unified_alerts.delete_alert_note()` helper does this automatically.
+
 ## Probing a new tenant
 
 When starting on an unfamiliar tenant, run the non-destructive smoke test once:
@@ -63,8 +243,8 @@ It enumerates every GET plus a curated allow-list of read-only query POSTs, reco
 - `scripts/call_endpoint.py` — CLI for one-shot calls: `python scripts/call_endpoint.py GET /web/api/v2.1/agents --param limit=5`.
 - `scripts/search_endpoints.py` — ranked keyword search over the endpoint index, with synonym expansion and an `--only-works` filter that restricts to endpoints confirmed reachable on this tenant.
 - `scripts/smoke_test_queries.py` — non-destructive sweep of every GET + safe query POST. Writes `references/tenant_capabilities.{json,md}`. Read-only; tenant state unchanged.
-- `scripts/purple_ai.py` — Purple AI natural-language wrapper over `POST /web/api/v2.1/graphql` (undocumented endpoint). Exports `purple_query()` and `PurpleAIError`.
-- `scripts/call_purple.py` — CLI wrapper: `python scripts/call_purple.py "show powershell.exe outbound connections"`.
+- `scripts/purple_ai.py` — Purple AI natural-language wrapper over `POST /web/api/v2.1/graphql`. **Non-functional for API tokens** — `purpleLaunchQuery NATURAL_LANGUAGE` requires a browser-session teamToken that service accounts never obtain (confirmed SERVICE_ERROR 2026-05-03). Use the Purple MCP (`mcp__purple-mcp__purple_ai`) for NL queries. Kept for reference only.
+- `scripts/call_purple.py` — CLI wrapper for `purple_query()`. **Non-functional for API tokens** (same teamToken constraint). Use the Purple MCP instead.
 - `scripts/unified_alerts.py` — Unified Alert Management (UAM) GraphQL wrapper over `POST /web/api/v2.1/unifiedalerts/graphql`. Covers the full query + mutation surface (list/filter/group/notes/history/trigger-actions). See `references/UNIFIED_ALERTS.md`.
 - `scripts/call_unified_alerts.py` — CLI for UAM: `python scripts/call_unified_alerts.py list --filter detectionProduct=EDR --first 10`, `... add-note <id> "…"`, `... set-status --scope <acct> --alert-id <id> RESOLVED`.
 - `references/UNIFIED_ALERTS.md` — UAM reference: operation catalogue, schema quirks, filter patterns, action catalogue, worked recipes.
@@ -135,67 +315,231 @@ Many endpoints are destructive or operationally sensitive: disconnect/reconnect 
 
 The safe pattern: run the matching `GET` with `countOnly=true` first to show the blast radius, then the mutating call.
 
-## Purple AI — natural-language query
+## Purple AI — natural-language query, alert summary, and auto-investigation
 
 > **Precedence:** if the user explicitly mentions "purple mcp" or "mcp", prefer the Purple MCP tools (`mcp__purple-mcp__purple_ai`, `mcp__purple-mcp__powerquery`, etc.) — this skill is the backup path in that case. Use the wrapper below when the user has asked for the S1 console/API directly, when Purple MCP is unavailable, or when you need to script a raw GraphQL call.
 
-SentinelOne exposes an undocumented GraphQL endpoint at `POST /web/api/v2.1/graphql` that powers the console's Purple AI chat. The skill wraps the `purpleLaunchQuery` operation so workflows can ask Purple AI in natural language and receive a structured response (summary text plus a generated PowerQuery).
+### Hosts
 
-Auth is identical to REST — the same `Authorization: ApiToken <token>` header. No extra credential setup beyond `$CLAUDE_CONFIG_DIR/sentinelone/credentials.json`.
+| Host | Purpose |
+|---|---|
+| `<region>.sentinelone.net` | Management console — all REST and GraphQL calls use this host |
+| `id.na1.sentinelone.net` | Browser session keep-alive (not relevant for API tokens) |
+| `metrics-proxy-use1.na1.sentinelone.net` | Internal metrics (returned 503 in observed sessions, non-fatal) |
 
-```python
-import sys
-sys.path.insert(0, "scripts")
-from s1_client import S1Client
-from purple_ai import purple_query, PurpleAIError
+### Endpoints
 
-c = S1Client()
-try:
-    r = purple_query(
-        c,
-        "Show powershell.exe processes making outbound connections in the last 24h, top 10.",
-        view_selector="EDR",   # EDR | IDENTITY | CLOUD | NGFW | DATA_LAKE
-        hours=24,
-    )
-except PurpleAIError as e:
-    # entitlement or permission failure — the token's role can't use Purple AI,
-    # or the tenant isn't entitled. These return HTTP 200 with an in-body error.
-    print(f"purple error: {e} (type={e.error_type})")
-else:
-    print(r["message"])           # natural-language answer
-    print(r["power_query"])       # generated PQ (may be None — see below)
-    print(r["suggested_questions"])
+Purple AI uses **three** GraphQL endpoints (all traffic is `POST` with JSON body). Each request carries `?opname=<OperationName>&requestId=<uuid>` as query-string params for tracing; the server only inspects the JSON body.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /web/api/v2.1/graphql` | LLM dispatcher — `purpleLaunchQuery`, `purpleAlertSummary` |
+| `POST /sdl/v2/graphql` | Notebook lifecycle + SDL query execution (see operation table below) |
+| `POST /web/api/v2.1/unifiedalerts/graphql` | UAM — auto-investigation trigger and polling |
+
+Auth uses the same `Authorization: ApiToken <token>` header as REST. No extra credential setup.
+
+### SDL operation table (`POST /sdl/v2/graphql`)
+
+| opname | Triggered by | Purpose |
+|---|---|---|
+| `notebooks` | Sidebar load | List My Notebooks / Shared Notebooks |
+| `createNotebook` | "+ New Notebook" or starter prompt | Creates a notebook; response includes `teamToken` |
+| `purpleNotebook` | Selecting a notebook | Loads full Q&A history for the notebook |
+| `addPurpleInputOutputMessage` | After each LLM/query step | Persists user prompt + AI output into the notebook |
+| `launchQuery` | After LLM produces a PowerQuery | Executes the PQ against the data lake |
+| `pingQuery` | Repeatedly while query runs | Short-poll for status/progress/results |
+| `removeQuery` | On completion or cancel | Cleans up the query and releases resources |
+
+### Bootstrap REST calls (browser-only)
+
+These fire on page load and when entering a notebook. Not needed for API-token workflows, but useful for debugging feature availability:
+
+- `GET /web/api/v2.1/private/system/enabled-features?siteIds=<id>` — feature flags (`purpleNative`, `purpleConversations`, `purpleAutoInvestigations`)
+- `GET /web/api/v2.1/private/rbac/user-permissions?siteIds=<id>` — current user's permission set
+- `POST /web/api/v2.1/private/users/session-info` — session info
+
+### Operations
+
+#### purpleLaunchQuery — NL → PowerQuery (or summary/suggestions)
+
+**Critical: this is a GraphQL `query` (not `mutation`). Variable wrapper is `request` (type `PurpleLaunchQueryRequest`). Prior implementations using `mutation` + `PurpleLaunchQueryInput` fail with HTTP 400.**
+
+`contentType` controls what the LLM is asked to do:
+
+| contentType | Returns |
+|---|---|
+| `NATURAL_LANGUAGE` | `result.powerQuery.query` — the generated PQ string |
+| `QUERY_RESULTS` | `result.summary` — English summary of a previous PQ result set |
+| `SUGGEST_QUESTIONS` | `result.suggestedQuestions[]` — follow-up question chips |
+| `STAR_RULE`, `DETECTION_RULE` | `result.detectionRule` — generated detection logic |
+
+```graphql
+query purpleLaunchQuery($request: PurpleLaunchQueryRequest!) {
+  purpleLaunchQuery(request: $request) {
+    token
+    resultType
+    status { state error { errorType errorDetail origin } }
+    stepsCompleted
+    result {
+      message
+      summary
+      maskedMetadata
+      powerQuery { query viewSelector timeRange { start end } }
+      suggestedQuestions { question powerQuery viewSelector timeRange { start end } }
+    }
+  }
+}
 ```
 
-CLI equivalent:
-
+Variables (`$request`):
+```jsonc
+{
+  "request": {
+    "isAsync": false,
+    "contentType": "NATURAL_LANGUAGE",
+    "consoleDetails": { "baseUrl": "https://<region>.sentinelone.net/", "version": "S-26.1.3#69" },
+    // TOP-LEVEL inputContent required (confirmed: HTTP 400 "missing input value at $request.inputContent" without it)
+    "inputContent": {
+      "userInput": "<the user's question>",
+      "viewSelector": "EDR",
+      "displayedTimeRange": { "start": <epochMs>, "end": <epochMs> },
+      "resultsPq": null, "powerQueryForResults": null, "contextId": null, "userDetails": null
+    },
+    "conversation": {
+      "id": "<uuid>",
+      "messages": [{
+        "inputMessage": {
+          "id": "<uuid>", "feedItemId": "<32hex>", "conversationId": "<uuid>",
+          "createdAt": "<iso>", "messageType": "INPUT", "contentType": "NATURAL_LANGUAGE",
+          "inputContent": {
+            "userInput": "<the user's question>",
+            "viewSelector": "EDR",
+            "displayedTimeRange": { "start": <epochMs>, "end": <epochMs> },
+            "resultsPq": null, "powerQueryForResults": null, "contextId": null, "userDetails": null
+          }
+        }
+      }]
+    }
+  }
+}
 ```
-python scripts/call_purple.py "show powershell.exe outbound connections, top 10"
-python scripts/call_purple.py --selector CLOUD --hours 48 "show s3 downloads by user"
-python scripts/call_purple.py --json "..."   # machine-readable normalized result
-python scripts/call_purple.py --raw  "..."   # full GraphQL response
+
+`PurpleUserDetailsRequest` schema (confirmed via live validation error — does NOT have `siteIds` or `groupIds`):
+```jsonc
+{
+  "accountId": "<19-digit ID>",  // ID! required
+  "teamToken": "<24-char>",      // ID! required — session token from Purple AI workspace
+  "sessionId": "<uuid>",
+  "emailAddress": "<user@...>",
+  "userAgent": "<browser UA>",
+  "buildDate": "<iso>",
+  "buildHash": "<short hash>"
+}
 ```
 
-### Purple AI's domain boundary — important
+Full end-to-end flow for one user question (observed in browser session):
+```
+1. purpleLaunchQuery  (NATURAL_LANGUAGE, /web/api/v2.1/graphql)
+   → result.powerQuery.query  (the generated PQ string)
 
-Purple AI answers questions about **SDL telemetry**: process events, network events, file events, indicators, and ingested third-party logs. It does **not** answer questions about **console entities** — alerts, threats, agents, sites, policies. Those are REST resources; use the matching REST endpoint (e.g. `GET /web/api/v2.1/threats`, `GET /web/api/v2.1/cloud-detection/alerts`) instead.
+2. addPurpleInputOutputMessage  (/sdl/v2/graphql)
+   → persists user prompt + generated PQ into the notebook
 
-Out-of-domain questions return HTTP 200 with `result_type: "MESSAGE"` and a scope refusal like *"Purple can query for threat indicators, OS events, and some third-party vendor logs ingested into the Singularity Data Lake."* — this is Purple's own guardrail, not a skill failure. When the user's ask is about an entity and Purple refuses, switch to the REST path and tell them why.
+3. launchQuery  (/sdl/v2/graphql)
+   → submits PQ to SDL execution engine
+   → returns { token, ids, status: RUNNING }
 
-### Interpreting the response
+4. pingQuery × N  (/sdl/v2/graphql, ~1 Hz)
+   → polls until status = COMPLETED
+   → returns columns + cells (table data)
 
-Key fields in the normalized dict:
+5. purpleLaunchQuery  (QUERY_RESULTS, /web/api/v2.1/graphql)
+   → result.summary  (English summary of the rows)
 
-- `result_type`: `"POWER_QUERY"` means Purple generated an executable PQ (check `power_query`). `"MESSAGE"` means docs/RAG mode — `message` has the answer, `power_query` will be None.
-- `state`: `"COMPLETED"` is the successful path. Any other state is unexpected.
-- `power_query`: the PQ Purple generated. Do **not** auto-execute it without showing it to the user first — Purple can hallucinate fields and execution has a tenant cost. Prefer: render it → confirm with user → then run it through the existing DV/PowerQuery endpoints.
-- `suggested_questions`: the "you might also ask" chips from the UI.
+6. purpleLaunchQuery  (SUGGEST_QUESTIONS, /web/api/v2.1/graphql)
+   → result.suggestedQuestions[]  (follow-up chips)
 
-### Caveats
+7. addPurpleInputOutputMessage  (/sdl/v2/graphql)
+   → persists the final answer into the notebook
 
-- The GraphQL endpoint is **undocumented** and not a committed public API. Field names, schema, and behavior can change between console releases. Flag this when building anything production-grade on top.
-- Entitlement and permission failures come back as HTTP 200 with `status.error` populated. The wrapper raises `PurpleAIError` on these so they don't masquerade as empty results — surface the `error_type` to the user verbatim (it's the best hint we have for "re-issue the token with Purple AI permission" vs "the tenant isn't licensed for Purple").
-- `teamToken` and `accountId` in the request body are UI-session artifacts; empty strings are accepted for API-token auth.
+8. removeQuery  (/sdl/v2/graphql)
+   → cleanup / releases query budget
+```
+
+Starter-prompt flow (e.g. "Find install logs" on the homepage):
+```
+createNotebook → purpleLaunchQuery (NATURAL_LANGUAGE) → addPurpleInputOutputMessage
+```
+Note: starter prompts that return a documentation-style answer skip the `launchQuery`/`pingQuery` stage entirely.
+
+**API-token users: use the Purple MCP.** The `purple_ai_query` MCP tool has been removed — `purpleLaunchQuery NATURAL_LANGUAGE` is confirmed non-functional for service-account API tokens (requires browser-session teamToken; returns AsimovError from LaunchQueryManager). Use `mcp__purple-mcp__purple_ai` for NL queries and `mcp__purple-mcp__powerquery` to execute the returned PQ.
+
+#### purpleAlertSummary — per-alert natural-language summary
+
+Separate operation (not purpleLaunchQuery). Synchronous (isAsync=false, no polling).
+
+```graphql
+query AlertSummary($request: PurpleAlertSummaryRequest!) {
+  purpleAlertSummary(request: $request) {
+    token
+    result { summary }
+  }
+}
+```
+
+Variables: `request.contentType = "ALERT_ENTRY"`, `request.inputAlert = "<OCSF alert JSON as string>"`, `request.consoleDetails`, `request.userDetails`.
+
+**MCP tool:** `purple_ai_alert_summary` — call `uam_get_alert` first to get the OCSF JSON, then pass it here.
+
+#### aiInvestigations — auto-investigation
+
+Two-step flow, both via the UAM GraphQL endpoint (`/web/api/v2.1/unifiedalerts/graphql`):
+
+1. `alertTriggerActions` mutation with `id: "S1/aiInvestigation/run"` — fires investigation
+2. `GetAlertAiInvestigations` query, polled every ~4s — streams `investigationStep` text, final `result` (markdown, ~16KB) + `verdict` enum
+
+Verdict enum: `UNKNOWN`, `TRUE_POSITIVE`, `FALSE_POSITIVE`.
+
+**API-token users: use the Purple MCP.** The `purple_ai_investigate` MCP tool has been removed — `aiInvestigation/run` via `alertTriggerActions` is confirmed non-functional for service-account API tokens (returns SERVICE_ERROR; same teamToken dependency as `purpleLaunchQuery`). Use `mcp__purple-mcp__purple_ai` for AI investigations.
+
+### Python CLI
+
+> **`purple_query()` and `scripts/call_purple.py` are non-functional for API tokens.** Both call `purpleLaunchQuery NATURAL_LANGUAGE`, which requires a browser-session teamToken that service accounts never have (confirmed SERVICE_ERROR 2026-05-03). Use the Purple MCP instead:
+>
+> ```
+> mcp__purple-mcp__purple_ai   # natural-language query → PQ → result
+> mcp__purple-mcp__powerquery  # run a PQ string directly
+> ```
+>
+> `scripts/purple_ai.py` and `scripts/call_purple.py` are kept in the skill for reference but will fail with AsimovError on any service-account token.
+
+### Domain boundary
+
+Purple AI answers questions about **SDL telemetry** (process/network/file events, indicators, ingested logs). It does **not** answer questions about **console entities** (alerts, threats, agents, sites, policies). Those are REST resources. Out-of-domain questions return `resultType: "MESSAGE"` with a guardrail refusal — switch to the REST path.
+
+### Caveats and confirmed API-token limitations (live-tested 2026-05-03)
+
+| Operation | API-token result | Notes |
+|---|---|---|
+| `purpleAlertSummary` (ALERT_ENTRY) | **PASS** — returns real LLM summary | Works with `userDetails: null`; no SDL dependency |
+| `purpleLaunchQuery` (NATURAL_LANGUAGE) | **FAIL** — `AsimovError` from `LaunchQueryManager` | LLM layer rejects service-account requests; see below |
+| `aiInvestigation/run` via `alertTriggerActions` | **FAIL** — `SERVICE_ERROR` | Same LLM-layer dependency |
+| `/sdl/v2/graphql` queries (`purpleConversations`, etc.) | **FAIL** — `unauthenticated` | SDL queries require browser session cookie |
+| `/sdl/v2/graphql` mutations (`createNotebook`, etc.) | **PARTIAL** — schema validation reached | Auth passes for mutations; mutation names differ from browser UI (introspection blocked) |
+
+**Root cause of NATURAL_LANGUAGE failures:** `purpleLaunchQuery` internally routes to the same LLM workspace layer as the browser UI. That layer uses `teamToken` (obtained by browser users via `createNotebook` on `/sdl/v2/graphql`) to identify the user's Purple AI notebook. Service accounts (API tokens) never initialize a browser session, so `teamToken` is always empty and the `LaunchQueryManager` (`AsimovError`) rejects the request. This is not a schema issue — the request passes GraphQL validation (HTTP 200) and fails at the LLM dispatch layer.
+
+`purpleAlertSummary` bypasses this because it is a self-contained summarisation operation: the full alert context is supplied inline in `inputAlert`, no SDL session or teamToken lookup is needed.
+
+**SDL auth nuance (confirmed via live testing):** SDL query operations return `unauthenticated` for API tokens. SDL mutations reach schema validation (meaning auth succeeds) — but the specific mutation names used by the browser UI (`createNotebook`, etc.) are not exposed under those names for API tokens. Introspection is blocked on the SDL endpoint.
+
+- The GraphQL endpoint is **not a committed public API**. Field names and schema can change between console releases.
+- Notebooks have a TTL — old notebooks return "Notebook is expired" and queries return no results.
+- Each GraphQL request should carry a unique `requestId` UUID as a query param for tracing (`?opname=<op>&requestId=<uuid>`). The server ignores it but it aids debugging.
+- Permission failures for `purpleLaunchQuery` surface as `status.state = FAILED` with `error.origin = LaunchQueryManager` (HTTP 200, not 400 or 403) — not the usual "invalid query" 400 you get for schema errors.
+- Do **not** auto-execute generated PQ without showing it to the user first — Purple can hallucinate fields.
+- `inputContent` must appear at **both** the top level of `request` AND inside `conversation.messages[0].inputMessage.inputContent` — the server requires both (confirmed via live validation).
 
 ## Querying logs via the mgmt console API — the foolproof procedure
 
@@ -716,7 +1060,7 @@ The collector creates `reports/<slug>_<window>/` on first run. The `reports/` di
 - **Threat triage (legacy)** — `GET /threats` filtered by `createdAt__gte` + `resolved=false`; enrich with agent details from `/agents?ids=...`; output a table.
 - **Endpoint isolation** — find agent IDs (`/agents` with name/IP filter), confirm count, `POST /agents/actions/disconnect` with filter.
 - **Hunt across DV / PowerQuery** -- `POST /sdl/v2/api/queries` with `queryType="LOG"` (S1QL) or `queryType="PQ"` (PowerQuery), then poll `GET /sdl/v2/api/queries/{id}` echoing the `X-Dataset-Query-Forward-Tag` response header. Auth is Bearer, not ApiToken. Legacy `/dv/init-query` + `/dv/query-status` + `/dv/events` + `/dv/events/pq` flows are deprecated (sunset 2027-02-15). See `references/WORKFLOWS.md` Section 4 for the canonical runner.
-- **Natural-language hunt via Purple AI** -- `purple_query(c, "...")` to generate a PQ, review, then execute via LRQ. Only for SDL-telemetry questions; route entity questions to REST.
+- **Natural-language hunt via Purple AI** -- Use `mcp__purple-mcp__purple_ai` (Purple MCP). The `purple_query()` Python helper and `scripts/call_purple.py` are non-functional for API tokens (`purpleLaunchQuery NATURAL_LANGUAGE` requires a browser-session teamToken, confirmed 2026-05-03). Only for SDL-telemetry questions; route entity questions to REST.
 - **Site/Group inventory** — `/sites`, `/groups`, `/accounts` are the tenant-structure endpoints; many resources require filtering by `siteIds` / `accountIds`.
 - **Bulk action audit** — `/activities` is the system-wide audit log; filter by `activityTypes` and `createdAt__gte`.
 - **Push alerts + indicators INTO UAM** -- build OCSF payloads, then call `UAMAlertInterfaceClient.post_alert_with_indicators(alert, [...])` once per alert (loop for many). The helper posts indicators, sleeps 3s, and posts the single alert in the one sequence proven to surface cleanly on US1 tenants. See "UAM Alert Interface" section above for the two silent-drop failure modes (multi-alert POST, no sleep) it prevents. Use for pipeline integrations, synthetic-alert generation, and detection testing.
@@ -725,21 +1069,81 @@ The collector creates `reports/<slug>_<window>/` on first run. The `reports/` di
 Consult the per-tag reference files for exact parameter names — the above are orientation, not copy-paste ready.
 
 
-## Sandbox proxy blocked? Use Desktop Commander
+## Hyperautomation (HA) — workflow management
 
-If any script raises `SandboxProxyBlockedError`, `PQError` mentioning "proxy", or
-`OSError: Tunnel connection failed: 403 Forbidden`, the Cowork sandbox proxy is blocking
-direct HTTPS to `*.sentinelone.net`. The fix is to run the script on the host Mac via
-Desktop Commander, which has unrestricted network access.
+API root (confirmed via live network capture 2026-05-03):
+```
+/web/api/v2.1/hyper-automate/api/v1
+```
+Auth: same `Authorization: ApiToken <token>` header as all other S1 REST calls.
 
-1. Re-run via `mcp__Desktop_Commander__start_process`:
-   ```
-   cd <PROJECT_ROOT>/claude-skills/sentinelone-mgmt-console-api
-   python3 scripts/<script>.py <args>
-   ```
-   To locate the skill root: `mdfind -name "s1_client.py" | grep claude-skills | head -1`
-2. `credentials.json` is at the project root folder (the folder you selected in Cowork).
-3. For inline Python, write to `/tmp/` via `mcp__Desktop_Commander__write_file`,
-   then execute with `mcp__Desktop_Commander__start_process`.
+### Endpoints
 
-This is not a credential issue. Do not widen time windows or change query logic to debug this.
+| Operation | Method | Path |
+|---|---|---|
+| List workflows | `GET` | `/workflows?limit=&skip=&siteIds=&sortBy=&sortOrder=` |
+| Get single workflow | `GET` | `/workflows/single/{workflowId}/{revisionId}` |
+| Workflow filter counts | `GET` | `/workflows/filters-count?siteIds=` |
+| Archive (delete) workflow | `POST` | `/workflows/archive` |
+| Export all workflows (ZIP) | `GET` | `/workflow-import-export/export` *(confirmed on /public path)* |
+| Import workflow | `POST` | `/workflow-import-export/import` *(confirmed on /public path)* |
+
+**Important:** the single-workflow fetch requires BOTH `workflowId` AND `revisionId`. The `revisionId` is the `workflow.version_id` field returned in the list response. `GET /workflows/single/{id}` without a revision returns 404.
+
+**Deletion is a soft-archive, not HTTP DELETE.** The UI calls `POST /workflows/archive` with an array of IDs in the request body.
+
+**Archive body format — unresolved (2026-05):** The archive endpoint is NOT in the swagger. UI DevTools capture suggests the body is `{"ids": ["<v1_uuid>"]}`. Tested variants via API token on the purple demo tenant: `{"ids": [...]}`, `{"ids": [...], "siteIds": [...]}`, `{"workflowIds": [...]}` — all return HTTP 500. The MCP tool `ha_archive_workflow` also returns 500 on this tenant. This is likely a tenant-level permission restriction on the service user token, not a body format problem. `Hyper Automate.write` scope is confirmed required; even with it, archive may be blocked for service users.
+
+Export/import were not captured in the v1 network trace. They are confirmed working at the `/public` base path; the `/v1` equivalents have not been verified.
+
+### List response shape (key fields)
+
+Each item in `data[]`:
+```jsonc
+{
+  "id": "<workflowUUID>",                     // top-level workflow ID
+  "workflow": {
+    "id": "<same UUID>",
+    "version_id": "<revisionUUID>",            // pass as revisionId to single endpoint
+    "name": "...",
+    "state": "active|inactive|deactivated|draft",
+    "status": "idle|running|...",
+    "scope_level": "account|site",
+    "scope_id": "<19-digit>",
+    "site_name": "<name or null>",
+    "created_at": "<iso>",
+    "updated_at": "<iso>",
+    "version_count": <int>
+  },
+  "actions": [
+    { "id": "<uuid>", "integration_id": "<uuid or null>", "type": "<action_type>" }
+  ]
+}
+```
+
+Action types observed: `singularity_response_trigger`, `manual_trigger`, `http_trigger`, `scheduled_trigger`, `email_trigger`, `http_request`, `condition`, `loop`, `variable`, `delay`, `send_email`, `snippet`, `data_formation`, `wait_for_slack`, `break_loop`, `create_interaction`, `wait_for_interaction`, `llm`.
+
+### filter-count response structure
+
+`GET /workflows/filters-count` returns `data[]` with keys: `states`, `scope_ids`, `trigger_types`, `core_actions`, `tags`, `integrations`. Each entry has `{ count, value, title }`. Use this for summary dashboards (e.g. how many active workflows, which integrations are most used).
+
+### MCP tools
+
+`ha_list_workflows` — list with scope/sort/pagination. Returns `revisionId` alongside each workflow.
+`ha_get_workflow` — fetch a single workflow by `workflowId` + optional `revisionId` (auto-resolves from list if omitted).
+`ha_archive_workflow` — soft-delete one or more workflows via `POST /workflows/archive`. Confirm with user before calling.
+`ha_import_workflow` — create workflow from JSON. Requires Hyper Automate.write permission.
+`ha_export_workflow` — export all workflows as ZIP.
+
+### Permissions
+
+`Hyper Automate.view` — read operations (list, get, filter-count, export).
+`Hyper Automate.write` — write operations (import, archive). Confirmed: without this permission, import returns 403.
+
+## Using sentinelone-mcp tools for direct console operations
+
+Console operations use the `sentinelone-mcp` MCP tools, which bypass the Cowork sandbox proxy
+entirely. Use `s1_api_get`, `s1_api_post`, `uam_list_alerts`, `uam_get_alert`, `uam_set_status`,
+and other MCP tools directly instead of falling back to the `sentinelone-mgmt-console-api`
+skill scripts. The MCP tools run locally on your machine and make direct HTTPS calls to
+`*.sentinelone.net` without proxy interference.

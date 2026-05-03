@@ -9,11 +9,18 @@ description: >
 
 This skill helps you design, author, and deploy Singularity Data Lake (SDL) dashboards — from a single panel to a full multi-tab SOC dashboard. Dashboards live as configuration files in SDL and are authored as JSON (or a relaxed JavaScript-literal superset of it). You deploy them via the `sentinelone-sdl-api` skill's `put_file` method.
 
+> **Sandbox proxy blocked?** If `put_file` or SDL API calls to `*.sentinelone.net` fail with a connection or proxy error inside the Claude sandbox, use the `sentinelone-mcp` server instead. It runs locally via `node` and bypasses the sandbox proxy entirely. Setup: add it to `claude_desktop_config.json` (see `claude-skills/sentinelone-mcp/README.md`). Use the `sdl_put_file` tool to deploy dashboards and `sdl_get_file` / `sdl_list_files` to inspect what's already deployed.
+
 ## Workflow
 
 This workflow is mandatory for every new or modified dashboard. Steps 0, 1, and 7 are non-negotiable: pre-flight discovery, the safety pre-flight check, and the post-deploy log-evidence report. Skipping any of them produces dashboards that look fine in isolation but mislead, hang, or silently drop data.
 
 0. **Discovery (MANDATORY for every session)** — Re-enumerate connected data sources (`| group UniqueDataSourceNames = array_agg_distinct(dataSource.name) | limit 1000`), run V1-query schema discovery on every source the dashboard will touch, and validate the discriminator field for any `event.type` you intend to count. See **Pre-authoring discovery** below. Never start a panel from a remembered schema.
+
+   **Execution path for schema discovery via sentinelone-mcp:**
+
+   1. **PowerQuery enumeration** (`array_agg_distinct(dataSource.name)`) — run via `mcp__sentinelone-mcp__powerquery_run` directly. The sentinelone-mcp server runs locally and makes direct HTTPS calls without sandbox interference.
+   2. **V1 query schema discovery** (full event JSON per source) — use `mcp__sentinelone-mcp__powerquery_schema_discover` to fetch sample events from each data source and inspect their field names and types. The MCP server runs on your local machine and bypasses the sandbox proxy entirely.
 1. **Understand the ask** — What data should the dashboard show? Who is the audience (SOC analyst, manager, customer POC)? What time range makes sense? What posture should each panel reflect (a panel that legitimately returns 0 needs a markdown header explaining the SOC-positive interpretation, see **Empty results are valid evidence**).
 2. **Design the structure** — Choose tabs (if multi-topic), then panels per tab. Match panel type to the data shape. Where one `event.type` covers multiple semantic populations (delivery-time vs click-time, scheduled vs on-demand, inbound vs outbound), build separate sections per population, not a mixed section.
 3. **Write the JSON** — Use the panel type reference below and real examples in `references/community-examples.md`. Compute explicit `x`/`y`/`w`/`h` for every panel. Apply the naming-hygiene rule from **Panel naming hygiene** so titles read as SLA-grade claims.
@@ -21,6 +28,8 @@ This workflow is mandatory for every new or modified dashboard. Steps 0, 1, and 
 5. **Deploy** — Use the `sentinelone-sdl-api` skill to `put_file` to a path like `/dashboards/my-dashboard` with `expected_version` set from a prior `get_file` (CAS guard). Save a backup of the prior JSON first. Sleep 3s, then `get_file` to verify the version bumped AND grep the returned content for a canary string from your change.
 6. **Iterate** — Show the user what was built, explain each panel, offer to tweak. If the dashboard hangs, follow the escalation ladder in **Pre-deploy validation**.
 7. **Log-evidence report (MANDATORY)** — Run `scripts/validate_dashboard.py` against the deployed dashboard JSON to replay every panel, persist per-panel evidence (sample rows, row count, matchCount, elapsed, errors) to a JSON, and emit a markdown evidence file. Then run `scripts/render_validation_pdf.py` to render the PDF report (cover, per-tab sections, sample-data tables, empty-result appendix with SOC-meaningful interpretations). Deliver both alongside the dashboard. A dashboard delivered without an evidence report is incomplete.
+
+   **`validate_dashboard.py` MUST be run as a background process** — at ~10s per panel, a 30-panel dashboard takes 5 minutes; a 60-panel dashboard takes 10-30 minutes. Both exceed the MCP timeout. Start it with `python3 scripts/validate_dashboard.py ... > /tmp/validate_out.txt 2>&1 &`, confirm the PID, then poll `len(json.load(open(evidence_json)))` vs the expected panel count in short separate calls. The script persists results after every panel (idempotent), so a cancelled poll never loses work. When a `stacked_bar` or `line` panel using `| transpose` returns 0 rows in validation, cross-check whether the corresponding number panel for the same source shows data — if it does, the empty result is a V1-API artefact, not a broken query. Document it in the Appendix as confirmed false-empty and do not remove the panel.
 
 ## Pre-authoring discovery
 
@@ -52,6 +61,19 @@ attrs = sorted({k for m in res["matches"] for k in (m.get("attributes") or {}).k
 ```
 
 Persist `attrs` to a per-session JSON and reference it during panel authoring. Do this for every source the dashboard will query.
+
+**SDL operations via sentinelone-mcp tools.**
+
+All SDL operations should use the sentinelone-mcp MCP tools, which run locally and bypass the sandbox proxy:
+
+| Operation | sentinelone-mcp tool |
+|---|---|
+| PowerQuery (enumeration, hunts, panel queries) | `mcp__sentinelone-mcp__powerquery_run` |
+| V1 `query` (full event JSON for schema discovery) | `mcp__sentinelone-mcp__powerquery_schema_discover` |
+| `put_file` / `get_file` / `list_files` (dashboard deploy) | `mcp__sentinelone-mcp__sdl_put_file`, `mcp__sentinelone-mcp__sdl_get_file`, `mcp__sentinelone-mcp__sdl_list_files` |
+
+These tools run on your local machine and make direct HTTPS calls to `xdr.us1.sentinelone.net`
+without sandbox proxy interference. No fallback or workaround needed.
 
 ### 3. A field visible in `raw_data` may NOT be queryable
 
@@ -527,8 +549,8 @@ fields are OCSF-namespaced.
 | `alert` | 99602001 (S1 Security Alert) | `severity_id` (numeric 0-5) | `resources[].name`, `resources[].s1_metadata.site_name` (NOTE: `resources[N]` only readable via V1 query, not PowerQuery `columns`) | `finding_info.title` = alert name. `metadata.product.name` ∈ {STAR, EDR, Identity, CWS, EPP}. `class_name` = "S1 Security Alert" |
 | `vulnerability` | 2002 (Vulnerability Finding) | `severity_id` + `severity_` (string, often empty) | `resource.s1_metadata.*`, `resource.uid` | `vulnerabilities[].cve.uid`, `vulnerabilities[].affected_packages[].{name,version,vendor_name}`. **No `kevAvailable` field in SDL** — KEV/EPSS metadata lives in the management console only |
 | `misconfiguration` | 2003 (Compliance Finding) | `severity_id` | `resources[].s1_metadata.*` | `compliance.standards[]` (CIS_AKS, CIS_KUBERNETES, etc.), `compliance.requirements[]`, `policy.{name,uid,desc}`, `cloud.provider`, `finding_info.title` |
-| `asset` | 3004 (Device Inventory) | `severity_id` (asset risk) | `device.agent.uuid`, `entity.uid` | `entity_result.data.console_metrics.is_connected` for online state. Does NOT have `agent.health.online` field. `operation` = OPERATION_UPSERT |
-| `ActivityFeed` | n/a (custom audit) | n/a | `data.scope_*`, `site_id` | `activity_type` (numeric ID, NOT string), `primary_description`, `secondary_description`. No `activityType` (camelCase) field |
+| `asset` | 3004 (Device Inventory) | `severity_id` + `severity_` | `device.agent.uuid`, `device.name`, `device.os.name` | 126 fields (live-confirmed). Rich endpoint inventory. Key fields: `device.agent.{uuid,version,network_status,network_status_title,is_active,is_decommissioned,is_uninstalled,network_quarantine_enabled,last_logged_in_user_name,scan_status}`, `device.os.{name,version,type}`, `device.ip_external`, `device.hw_info.*`, `device.network_interfaces[N].*`. `operation` = OPERATION_UPSERT. No `entity.uid`, no `entity_result.*`, no `agent.health.online` fields — use `device.agent.network_status` for connectivity state |
+| `ActivityFeed` | n/a (Hyperautomation / mgmt activity audit) | n/a | `data.scope_id`, `site_id`, `account.id` | 41 fields (live-confirmed). Hyperautomation workflow execution audit log and management console activity log. Key fields: `activity_type` (numeric — e.g. 9207 = workflow execution event, NOT a string), `activity_uuid`, `primary_description`, `secondary_description`, `data.workflow_{id,name,execution_url}`, `data.{scope_id,scope_level,scope_name,site_name,user_id}`, `created_at`, `updated_at`, `context`. `sca:RetentionType = 'ACTIVITY_LOG'`. No `activityType` (camelCase) field. Not useful for threat hunting — use for Hyperautomation audit and compliance workflow tracking |
 | `Identity` | 3002 (Authentication) | `severity_id`, `status_id` | `user.name`, `user.domain`, `src_endpoint.ip`, `dst_endpoint.hostname` | `auth_protocol` (Kerberos, NTLM), `ref_event_code` (Win Event ID like 4624), `unmapped.type` ("Logon Success"/"Logon Failure"), `type_name` ("Authentication: Logon") |
 | `finding` | n/a — **NOT security findings** | n/a | n/a | `dataSource.category='metrics'`, `tag='ingestionHealth'`, `processor='ocsf-findings'`. This source is OCSF processor latency/batch metrics, not findings |
 
@@ -669,7 +691,7 @@ Read the community examples before creating a new dashboard, and read `lessons-l
 These scripts are mandatory parts of the workflow, not optional tooling.
 
 - `scripts/panel_safety_check.py <dashboard.json>`: pre-deploy. Scans dashboard JSON for known-bad patterns (markdown `content` vs `markdown` field, `area` + `query`, transpose-not-terminal, hyphenated arithmetic, `count_if` / `sum(if())` / `| union` / named subqueries, `\\s`/`\\d` regex escapes inside `matches`, full-text combined with timebucket+transpose, missing layout, missing `| limit` on number/table panels). Exits non-zero on any flag. Run before every `put_file`.
-- `scripts/validate_dashboard.py <dashboard.json> [--start 7d] [--out <dir>]`: post-deploy. Replays every non-markdown panel against the SDL `power_query` API, persists per-panel evidence (style, query, elapsed, rowCount, matchCount, columns, sample rows, error) to a JSON keyed on `tab::title`, and emits a markdown evidence file. Idempotent, resumes cleanly, persists after each panel. Auth falls through to console JWT (force-clears scoped keys).
+- `scripts/validate_dashboard.py <dashboard.json> [--start 7d] [--out <dir>]`: post-deploy. Replays every non-markdown panel against the SDL `power_query` API, persists per-panel evidence (style, query, elapsed, rowCount, matchCount, columns, sample rows, error) to a JSON keyed on `tab::title`, and emits a markdown evidence file. Idempotent, resumes cleanly, persists after each panel. Auth falls through to console JWT (force-clears scoped keys). **Always run as a background process** (`... &`) — see step 7 in the Workflow section. Do not wait for it inline.
 - `scripts/render_validation_pdf.py <evidence.json> [--out <pdf>]`: post-deploy. Reads the validation JSON and emits a PDF report with cover page, per-tab sections, sample-data tables (first 3 rows of N), and an Appendix listing every empty-result panel with the operator's prepared SOC-meaningful interpretation. The PDF is the leadership deliverable; the markdown evidence stays in version control.
 
 ## Log-evidence report (mandatory deliverable)
@@ -986,8 +1008,6 @@ makes direct HTTPS calls to `*.sentinelone.net`. If you see `SandboxProxyBlocked
 or `OSError: Tunnel connection failed: 403 Forbidden`, the Cowork sandbox proxy is
 blocking those calls.
 
-The fix: write the dashboard JSON to `/tmp/` via `mcp__Desktop_Commander__write_file`,
-then deploy with `mcp__Desktop_Commander__start_process` running `sdl_client.py` on the
-host Mac. `credentials.json` is at the project root folder
-(the folder you selected in Cowork). See the `sentinelone-sdl-api` skill for
-full Desktop Commander fallback instructions.
+The fix: use sentinelone-mcp MCP tools instead. Use `sdl_put_file` and `sdl_get_file`
+to deploy dashboards directly. These tools run locally and bypass the sandbox proxy entirely.
+No Desktop Commander workaround is necessary.
