@@ -2,6 +2,8 @@
 
 Complete reference for SDL dashboard JSON authoring. All entries are confirmed against a live tenant via the `panel-showcase` dashboard (`/dashboards/panel-showcase`).
 
+**Full working example:** [`sentinelone-sdl-dashboard/examples/panel-showcase.json`](../sentinelone-sdl-dashboard/examples/panel-showcase.json) — a 3-tab, 23-panel dashboard covering every supported panel type and feature. Deploy it directly with `sdl_put_file` to `/dashboards/panel-showcase`.
+
 ---
 
 ## Panel types
@@ -315,3 +317,5 @@ Grid is 60 units wide. `h`/`w` in grid units, `x`/`y` are top-left offsets. Pane
 | Panel Features | Alerts by Product | `pie` | `maxPieSlices`, `dataLabelType: "PERCENTAGE"` |
 | Panel Features | Alerts by Title | `""` (table) | `showBarsColumn: true`, `filters[]` active |
 | All tabs | Tab filter widgets | — | `filters[]` with `facet` — Site, Data Source, Alert Product |
+
+The complete JSON source for all panels above is in [`sentinelone-sdl-dashboard/examples/panel-showcase.json`](../sentinelone-sdl-dashboard/examples/panel-showcase.json).
