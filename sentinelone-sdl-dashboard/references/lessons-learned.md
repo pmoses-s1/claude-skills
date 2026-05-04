@@ -483,3 +483,175 @@ During validation of stacked-bar panels using `| transpose <field> on timestamp`
 **Rule:** when `validate_dashboard.py` marks a stacked-bar or line chart panel as empty (`row_count=0`), check whether the corresponding number panel for the same source shows data. If the number panel has data and the trend panel is empty, the empty result is a V1-API artefact, not a broken query. Document it as such in the evidence report Appendix with the note: `"0 rows via deprecated V1 API — confirmed live data from corresponding KPI panel; expect correct render in browser."`
 
 Do not remove or rewrite trend panels based on V1 validation empty results alone. The final authority is the browser renderer.
+
+---
+
+## 15. Third-party parser dashboards: `unmapped.*` fields and `plots`-based panels
+
+**Confirmed 2026-05-04 (FortiGate showcase dashboard engagement).**
+
+### 15.1 `plots` filter silently drops `unmapped.*` fields — always use stacked_bar+transpose instead
+
+The `plots: [{ "filter": "...", "facet": "count" }]` mechanism used for `line` and `area` chart panels silently ignores any predicate that references the `unmapped.*` field namespace. A panel like:
+
+```json
+{
+  "graphStyle": "line",
+  "plots": [
+    { "filter": "dataSource.name='FortiGate' unmapped.action='deny'", "label": "Deny", "facet": "count" },
+    { "filter": "dataSource.name='FortiGate' unmapped.action='accept'", "label": "Accept", "facet": "count" }
+  ]
+}
+```
+
+renders as "No results found" even when PowerQuery confirms tens of thousands of matching events (confirmed: 93k deny events in a 24h window). No error is surfaced — the panel appears healthy but is completely empty.
+
+**Root cause:** the `plots` filter path does not evaluate the `unmapped.*` field namespace. The filtering silently returns 0 matches.
+
+**Fix:** replace any `plots`-based timeline panel that uses `unmapped.*` fields with a PowerQuery `stacked_bar` using `| transpose`:
+
+```
+dataSource.name='FortiGate' event.type='traffic' unmapped.action in ('deny', 'accept', 'close')
+| group count=count() by timestamp=timebucket('1h'), action=unmapped.action
+| transpose action on timestamp
+```
+
+The PowerQuery engine fully supports `unmapped.*` fields. The `stacked_bar` + transpose pattern is the safe equivalent for every case where `plots`-based line charts would use an `unmapped.*` predicate.
+
+**Pre-authoring check:** before building any timeline panel that groups by a field in the `unmapped.*` namespace, use the PowerQuery stacked_bar pattern from the start. Never use `plots` for `unmapped.*`-based series.
+
+### 15.2 `"facet": "count"` not `"facet": "count()"` in plots arrays
+
+The `plots` array entries must use `"facet": "count"` (no parentheses). The error when parentheses are present:
+
+```
+Couldn't load content
+field=[DashboardPlotQuery.plotIndex]
+error=[Facet for plot at index: 0 is invalid]
+```
+
+Older community examples and some internal docs show `"facet": "count()"` — this is wrong and breaks every `plots`-based panel. The correct form is `"facet": "count"` for event counts, `"facet": "field_name"` for other facet targets. The SKILL.md example has been corrected to reflect this.
+
+### 15.3 Always verify field population before using presence filters (`field=*`)
+
+Before building a panel with a field presence filter, confirm the field is actually populated:
+
+```
+dataSource.name='FortiGate' event.type='app-ctrl' app_name=*
+| group count=count()
+| limit 1
+```
+
+If this returns 0, every panel using `app_name=*` as a filter will return nothing. The FortiGate marketplace parser does not populate `app_name` for `event.type='app-ctrl'` events — the field is null universally for this source. Pivot to grouping by whatever structured fields are populated (`unmapped.action`, `src_endpoint.svc_name`) and update the panel title to reflect the parser limitation.
+
+**General rule:** run a field-population check before every panel that relies on `field=*` as a meaningful filter criterion, not just as a null-drop. A field can be present in raw event JSON but unpopulated at the structured-column level for all events.
+
+### 15.4 Markdown panel: plain text in `title`, no heading repetition in body
+
+The SDL UI renders the `"title"` string as the panel header. Any heading prefix (`##`) embedded in the `title` field produces raw markup in the panel header, and if the same heading also opens the `"markdown"` body, the heading appears twice.
+
+**Wrong pattern (causes doubled heading):**
+```json
+{
+  "title": "## Policy Enforcement Intelligence",
+  "graphStyle": "markdown",
+  "markdown": "## Policy Enforcement Intelligence\nAnalysis of deny and block actions..."
+}
+```
+
+**Correct pattern:**
+```json
+{
+  "title": "Policy Enforcement Intelligence",
+  "graphStyle": "markdown",
+  "markdown": "Analysis of deny and block actions..."
+}
+```
+
+Rule: `title` is always plain text. The `markdown` body starts directly with descriptive prose, never repeating the title as a heading.
+
+### 15.5 Operational dashboards default to `"duration": "24h"`, not `"7 days"`
+
+Security operations dashboards (firewall visibility, threat triage, VPN health, alert queue) should default to `"duration": "24h"`. Use `"7 days"` only for trend dashboards (weekly capacity, historic comparison). Always set the correct default before the first deploy — changing it requires a re-deploy and a page reload for the user to see the new default.
+
+### 15.6 Use ternary `?:` chaining for field-mapping in `let` — not `if()` function
+
+When mapping a numeric code field to a human-readable label (e.g. protocol numbers to names), use ternary `?:` chaining, not `if()`:
+
+```
+| let proto = connection_info.protocol_num='6' ? 'TCP'
+            : connection_info.protocol_num='17' ? 'UDP'
+            : connection_info.protocol_num='1' ? 'ICMP'
+            : 'Other'
+```
+
+`if(predicate, then, else)` used inside `let` followed by aggregation causes a 500 server error (see section 2). This pattern surfaces commonly when building protocol/severity/disposition mapping panels for network device dashboards.
+
+### 15.7 `number()` wrapping for network device byte/packet fields
+
+`traffic.bytes_in` and `traffic.bytes_out` on FortiGate events are string-typed at the index level. Arithmetic without `number()` returns NaN silently:
+
+```
+| let b_out = number(traffic.bytes_out)
+| group gb_sent = sum(b_out) / 1073741824
+```
+
+Apply `number()` to byte/packet/duration fields from third-party network device parsers before using them in `sum()`, `avg()`, or division. Confirm by running a test query: if `sum(traffic.bytes_out)` returns 0 or NaN but `sum(number(traffic.bytes_out))` returns a non-zero value, the field is string-typed.
+
+### 15.8 FortiGate marketplace parser: confirmed field layout
+
+Schema validated against live tenant data (2026-05-04):
+
+| Event type | Key fields |
+|---|---|
+| `traffic` | `unmapped.action` (deny/accept/close/pass/timeout), `src_endpoint.ip`, `dst_endpoint.ip`, `src_endpoint.location.country`, `dst_endpoint.location.country`, `dst_endpoint.port`, `connection_info.protocol_num`, `traffic.bytes_in` (string-typed), `traffic.bytes_out` (string-typed), `app_name` (populated), `src_endpoint.svc_name` |
+| `vpn` | `unmapped.action` (accept/deny/ssl-login-fail/ssl-alert/tunnel-up/tunnel-down), `unmapped.srcip` (source IP — NOT `src_endpoint.ip` which is null for vpn events), `src_endpoint.svc_name` (also null for vpn) |
+| `app-ctrl` | OCSF class "Security Finding". `unmapped.action` (pass/start/accept/deny/close/passthrough/ssl-login-fail), `applist` (AC policy name e.g. "Fusion_Base_AppCtrl"), `unmapped.level`. ALL of the following are NULL: `app_name`, `src_endpoint.ip`, `dst_endpoint.ip`, `dst_endpoint.port`, `finding_info.title`, `unmapped.appcat`, `unmapped.appid`, `unmapped.msg`, `src_endpoint.svc_name`. The FortiGate raw `app` field (actual app name like "YouTube") is NOT extracted by this parser — it lives in `raw_data` only and cannot be grouped. Group by `unmapped.action` + `applist` only. |
+| `virus` | Presence panel only; details in `unmapped.*` |
+
+Use `net_rfc1918(src_endpoint.ip)` to identify internal source IPs for `traffic` events. The `dst_endpoint.location.country` field is populated and usable for geo panels; filter `!(country in ('Reserved'))` to exclude RFC-1918 and loopback ranges from destination geo charts.
+
+### 15.9 Field namespaces differ per event type — validate each event type separately
+
+The root cause of the `unmapped.srcip` miss: schema discovery was performed against `event.type='traffic'` and the field mapping was assumed to carry across to `vpn` events. It does not. The FortiGate marketplace parser uses `src_endpoint.ip` for `traffic` events and `unmapped.srcip` for `vpn` events. `src_endpoint.ip` is null for all `vpn` events; `src_endpoint.svc_name` is null for both `vpn` and `app-ctrl` events.
+
+**Rule: run a separate field-population check for every `event.type` you intend to query.** Do not assume OCSF field mappings are consistent across event types within the same source. A field confirmed for `traffic` may be in a completely different namespace for `vpn`, `app-ctrl`, or `virus` events from the same parser.
+
+Minimum check before authoring any panel that uses a shared field like `src_endpoint.ip`:
+
+```
+dataSource.name='FortiGate' event.type='vpn' src_endpoint.ip=*
+| group count=count()
+| limit 1
+```
+
+If this returns 0, the field is not populated for that event type. Find the correct field by running schema discovery specifically against that event type.
+
+### 15.10 PowerQuery `| parse` with quoted KV values: two-pass approach
+
+FortiGate (and many other network device parsers) emit KV pairs where string values are wrapped in double quotes: `app="HTTPS.BROWSER" appcat="Web.Client"`. The SDL PowerQuery `| parse` format string is itself delimited by double quotes, which means you cannot embed a literal `"` in the format string to match the quote wrappers around the value.
+
+**Confirmed workaround: two-pass parse.**
+
+Pass 1: use `{regex=\\S+}` (non-whitespace) to capture the entire quoted value including its surrounding double quotes.
+
+Pass 2: use `{regex=[A-Z0-9./_-]+}` (or appropriate character class) to extract just the clean value from the quoted string, skipping the leading `"`.
+
+```
+| parse "app=$raw_app{regex=\\S+}$" from message
+| parse "$app_name{regex=[A-Z0-9./_-]+}$" from raw_app
+```
+
+For `app="HTTPS.BROWSER"`, `raw_app` becomes `"HTTPS.BROWSER"` and `app_name` becomes `HTTPS.BROWSER`.
+
+**Escaping rule inside `{regex=...}` in a dashboard JSON query field:**
+
+- The dashboard JSON stores query strings as JSON string values, so backslashes must be JSON-escaped.
+- `\\S+` in the PowerQuery string (what the engine sees) requires `\\\\S+` in the JSON source.
+- When using the `powerquery_run` MCP tool directly (Python string), pass `\\S+` — Python string escaping takes one step.
+
+**Why `| parse` with embedded `"` fails:**
+
+All attempts to embed a literal `"` in the format string (single-quoted outer, double-quoted outer, regex `/pattern/`) produce "Start quote with no matching end quote" or "Expected a quoted string". The engine treats `"` as a string delimiter regardless of quoting style. The two-pass workaround avoids this entirely.
+
+**Invoke the PowerQuery skill before authoring parse expressions.** The skill references official documentation and reaches the correct pattern faster than ad-hoc trial-and-error.

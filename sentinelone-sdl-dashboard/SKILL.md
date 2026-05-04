@@ -94,6 +94,20 @@ dataSource.name='<source>' event.type='<type>'
 
 If the same `event.type` row repeats with different discriminator values, that secondary field is part of the partition key. Panels must filter on both, or split into separate sections per population. Counting "events of type X" without splitting by discriminator gives a number that conflates two semantically different things, which is the highest-cost class of dashboard bug because it looks correct.
 
+### 4b. Null-check every grouping column before including it in a table panel
+
+Before including any field as a grouping column in a table panel, confirm it is non-null for that specific `event.type`. A column that is null for all rows produces an empty column in the rendered table with no error. The check is one query:
+
+```
+dataSource.name='<source>' event.type='<type>' <field>=*
+| group count=count()
+| limit 1
+```
+
+If this returns 0, that field is null for that event type. Remove it from the panel or replace with the correct field. **This check is mandatory for every column in every table panel, not just fields you suspect might be missing.**
+
+Common trap: `src_endpoint.svc_name` (service name), `src_endpoint.ip`, and `app_name` may be populated for `traffic` events but null for `vpn` or `app-ctrl` events from the same source. Schema discovery on `traffic` events does not transfer to other event types.
+
 ### 5. `event.type` is not always the right partition key
 
 Some sources emit multiple log subtypes under the same `event.type` (header logs vs body logs, policy events vs detection events). Run the same exploration query above with `event.type` PLUS a secondary discriminator before assuming `event.type` partitions the source cleanly.
@@ -131,6 +145,39 @@ The patterns below produce HTTP 500s or silent renderer failures on current SDL 
 | Long-format table: `\| group hits=count() by <category>, <action> \| sort <category>, -hits \| limit N` | When you need both dims as columns and a wide table can't be produced |
 | Index-level filter (before the first pipe) | Narrow scan to relevant events; cheaper than a post-pipe `\| filter` |
 | `\| filter <field> matches '<simple-regex>'` for selective dim filtering | Works with simple character classes; avoid `\\s` / `\\d` escapes |
+
+### Two-pass parse for quoted KV values
+
+Network device logs (FortiGate, Palo Alto, etc.) emit KV pairs where values are wrapped in double quotes: `app="HTTPS.BROWSER" appcat="Web.Client"`. The `| parse` format string is itself double-quoted, so you cannot embed a `"` to match the wrappers. The workaround is two passes:
+
+**Pass 1** — capture the whole non-whitespace token including its surrounding quotes:
+```
+| parse "app=$raw_app{regex=\\S+}$" from message
+```
+This extracts `"HTTPS.BROWSER"` (with quotes) into `raw_app`.
+
+**Pass 2** — extract the clean value by matching the alphanumeric content, which skips the leading `"`:
+```
+| parse "$app_name{regex=[A-Z0-9./_-]+}$" from raw_app
+```
+This produces `HTTPS.BROWSER` (no quotes) in `app_name`.
+
+Full example for an app-ctrl panel:
+```
+dataSource.name='FortiGate' event.type='app-ctrl'
+| parse "app=$raw_app{regex=\\S+}$" from message
+| parse "appcat=$raw_cat{regex=\\S+}$" from message
+| parse "$app_name{regex=[A-Z0-9./_-]+}$" from raw_app
+| parse "$app_cat{regex=[A-Za-z0-9./_-]+}$" from raw_cat
+| filter app_name != ''
+| group Events=count() by Application=app_name, Category=app_cat
+| sort -Events
+| limit 20
+```
+
+**Escaping in dashboard JSON:** `\\S+` in the PowerQuery string (what the engine sees) must be written as `\\\\S+` in the JSON source because JSON applies one level of backslash-escaping before PowerQuery sees the string.
+
+**Always invoke the `sentinelone-powerquery` skill before authoring parse expressions.** It references official parse documentation and gets to the correct pattern without trial-and-error.
 
 ### Workaround for "I need totals AND breakdown in one panel"
 
@@ -286,8 +333,8 @@ Best for: event rates over time, multi-metric comparison, trend lines.
   "lineSmoothing": "straightLines",
   "yScale": "linear",
   "plots": [
-    { "filter": "event.category='indicators' indicator.category='Ransomware'", "label": "Ransomware", "facet": "count()" },
-    { "filter": "event.category='indicators' indicator.category='Exploitation'", "label": "Exploitation", "facet": "count()" }
+    { "filter": "event.category='indicators' indicator.category='Ransomware'", "label": "Ransomware", "facet": "count" },
+    { "filter": "event.category='indicators' indicator.category='Exploitation'", "label": "Exploitation", "facet": "count" }
   ]
 }
 ```
@@ -484,11 +531,13 @@ Accepts GitHub-flavored Markdown. Good for section headers, links, or explanatio
 > no error** — the API accepts it, the UI just has nothing to display. Always
 > use `"markdown": "..."`.
 
+> **Title duplication:** the SDL UI renders the `"title"` field as a header above the panel body. Do NOT repeat the same heading inside the `"markdown"` body. A common mistake is setting `"title": "## Policy Enforcement"` (with the `##` markdown prefix) and then starting the markdown body with `## Policy Enforcement\nDescription...` — this produces the heading twice. Keep the `title` field as plain text and put only the descriptive prose (no repeated heading) inside `"markdown"`.
+
 ```json
 {
   "title": "About this dashboard",
   "graphStyle": "markdown",
-  "markdown": "## SOC Overview\nThis dashboard tracks **threat activity** across all managed endpoints.\n\n[Open Event Search](/logs)"
+  "markdown": "This dashboard tracks **threat activity** across all managed endpoints.\n\n[Open Event Search](/logs)"
 }
 ```
 
@@ -504,6 +553,8 @@ preemptively when authoring panels of these shapes.
 |---|---|---|
 | Markdown panel renders blank, no error | Wrong body field | Use `markdown:` (NOT `content:`) — see Markdown panel section above |
 | `area` chart with `query` field shows an indefinite spinner; no error in UI | `graphStyle: "area"` is built around the `plots: [...]` pattern. A query-driven multi-series chart that ends in `transpose` does not render under `area`. | Switch to `graphStyle: "stacked_bar"` (or `"line"`) with `xAxis: "time"`. The query body stays the same. |
+| `plots`-based line or area panel returns "No results found" even though data clearly exists (confirmed via a number or table panel on the same source) | The `plots: [{ "filter": "...", "facet": "..." }]` filter mechanism silently ignores fields in the `unmapped.*` namespace. Any predicate like `unmapped.action='deny'` in a `filter` string inside `plots` matches 0 events regardless of actual data volume. No error is surfaced — the panel just shows empty. | Replace with a PowerQuery `stacked_bar` + `\| transpose` panel. The PowerQuery engine fully supports `unmapped.*` fields. The query body is equivalent: `<source-filter> unmapped.action in ('deny', ...) \| group count=count() by timestamp=timebucket('1h'), action=unmapped.action \| transpose action on timestamp`. |
+| `Couldn't load content` — `field=[DashboardPlotQuery.plotIndex] error=[Facet for plot at index: 0 is invalid]` | `"facet": "count()"` (with parentheses) is invalid in a `plots` array. Only `"facet": "count"` (no parentheses) is accepted. The community examples in older docs show `count()` — this is wrong. | Use `"facet": "count"` (no parentheses) in every plots entry. |
 | `Couldn't load content` — `"transpose" can only be used as the last command in a query` | `transpose` is the terminal command in the PQ pipeline; nothing can follow it | Remove any `\| limit N` / `\| sort` / `\| filter` placed AFTER `transpose`. If you need a limit, apply it pre-transpose via a subquery or a column-list filter |
 | `Couldn't load content` — `Identifier "x-y" is ambiguous. To subtract, add spaces: "x - y". Otherwise, add backslashes: "x\-y"` | The PQ parser reads hyphenated text as a single identifier, not as subtraction | Add spaces around `-` in arithmetic: `total - min`, `max - min`, `(a - b) / (c - d)`. Same applies to all PQ panels and rule bodies. |
 | `transpose <field> on timestamp` hangs the renderer when field values contain hyphens (e.g. `db-prod-01`, ISO dates, UUIDs, container names) | The renderer must parse the transposed values as column names for the chart legend. The PQ parser reads `db-prod-01` as subtraction and throws `Identifier is ambiguous` — or hangs silently. The V1 API tolerates this; the renderer does not. | **Option A** — pre-process: `\| let host_safe = replace_all(host_raw, '-', '_')` then transpose on `host_safe`. **Option B (preferred for by-host charts)** — avoid transpose: use `"xAxis": "grouped_data"` with a grouping query. Loses time dimension but renders reliably. **Option C** — only use `transpose` on fields whose values are guaranteed free of hyphens (numeric codes, single-token labels like `Success`/`Failure`). |
@@ -519,6 +570,7 @@ preemptively when authoring panels of these shapes.
 | Wide range + fine `timebucket` = thousands of points per series | E.g. `timebucket("10m")` over 7d = 1,008 points × N series | Match bucket to duration: 1d → `10m`, 7d → `1h` (minimum), 30d → `1 day` minimum |
 | Two near-identical dashboards appear in *Configuration files* under `/dashboards/<name>` and `/dashboards/id/<dashboardId>/<name>` | The SDL UI's **Save** button writes to `/dashboards/id/<dashboardId>/<name>`. `put_file("/dashboards/<name>")` writes to the simpler path. Both render in the UI and both are visible to the file API; neither is access-controlled. | Pick one canonical path **before** the first deploy. Recommend the UI-native `/dashboards/id/<id>/<name>` if the dashboard already exists in the UI; otherwise `/dashboards/<name>`. Don't mix the two — each `put_file` to the alternate path creates a silent duplicate alongside the UI-saved copy. |
 | `columns resources[0].name` or `vulnerabilities[0].cve.uid` returns HTTP 500 | PowerQuery does not accept bracket-array indexing in `columns`. The V1 query API exposes nested arrays as flattened keys (`resources[0].name`) for display, but those flattened keys are NOT valid PowerQuery field paths. | Use top-level scalar fields only (`severity_id`, `finding_info.title`, `metadata.product.name`, `class_name`, `time`). For first-element access inside a query, use `array_get(resources, 0).name` only inside `let`. For richer drill-down, switch from PowerQuery to the V1 query API (returns full event JSON) — see `sentinelone-sdl-api` skill. |
+| `\| parse "app=$val$" from message` fails with "Start quote with no matching end quote" when the raw field value is wrapped in double quotes (e.g. `app="HTTPS.BROWSER"`) | The `\| parse` format string uses `"..."` as its outer delimiter. Any `"` character embedded in the format — to match quote-wrapped KV values common in network device logs — is treated as a string terminator. No escape sequence (backslash, single-quote outer, hex) works around this. | Use a two-pass parse: pass 1 captures the entire non-whitespace token including quotes (`{regex=\\S+}`), pass 2 extracts the clean value from that token. See **Two-pass parse for quoted KV values** below. |
 
 ---
 
@@ -678,7 +730,11 @@ event.category in ('process', 'file', 'ip', 'dns', 'indicators', 'logins', 'url'
 ### Third-party sources
 ```
 dataSource.vendor = 'Microsoft'        // O365, Azure AD
-dataSource.name = 'FortiGate'          // unmapped.action='deny', src_endpoint.ip, dst_endpoint.ip, app_name, category_name
+dataSource.name = 'FortiGate'          // field namespaces differ per event.type — validate each type separately before authoring panels
+                                       // traffic:   src_endpoint.ip, dst_endpoint.ip, app_name (populated), unmapped.action, traffic.bytes_out/in
+                                       // vpn:       unmapped.srcip (NOT src_endpoint.ip which is null), unmapped.action, unmapped.dstip
+                                       // app-ctrl:  app_name is null (not promoted by marketplace parser); extract via two-pass parse from message field
+                                       // All types: unmapped.action for the raw action string
 dataSource.name = 'Okta'               // unmapped.eventType='user.session.start', status='FAILURE'/'SUCCESS', actor.user.name, src_endpoint.ip, src_endpoint.location.country
 dataSource.name = 'Zscaler Internet Access'   // http_request.url.categories
 metadata.product.name = 'SharePoint'
@@ -1139,7 +1195,7 @@ POST-DEPLOY (MANDATORY)
 - **Avoid breakdown graphs** in production dashboards — they can time out and can't be pre-cached. Use explicit labeled plots instead.
 - **Lock layout** with `options: {"layout": {"fixed": 1}}` to prevent accidental repositioning.
 - **Use `showBarsColumn: "true"`** on table panels with a count column to get inline bar charts.
-- **Time range**: set `duration` to match how "fresh" the data needs to be. `"4h"` for operations, `"7 days"` for trend dashboards.
+- **Time range**: set `duration` to match how "fresh" the data needs to be. Use `"24h"` for security operations / alert-triage dashboards (the standard for SOC real-time views), `"7 days"` for trend and capacity dashboards. Never default to `"7 days"` for an operations dashboard — analysts lose the short-window density that makes operational dashboards useful.
 - **Test queries first** with the `sentinelone-powerquery` skill before embedding them in dashboard JSON.
 - **Use `estimate_distinct()`** for cardinality counts — exact distinct is expensive on large datasets.
 - **Add a markdown panel** to each tab explaining what it covers — this helps both users and future editors understand the dashboard at a glance.
