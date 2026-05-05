@@ -121,6 +121,37 @@ Fix: the source goes at the end with `from`.
 | parse "$bin$ $args$" from src.process.cmdline
 ```
 
+### `timebucket` in `group by` without an alias — "undefined field 'timebucket'"
+
+```
+| group count=count() by timebucket('1h')     ← 500 "undefined field 'timebucket'"
+```
+
+Without an alias, PQ treats the bare name `timebucket` as a field lookup rather than a function call. Fix: always assign an alias in `group by` when using functions as keys.
+
+```
+| group count=count() by bucket=timebucket('1h') | sort +bucket
+```
+
+Same rule applies to any function used as a group key — `lower(field)`, `net_url_path(url)`, `strftime(ts, '%Y-%m-%d')`, etc. If no alias is assigned, the function name is interpreted as a field identifier.
+
+### Non-existent functions: `formatdate`, `floor_time`, and similar
+
+These function names do not exist in PowerQuery and return `Unknown function '<name>'`:
+
+| Invalid | Valid replacement |
+|---|---|
+| `formatdate(ts)` | `strftime(ts)` or `simpledateformat(ts)` |
+| `formatdate(ts, pattern)` | `strftime(ts, pattern)` |
+| `floor_time(ts, unit)` | `bucket=timebucket(unit)` in `group by` |
+| `date_trunc(...)` | `timebucket(unit)` |
+| `coalesce(a, b)` | bare-field ternary: `a ? a : b` (see coalesce pitfall above) |
+| `ifnull(a, b)` | same |
+| `if(cond, a, b)` in aggregates | `count(predicate)` or ternary in `let` |
+| `percentile(x, N)` | `p50(x)` / `p95(x)` / `p99(x)` |
+
+The valid date/time functions are: `strftime`, `simpledateformat`, `strptime`, `simpledateparse`, `timebucket`, `querystart`, `queryend`, `queryspan`. If you need a date function and aren't sure of the name, check `functions-reference.md §9` before writing the query.
+
 ### `first(x)` / `last(x)` / `percentile(x, N)` return 500
 
 Some docs list these as aggregate functions, but they fail on many tenants. Use the reliable forms instead:
