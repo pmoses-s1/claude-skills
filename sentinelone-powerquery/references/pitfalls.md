@@ -143,6 +143,8 @@ These function names do not exist in PowerQuery and return `Unknown function '<n
 |---|---|
 | `formatdate(ts)` | `strftime(ts)` or `simpledateformat(ts)` |
 | `formatdate(ts, pattern)` | `strftime(ts, pattern)` |
+| `formattime(ts)` | `strftime(ts)` or `simpledateformat(ts)` |
+| `formattime(ts, pattern)` | `strftime(ts, pattern)` |
 | `floor_time(ts, unit)` | `bucket=timebucket(unit)` in `group by` |
 | `date_trunc(...)` | `timebucket(unit)` |
 | `coalesce(a, b)` | bare-field ternary: `a ? a : b` (see coalesce pitfall above) |
@@ -471,6 +473,22 @@ Alerts don't support these. Move the correlation logic into a `join` (bounded) o
 
 ## Result-quality issues
 
+### Always filter on `field=*` before projecting or inspecting a field
+
+`| limit N | columns field` returns the first N events in the index regardless of whether `field` is populated — most will be null. This makes a field look absent when it isn't.
+
+**Always add `field=*` to the initial filter** to scope to events that actually carry the field:
+
+```
+// Wrong — returns nulls because most events don't have message
+dataSource.name='FortiGate' | limit 3 | columns message
+
+// Correct — only events where message is present
+dataSource.name='FortiGate' message=* | limit 3 | columns message
+```
+
+This rule applies to every field, not just `message`. Whenever you want to inspect, sample, or aggregate a field, include `field=*` in the initial filter. Confirmed on FortiGate: `message=*` surfaces the raw syslog; without it, every row returns null.
+
 ### Empty results from a correct-looking query
 
 Before blaming the query:
@@ -478,7 +496,7 @@ Before blaming the query:
 1. Time range: are you sure events exist in the window?
 2. Data view: `EDR` doesn't have integrated sources; `XDR` does; `All Data` adds Collector.
 3. Case: are you using `contains` (ci) or `in` / `=` (cs)?
-4. Field name: does the field exist on this schema? Run `| limit 1 | columns …` to inspect one event.
+4. Field name: does the field exist on this schema? Run `dataSource.name='X' field=* | limit 1 | columns field` to confirm it's populated.
 
 Don't keep re-running slightly rephrased versions — the Purple MCP docs warn explicitly against that. If the data isn't there, no rewrite finds it.
 

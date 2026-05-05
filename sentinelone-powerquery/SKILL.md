@@ -67,6 +67,26 @@ initial-filter-expression
 
 Strings need quotes (`'foo'` or `"foo"`); numbers and booleans don't. Underscores in numbers are OK for readability (`1_000_000`).
 
+## BANNED functions — do not use, ever
+
+These function names do not exist in PowerQuery. Using any of them produces `Unknown function '<name>'` (HTTP 500). Do not invent plausible-sounding names — if a function isn't in `references/functions-reference.md`, it doesn't exist.
+
+| Do NOT write | Write this instead |
+|---|---|
+| `formattime(...)` | `strftime(ts)` / `strftime(ts, pattern)` |
+| `formatdate(...)` | `strftime(ts)` / `simpledateformat(ts, pattern)` |
+| `floor_time(...)` | `bucket=timebucket(unit)` in `group by` |
+| `date_trunc(...)` | `timebucket(unit)` |
+| `coalesce(a, b)` | `a ? a : b` (bare-field ternary) |
+| `ifnull(a, b)` | `a ? a : b` |
+| `if(cond, a, b)` inside aggregates | `count(predicate)` |
+| `percentile(x, N)` | `p50(x)` / `p95(x)` / `p99(x)` |
+| `first(x)` / `last(x)` | `min_by(x, timestamp)` / `max_by(x, timestamp)` |
+
+The only valid date/time functions are: `strftime`, `simpledateformat`, `strptime`, `simpledateparse`, `timebucket`, `querystart`, `queryend`, `queryspan`.
+
+---
+
 ## The most important rules (learned the hard way)
 
 These are where queries go wrong. Internalize them before writing.
@@ -98,7 +118,19 @@ These are where queries go wrong. Internalize them before writing.
 
     The `(field = *) ? a : b` form (i.e. wrapping the field-presence test in parens before the ternary) **returns HTTP 500 inside `let`** on this engine — `field = *` is a filter operator, not a boolean expression usable in computed columns. Bare-field truthy is the only working coalesce idiom in PQ.
 16. **`if(...)` is not a function in aggregates.** `sum(if(cond, 1, 0))` returns 500. Use `count(<predicate>)` instead — `count(severity_id == 5)` evaluates the predicate per row and sums the truthy ones. Same for any "count where X" semantic.
-17. **Statistical baselining is two queries plus a client-side merge, not one inline join.** Subqueries inside a single `| join` share the parent query's time range. To compare a 24h live window against a 7d/30d baseline, run them as separate LRQs (or as separate `savelookup`+`lookup` rounds) and merge — there is no single-pass form. Pattern in `examples/behavioral-baselines.md`.
+17. **Always filter `field=*` before projecting or inspecting any field.** `| limit N | columns field` returns the first N events regardless of whether the field is populated — most rows will be null. Add `field=*` to the initial filter to scope to events that actually carry the field:
+
+    ```
+    // Wrong — returns nulls; message may not be present on most events
+    dataSource.name='FortiGate' | limit 3 | columns message
+
+    // Correct — only events where message is present
+    dataSource.name='FortiGate' message=* | limit 3 | columns message
+    ```
+
+    This applies to every field, not just `message`. Any time you want to sample, inspect, or aggregate a field, include `field=*` in the initial filter.
+
+18. **Statistical baselining is two queries plus a client-side merge, not one inline join.** Subqueries inside a single `| join` share the parent query's time range. To compare a 24h live window against a 7d/30d baseline, run them as separate LRQs (or as separate `savelookup`+`lookup` rounds) and merge — there is no single-pass form. Pattern in `examples/behavioral-baselines.md`.
 
 ## When to delegate baselining + anomaly detection to the mgmt-console-api skill
 
