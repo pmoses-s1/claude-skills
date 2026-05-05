@@ -2,6 +2,8 @@
 
 A full-stack AI analyst for SentinelOne, built as a set of Claude skills, two MCP servers, and an operating persona (CLAUDE.md). Install once and Claude can hunt threats, triage alerts, write detections, deploy dashboards, author parsers, and build automation workflows, entirely from natural language.
 
+> **New here?** Start with the [Zero to Hero guide](./docs/zero-to-hero.md): a 20-minute onboarding walkthrough for customers and partners new to Claude Skills.
+
 - [Architecture overview](#architecture-overview)
 - [What's included](#whats-included)
 - [PrincipalSOCAnalyst Project](#principalsocanalyst-project)
@@ -351,6 +353,7 @@ This repo includes Windsurf workflow files in `.windsurf/workflows/`. Each workf
 
 | Doc | Contents |
 |---|---|
+| [docs/zero-to-hero.md](./docs/zero-to-hero.md) | Onboarding guide for customers and partners new to Claude Skills: concepts, install, first session, common workflows, troubleshooting |
 | [docs/installation.md](./docs/installation.md) | Step-by-step install and upgrade guide: prerequisites, sentinelone-mcp setup, plugin install, credential config, project creation |
 | [docs/architecture.md](./docs/architecture.md) | How the three layers fit together, data flow, auth patterns, sandbox proxy explanation |
 | [docs/skills.md](./docs/skills.md) | Per-skill capability reference, key scripts, and field requirements |
