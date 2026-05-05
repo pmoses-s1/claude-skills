@@ -2,10 +2,10 @@
 
 A practical onboarding guide for customers and partners new to Claude Skills. Read this start to finish (~20 minutes) and you'll understand what skills are, why they matter, and how to get a working SentinelOne AI analyst running in a Cowork project.
 
-This guide assumes no prior exposure to Claude Skills, MCP, or Cowork. It covers concepts and installation only. For building or distributing your own skills, see the pointers in [Going deeper](#going-deeper).
+This guide assumes no prior exposure to Claude Skills, MCP, or Cowork. It covers concepts, installation, and day-to-day use.
 
 - [1. What are Claude Skills?](#1-what-are-claude-skills)
-- [2. Pick your path](#2-pick-your-path)
+- [2. How to use the skills](#2-how-to-use-the-skills)
 - [3. Install in 30 minutes](#3-install-in-30-minutes)
 - [4. Your first session](#4-your-first-session)
 - [5. Walkthroughs by use case](#5-walkthroughs-by-use-case)
