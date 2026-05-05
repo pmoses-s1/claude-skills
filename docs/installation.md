@@ -10,6 +10,7 @@ This page covers everything needed to go from zero to a working PrincipalSOCAnal
 - [Step 5: Verify the install](#step-5-verify-the-install)
 - [Upgrading](#upgrading)
 - [Building from source](#building-from-source)
+- [Configuration](#configuration)
 
 ---
 
@@ -211,3 +212,57 @@ cd sentinelone-skills-plugin && bash scripts/build.sh --clean
 ```
 
 Then reinstall the resulting `.plugin` file from `sentinelone-skills-plugin/dist/` via Browse plugins → Replace.
+
+---
+
+## Configuration
+
+**If you are using `sentinelone-mcp` (recommended):** credentials are passed as environment variables in `claude_desktop_config.json` as shown in [Step 2](#step-2-configure-mcp-servers) above. You do not need a `credentials.json` file in your project folder.
+
+**If you are using the skills directly without `sentinelone-mcp`** (or for backwards compatibility): the skills also read credentials from a `credentials.json` file placed in your Cowork project folder. The plugin's SessionStart hook auto-discovers it and makes it available to every skill in the session.
+
+**Setup is two commands.** Copy [`credentials.example.json`](../sentinelone-skills-plugin/credentials.example.json) from this repo into your Cowork project folder, renaming it to `credentials.json`, then edit it.
+
+**macOS / Linux:**
+
+```bash
+# 1. Pick your Cowork project folder.
+PROJECT_DIR=~/Documents/Claude/Projects/MyProject
+
+# 2. Copy the example, renaming to credentials.json.
+cp sentinelone-skills-plugin/credentials.example.json "$PROJECT_DIR/credentials.json"
+
+# 3. Edit it: replace the placeholder values with your real ones.
+${EDITOR:-nano} "$PROJECT_DIR/credentials.json"
+```
+
+**Windows (PowerShell):**
+
+```powershell
+# 1. Pick your Cowork project folder.
+$projectDir = "$env:USERPROFILE\Documents\Claude\Projects\MyProject"
+
+# 2. Copy the example, renaming to credentials.json.
+Copy-Item .\sentinelone-skills-plugin\credentials.example.json "$projectDir\credentials.json"
+
+# 3. Edit it: replace the placeholder values with your real ones.
+notepad "$projectDir\credentials.json"
+```
+
+If you only downloaded the `.plugin` file (not the full repo), extract `credentials.example.json` from the plugin zip with any unzip tool, or grab it directly from the repo at [`sentinelone-skills-plugin/credentials.example.json`](../sentinelone-skills-plugin/credentials.example.json).
+
+| Credential key | Required for | How to get it |
+|---|---|---|
+| `S1_CONSOLE_URL` | All management console skills | Your console URL, e.g. `https://usea1-acme.sentinelone.net` |
+| `S1_CONSOLE_API_TOKEN` | `sentinelone-mgmt-console-api`, `sentinelone-powerquery`, plus SDL query and config methods (not `uploadLogs`) | Settings → Users → Service Users → Create New Service User → copy the API token. The same JWT works for the SDL API from Management version Z SP5+. See [Creating service users](https://community.sentinelone.com/s/article/000005291) and [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+| `S1_HEC_INGEST_URL` | UAM alert/indicator ingest and log ingest via HEC | The SentinelOne HEC ingest host for your region, e.g. `https://ingest.us1.sentinelone.net`. See [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
+| `SDL_XDR_URL` | `sentinelone-sdl-api`, `sentinelone-sdl-dashboard`, `sentinelone-sdl-log-parser` | Your SDL tenant URL, e.g. `https://xdr.us1.sentinelone.net`. See [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
+| `SDL_LOG_WRITE_KEY` | `uploadLogs` only | Singularity Data Lake → menu next to username → API Keys → Log Access Keys → New Key (Log Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+| `SDL_CONFIG_WRITE_KEY` | Deploying parsers/dashboards via `putFile` | Singularity Data Lake → menu next to username → API Keys → Configuration Access Keys → New Key (Configuration Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
+
+Resolution order (highest priority wins):
+1. Environment variables in `claude_desktop_config.json` via `sentinelone-mcp` (recommended)
+2. `<project folder>/credentials.json` (backwards-compatible fallback for direct skill usage)
+3. `~/.config/sentinelone/credentials.json` (terminal fallback)
+
+Full credential reference including all SDL keys: [credentials.md](./credentials.md)
