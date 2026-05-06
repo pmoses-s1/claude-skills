@@ -255,6 +255,8 @@ Apply in order — first match wins:
 - **`intermittentTimestamps: true`** is required for logs (like MySQL general query log) that emit a timestamp only on the second they roll over. Without it, every line missing a timestamp gets the ingest time.
 - **Regex alternation cannot wrap a `$...$` token.** `($a$|$b$)` is invalid. Use multiple line fragments instead.
 - **SDL regex engine does NOT support lookarounds.** `(?=...)`, `(?!...)`, `(?<=...)`, `(?<!...)` all fail silently. Use explicit token delimiters or split into multiple formats.
+- **SDL strips the leading `.*` from a regex before passing it to the Java engine.** This means using `.*?` (non-greedy) at the start of a regex produces an orphaned `?` which the engine rejects as "Dangling meta character '?' near index 0". Use plain `.*` and rely on normal greedy matching. If you need non-greedy behavior, restructure the capture into two segments (see below).
+- **Two-segment sequential capture pattern for JSON values inside a raw string.** When a log line is a raw JSON string (with `\"` escaping) and you need to extract a field value, use a two-segment format with a `$$` transition. First segment grabs everything up to and including the opening quote of the value into a scratch field; second segment captures the value up to the closing quote. Example for extracting `severity_name` before SDL coerces it: `$_ps{regex=.*\\\"severity\\\":\\\"}$$severity_name{regex=[^\\\"]*}$`. The `$$` boundary: the first `$` closes seg 1, the second `$` opens seg 2. The scratch field (`_ps`) must be in `discardAttributes`. This pattern works for any quoted string value in a JSON-encoded log line.
 - **`$pri{parse=syslogPriority}$` can cause silent event drops on some tenants.** If you suspect priority parsing is the culprit, capture the priority as a plain field (`$pri{regex=\\d+}$`) and skip the parse directive.
 - **Indexed positional access `attr[N]` only works in `mappings.version: 1`.** v0 mappings reject `attr[0]`/`attr[1]` syntax. If the source is positional CSV (Palo Alto Firewall is the canonical case), use v1. Reference: `parsers/sentinelone/marketplace-paloaltonetworksfirewall-latest/`.
 - **`{parse=gron}` flattens nested JSON to dotted keys, but the keys themselves contain dots.** A source `{"Resource": {"Id": 5}}` becomes the single flat field `unmapped.Resource.Id` (one key with two dots), not a nested object. To rename it use `from: "unmapped.Resource.Id"` (no escapes). To rename a whole subtree use `rename_tree: { from: "unmapped.Resource", to: "resource" }` and the engine walks the dotted-prefix subtree. Reference: `parsers/sentinelone/marketplace-cloudflare-latest/`.
@@ -306,6 +308,17 @@ If you inherit a marketplace parser, keep it on v0 rather than rewriting. For ne
 **`constant` / `constants` op** (both versions) is the workhorse for conditional OCSF class/activity assignment — give it a `predicate` and it only fires when matched, so you can fan one vendor-native state code (`conn_state`, `action`, etc.) out into `activity_id` + `activity_name` + `type_uid` triples.
 
 **Format-id-as-sentinel predicate**: `format: { id: "mySqlErrorLog", ... }` auto-sets a boolean-string field `mySqlErrorLog='true'` on events that matched that format. Use `predicate: "mySqlErrorLog='true'"` (v0) or `"mySqlErrorLog == 'true'"` (v1) to fan mapping entries out to sub-shapes. Quote the `'true'` — it's a string, not a bare boolean.
+
+**`mappings.version: 1` uses FIRST-MATCH-WINS, not all-match.** The first mapping block whose predicate matches consumes the event — no subsequent blocks run. This is the single most important structural constraint when using v1. Consequences:
+- A `predicate: "true"` unconditional block placed FIRST will fire on every event and prevent all per-app conditional blocks from ever executing. Always place the catch-all at the END.
+- `drop` / `drop_tree` transformations cannot be factored into a standalone unconditional block at the start and shared across per-app blocks. They must be duplicated into each per-app block. Verbose but correct.
+- v0 mappings DO run all matching blocks (marketplace parsers like Cloudflare and FortiGate rely on this: an unconditional first block handles common renames, then conditional blocks handle sub-types). If you need multiple pass-through effects, consider whether v0 is a better fit — but note v0 lacks `drop`/`drop_tree`.
+
+**`discardAttributes` does NOT remove fields produced by `{parse=gron}` at the top level.** It works only for fields created by format captures (e.g. scratch fields `_d`, `_ps`) and for format-id sentinel booleans. If `{parse=gron}` extracts `host`, `facility`, `sndr`, etc. directly to the event root, adding them to `discardAttributes` has zero effect. Tenant-validated May 2026.
+
+**`attrBlacklist` on a bare `{parse=gron}` format cannot drop top-level fields.** The `attrBlacklist` directive only filters subfields when a NAMED PREFIX is in use — e.g. `$payload{parse=gron}{attrBlacklist=debug}$` drops `payload.debug`. Without a named prefix (`${parse=gron}{attrBlacklist=host,sndr}$`), the blacklist is ignored for top-level keys because there is no prefix namespace to filter within. This means `{parse=gron}` with `attrBlacklist` cannot be used to suppress noise fields at the root level. Tenant-validated May 2026.
+
+**The correct mechanism for dropping top-level gron-produced fields is `mappings.drop` / `mappings.drop_tree`.** Add `{ drop: { field: "host" } }` (scalars) and `{ drop_tree: { field: "object" } }` (subtrees) in the `transformations` of every applicable mapping block. Because v1 is first-match-wins, these drop ops must be duplicated into each per-app block AND in the catch-all block — there is no shortcut.
 
 ### `computeFields` gotchas
 
@@ -401,3 +414,40 @@ Cowork sandbox proxy entirely. Use `sdl_put_file`, `sdl_get_file`, `sdl_list_fil
 and `sdl_upload_logs` directly instead of falling back to the `sentinelone-sdl-api`
 skill scripts. The MCP tools run locally on your machine and make direct HTTPS calls
 to `*.sentinelone.net` without proxy interference.
+
+
+## Per-app sentinel pattern (multi-tenant / multi-service parsers)
+
+Use this pattern when a single parser handles events from many distinct services or applications, each needing its own OCSF class assignment.
+
+### Pattern overview
+
+1. **Extract a discriminator field** (e.g. `app_name` from a raw JSON `app_id` key) using a two-segment capture format.
+2. **Create one format-id sentinel per service**: `{ id: "my_app", format: "$_scratch{regex=.*\"app_id\":\"my-app-id\"}$" }`. This sets `my_app='true'` on matching events.
+3. **List all sentinel field names in `discardAttributes`** so they don't appear in the output event.
+4. **Add one v1 mappings block per sentinel** with the OCSF constants and any drop ops. Because v1 is first-match-wins, drops cannot be factored into a shared block — duplicate them in every block including the catch-all.
+5. **End with a `predicate: "true"` catch-all** that applies drops but assigns no class. Place it last or it will consume every event.
+
+### How to add a new service
+
+1. Confirm the new service's discriminator value (e.g. sample a few raw events via PowerQuery).
+2. Check whether it already fires an existing sentinel (e.g. a shared type field that already has a sentinel). If yes, no new entry needed.
+3. Add the sentinel ID to `discardAttributes`.
+4. Add a format entry before the catch-all sentinels.
+5. Add a mapping block before `predicate: "true"` with the right OCSF constants and all noise drops.
+6. Bump `metadata.version` (minor bump for new service; patch for fixes).
+7. Deploy via `sdl_put_file` with the current `expectedVersion` from `sdl_get_file`.
+8. Wait ~3 min for propagation, then verify on a short window (5 min): `dataSource.name = 'MySource' | group count=count(), has_class=count(class_uid) by app_name | filter app_name = 'my-new-service'`.
+
+### Periodic audit query
+
+Run this periodically to catch new services that have accumulated in the catch-all:
+
+```
+dataSource.name = 'MySource' app_name = *
+| group count=count(), has_class=count(class_uid) by app_name
+| filter has_class == 0
+| sort -count
+```
+
+Any `app_name` with `has_class == 0` and meaningful volume is a candidate for a new sentinel.

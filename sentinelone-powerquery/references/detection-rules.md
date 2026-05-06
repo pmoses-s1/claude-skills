@@ -155,6 +155,44 @@ When a detection rule fires, the detection engine looks for these columns to pop
 
 Renames are fine: the engine resolves by name, so `host = any(endpoint.name)` is fine; it just helps the analyst read the row.
 
+## Deploying a rule via the API
+
+Use `POST /web/api/v2.1/cloud-detection/rules`. The `queryLang` field controls which query dialect is accepted:
+
+| `queryLang` | Dialect | Pipe syntax (`\|`) |
+|---|---|---|
+| `"2.1"` | PowerQuery | Supported |
+| `"2.0"` | S1QL log-search | Rejected — HTTP 400 "Don't understand [|]" |
+
+Always use `queryLang: "2.1"` for PowerQuery detection rules. The query string goes in the `s1ql` field regardless of which dialect is in use.
+
+```json
+{
+  "data": {
+    "name": "Rule name",
+    "description": "What it detects.",
+    "queryType": "events",
+    "queryLang": "2.1",
+    "s1ql": "<your PowerQuery here>",
+    "severity": "High",
+    "status": "Activating",
+    "expirationMode": "Permanent",
+    "treatAsThreat": "Malicious",
+    "networkQuarantine": false,
+    "disableAgentMitigation": true
+  },
+  "filter": {
+    "siteIds": ["<site_id>"]
+  }
+}
+```
+
+`disableAgentMitigation: true` is required when the source data is from cloud or network logs (no EDR agent to respond against). Omitting it causes activation to fail silently on some tenants.
+
+Do not use Hyperautomation workflows to schedule PQ detections. `cloud-detection/rules` is the correct mechanism. HA is for SOAR-style response playbooks.
+
+---
+
 ## Testing a rule body before deploying
 
 1. Run it with the Purple MCP `powerquery` tool over the last 24 hours. Confirm it parses and returns 0–N rows (not an error, not thousands).

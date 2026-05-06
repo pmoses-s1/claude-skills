@@ -476,6 +476,37 @@ A `lookup` before a `group` is evaluated per-event. Once per-group is always che
 | lookup os_version from machineinfo by endpoint.name
 ```
 
+## Deploying PQ detections
+
+### Using Hyperautomation instead of cloud-detection/rules
+
+Hyperautomation (HA) workflows are for SOAR-style response playbooks: conditional branching, external webhooks, multi-step actions triggered by an event. They are not the right mechanism for scheduled PowerQuery detections.
+
+The correct API is `POST /web/api/v2.1/cloud-detection/rules` with `queryLang: "2.1"`. HA adds unnecessary complexity, requires workarounds for LRQ poll headers, and puts detection logic in a workflow engine rather than the detection engine where it belongs.
+
+### `queryLang: "2.0"` rejects PowerQuery pipe syntax
+
+```
+POST /web/api/v2.1/cloud-detection/rules
+{ "queryLang": "2.0", "s1ql": "dataSource.name='X' | filter ..." }
+→ HTTP 400: Wrong query Don't understand [|]
+```
+
+`"2.0"` is the S1QL log-search dialect and does not accept `|` pipe stages. Use `queryLang: "2.1"` for any query that contains pipes.
+
+### `queryLang: "2.1"` is NOT the LRQ `queryType`
+
+These are two different fields on two different APIs:
+
+| API | Field | PowerQuery value |
+|---|---|---|
+| `POST /web/api/v2.1/cloud-detection/rules` | `queryLang` | `"2.1"` |
+| `POST /sdl/v2/api/queries` (LRQ) | `queryType` | `"PQ"` |
+
+Do not confuse them. On the LRQ API, `queryType: "2.1"` is invalid. On cloud-detection/rules, `queryType` is always `"events"` regardless of query dialect.
+
+---
+
 ## Alert-specific issues
 
 ### Rule silently under-counts

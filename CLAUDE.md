@@ -943,6 +943,14 @@ This is the order that produced a clean delivery on FortiGate. Replicate the sha
 
 ---
 
+## PowerQuery Syntax Rules — Non-Negotiable
+
+- Sort descending: `| sort -fieldname` (e.g. `| sort -count`, `| sort -timestamp`)
+- Sort ascending: `| sort fieldname`
+- NEVER use `sort fieldname desc` or `sort fieldname asc` — wrong syntax, causes parse error.
+- NEVER use bare `*` as the initial filter — causes HTTP 500 (`"Don't understand [*]"`). Use a field presence check like `event.time=*` or `dataSource.name=*` instead.
+- NEVER start a query with `|` and no initial predicate — also causes a 500.
+
 ## SDL Dashboard — Pitfalls Confirmed in This Tenant
 
 These rendering failures cost iteration cycles in the 2026-04-25 engagement. Apply preemptively.
