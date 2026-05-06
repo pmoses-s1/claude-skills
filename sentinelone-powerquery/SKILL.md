@@ -82,6 +82,7 @@ These function names do not exist in PowerQuery. Using any of them produces `Unk
 | `if(cond, a, b)` inside aggregates | `count(predicate)` |
 | `percentile(x, N)` | `p50(x)` / `p95(x)` / `p99(x)` |
 | `first(x)` / `last(x)` | `min_by(x, timestamp)` / `max_by(x, timestamp)` |
+| `sort count desc` / `sort field asc` | `sort -count` / `sort +field` — PowerQuery uses `-`/`+` prefix, NOT SQL-style `desc`/`asc`. Using `desc` or `asc` causes HTTP 500 "Unable to parse the entire query". Purple AI frequently generates this wrong — always correct before running. |
 
 The only valid date/time functions are: `strftime`, `simpledateformat`, `strptime`, `simpledateparse`, `timebucket`, `querystart`, `queryend`, `queryspan`.
 

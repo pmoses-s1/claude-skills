@@ -45,6 +45,25 @@ Use when you want all events with no initial predicate.
 | group ct=count() by event.type
 ```
 
+### SQL-style `sort` direction keywords cause parse error (HTTP 500)
+
+PowerQuery uses `-`/`+` prefix for sort direction. `desc` and `asc` are not valid keywords and cause the LRQ API to return HTTP 500 "Unable to parse the entire query".
+
+```
+| sort count desc          ← HTTP 500 — "desc" is not valid PowerQuery syntax
+| sort timestamp asc       ← HTTP 500 — "asc" is not valid PowerQuery syntax
+```
+
+Fix: use `-` for descending, `+` for ascending (ascending is also the default when no prefix is given).
+
+```
+| sort -count
+| sort +timestamp
+| sort -hits, +endpoint.name
+```
+
+**This applies to Purple AI generated queries too.** Purple AI frequently produces `sort field desc` — always correct it to `sort -field` before running via the LRQ API or `powerquery_run`.
+
 ### `join` without a leading pipe
 
 ```
