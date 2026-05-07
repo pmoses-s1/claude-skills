@@ -4,6 +4,8 @@ Four steps from zero to a working PrincipalSOCAnalyst session: configure MCP ser
 
 The MCP servers all run via package managers (`npx` and `uvx`). There is no git clone, no `npm install`, no absolute path to manage. New machine = paste the config, paste the tokens, restart Claude Desktop.
 
+> **On a locked-down machine?** A Docker-based install path is also available: one image bundles all three MCPs, no host-level Node/Python/uv required. See [`docker.md`](./docker.md).
+
 - [Prerequisites](#prerequisites)
 - [Step 1: Configure MCP servers](#step-1-configure-mcp-servers)
 - [Step 2: Install the plugin](#step-2-install-the-plugin)

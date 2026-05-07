@@ -97,6 +97,8 @@ Four steps. The MCP servers run via `npx` (sentinelone-mcp, virustotal) and `uvx
 
 Full reference (prerequisites, credential keys, upgrade paths, troubleshooting): [docs/installation.md](./docs/installation.md)
 
+**Locked-down machine?** A Docker install path is also available: one image at `ghcr.io/pmoses-s1/s1-mcps` bundles all three MCPs, no host-level Node/Python/uv required. See [docs/docker.md](./docs/docker.md).
+
 **Start a session**
 
 Open the **PrincipalSOCAnalyst** project and start a new chat. Claude reads `CLAUDE.md` automatically and immediately runs:
@@ -364,6 +366,7 @@ This repo includes Windsurf workflow files in `.windsurf/workflows/`. Each workf
 |---|---|
 | [docs/zero-to-hero.md](./docs/zero-to-hero.md) | Onboarding guide for customers and partners new to Claude Skills: concepts, install, first session, common workflows, troubleshooting |
 | [docs/installation.md](./docs/installation.md) | Four-step install via `npx`/`uvx`, plus credential config, project creation, and upgrade paths |
+| [docs/docker.md](./docs/docker.md) | Alternate Docker install path: one image bundles all three MCPs, no host-level Node/Python/uv |
 | [docs/architecture.md](./docs/architecture.md) | How the three layers fit together, data flow, auth patterns, sandbox proxy explanation |
 | [docs/skills.md](./docs/skills.md) | Per-skill capability reference, key scripts, and field requirements |
 | [docs/mcp-tools.md](./docs/mcp-tools.md) | All sentinelone-mcp and purple-mcp tools with usage notes and which to use when |

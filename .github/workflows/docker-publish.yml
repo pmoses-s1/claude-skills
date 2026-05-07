@@ -1,0 +1,90 @@
+name: docker-publish
+
+# Builds and pushes the SentinelOne Claude Skills MCP Stack image to
+# ghcr.io. Tag-based releases produce semver tags; pushes to main produce
+# :latest and :sha-<short>; pull_request runs build-only (no push) to
+# keep the Dockerfile honest.
+#
+# Pins are kept in env: below. Keep these in sync with docker/build.sh;
+# the pin-sync check below fails the build if they drift.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+    paths:
+      - 'docker/**'
+      - '.github/workflows/docker-publish.yml'
+      - 'CLAUDE.md'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: pmoses-s1/s1-mcps
+  # Pinned versions (keep in sync with docker/build.sh)
+  S1_MCP_VERSION: '1.0.0'
+  VT_MCP_PACKAGE: '@burtthecoder/mcp-virustotal'
+  VT_MCP_VERSION: '1.0.21'
+  PURPLE_MCP_REF: '1582c0945101d0da2a158e66d8c329f66f251f27'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify pins match docker/build.sh
+        run: |
+          grep -q "S1_MCP_VERSION:-${S1_MCP_VERSION}}" docker/build.sh
+          grep -q "VT_MCP_VERSION:-${VT_MCP_VERSION}}" docker/build.sh
+          grep -q "PURPLE_MCP_REF:-${PURPLE_MCP_REF}}" docker/build.sh
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            S1_MCP_VERSION=${{ env.S1_MCP_VERSION }}
+            VT_MCP_PACKAGE=${{ env.VT_MCP_PACKAGE }}
+            VT_MCP_VERSION=${{ env.VT_MCP_VERSION }}
+            PURPLE_MCP_REF=${{ env.PURPLE_MCP_REF }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+            VCS_REF=${{ github.sha }}
