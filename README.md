@@ -1,6 +1,6 @@
 # SentinelOne AI Analyst: Claude Skills
 
-A full-stack AI analyst for SentinelOne, built as a set of Claude skills, two MCP servers, and an operating persona (CLAUDE.md). Install once and Claude can hunt threats, triage alerts, write detections, deploy dashboards, author parsers, and build automation workflows, entirely from natural language.
+A full-stack AI analyst for SentinelOne, built as a set of Claude skills, three MCP servers, and an operating persona (CLAUDE.md). Install once and Claude can hunt threats, triage alerts, write detections, deploy dashboards, author parsers, and build automation workflows, entirely from natural language.
 
 > **New here?** Start with the [Zero to Hero guide](./docs/zero-to-hero.md): a 20-minute onboarding walkthrough for customers and partners new to Claude Skills.
 
@@ -30,7 +30,7 @@ CLAUDE.md            SOC Analyst persona: session protocol, evidence rules,
        │
        ▼
 MCP Servers          Live API access, outside the Cowork sandbox proxy
-  sentinelone-mcp    19 tools: PowerQuery, SDL, Mgmt Console REST, UAM, Hyperautomation
+  sentinelone-mcp    26 tools: PowerQuery, SDL, Mgmt Console REST, UAM, Hyperautomation
   purple-mcp         Alert triage, Purple AI NLQ, Deep Visibility, assets, vulnerabilities
   threat-intel-mcp   External IOC enrichment (required for CRITICAL classification)
        │
@@ -88,7 +88,14 @@ The plugin bundles every skill; installing it is sufficient. No individual skill
 
 ### Setting up the PrincipalSOCAnalyst project
 
-Full install instructions, including sentinelone-mcp setup, prerequisite checks, MCP server config, plugin install, and project creation: [docs/installation.md](./docs/installation.md)
+Four steps. The MCP servers run via `npx` (sentinelone-mcp, virustotal) and `uvx` (purple-mcp), so there is no git clone, no `npm install`, and no absolute path to manage.
+
+1. Paste the [MCP config](./docs/installation.md#step-1-configure-mcp-servers) into `claude_desktop_config.json` and replace the placeholders with your tokens and region URLs.
+2. Install the [`.plugin` file](./sentinelone-skills-plugin/dist/) via Cowork → Customize → Browse plugins.
+3. Create a Cowork project named `PrincipalSOCAnalyst`, select a folder for it, drop a copy of [`CLAUDE.md`](./CLAUDE.md) into the folder.
+4. Open the project and run `smoke test s1 skills` to verify.
+
+Full reference (prerequisites, credential keys, upgrade paths, troubleshooting): [docs/installation.md](./docs/installation.md)
 
 **Start a session**
 
@@ -328,7 +335,9 @@ These are real questions you can ask. Claude will pick the right skill automatic
 
 ## Installing and upgrading
 
-See [docs/installation.md](./docs/installation.md) for the complete guide: prerequisites, sentinelone-mcp setup, plugin install, credential config, and upgrade steps.
+Four steps from zero to a working session. See [docs/installation.md](./docs/installation.md) for the complete guide: prerequisites, the `claude_desktop_config.json` block (`npx`/`uvx`-based, no clone or absolute paths), plugin install, credential config, and upgrade steps.
+
+Upgrades are effectively free: `npx -y` and `uvx` re-resolve the MCP servers to the latest published version on each Claude Desktop launch. Plugin upgrades are a single-file replace via Cowork → Customize → Browse plugins.
 
 ---
 
@@ -354,7 +363,7 @@ This repo includes Windsurf workflow files in `.windsurf/workflows/`. Each workf
 | Doc | Contents |
 |---|---|
 | [docs/zero-to-hero.md](./docs/zero-to-hero.md) | Onboarding guide for customers and partners new to Claude Skills: concepts, install, first session, common workflows, troubleshooting |
-| [docs/installation.md](./docs/installation.md) | Step-by-step install and upgrade guide: prerequisites, sentinelone-mcp setup, plugin install, credential config, project creation |
+| [docs/installation.md](./docs/installation.md) | Four-step install via `npx`/`uvx`, plus credential config, project creation, and upgrade paths |
 | [docs/architecture.md](./docs/architecture.md) | How the three layers fit together, data flow, auth patterns, sandbox proxy explanation |
 | [docs/skills.md](./docs/skills.md) | Per-skill capability reference, key scripts, and field requirements |
 | [docs/mcp-tools.md](./docs/mcp-tools.md) | All sentinelone-mcp and purple-mcp tools with usage notes and which to use when |
