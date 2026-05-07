@@ -114,26 +114,16 @@ The full reference is [`docs/installation.md`](./installation.md). This section 
 | Regional endpoint URLs | n/a | [Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
 | Threat intel API key | e.g. [virustotal.com/gui/my-apikey](https://www.virustotal.com/gui/my-apikey) | Free tier is sufficient |
 
-### Step 1: Clone the repo and install sentinelone-mcp
+### Step 1: Confirm Node.js 18+ and uvx are on your PATH
 
 ```bash
-git clone https://github.com/pmoses-s1/claude-skills.git
-cd claude-skills/sentinelone-mcp
-npm install
-cd ..
-```
-
-What you got: a local Node.js MCP server with 19 tools that bypass the Cowork sandbox proxy and talk directly to your tenant. Note the absolute path to `sentinelone-mcp/index.js`; you'll paste it into the config file in Step 3.
-
-### Step 2: Confirm uvx is on your PATH
-
-```bash
+node --version    # 18 or higher
 uvx --version
 ```
 
-What you got: the ability to run `purple-mcp` directly from GitHub with no local clone. `uvx` fetches and caches the package on first use.
+What you got: a Node runtime to run `sentinelone-mcp` and `mcp-virustotal` via `npx`, and `uvx` to run `purple-mcp`. No git clone, no `npm install`, no absolute paths. Each MCP fetches and caches itself on first launch.
 
-### Step 3: Wire up the MCP servers in Claude Desktop
+### Step 2: Wire up the MCP servers in Claude Desktop
 
 Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
@@ -141,8 +131,8 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
 {
   "mcpServers": {
     "sentinelone-mcp": {
-      "command": "node",
-      "args": ["/path/to/claude-skills/sentinelone-mcp/index.js"],
+      "command": "npx",
+      "args": ["-y", "@pmoses-s1/sentinelone-mcp"],
       "env": {
         "S1_CONSOLE_URL": "https://usea1-yourorg.sentinelone.net",
         "S1_CONSOLE_API_TOKEN": "eyJ...your-api-token...",
@@ -166,7 +156,8 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
       }
     },
     "virustotal": {
-      "command": "mcp-virustotal",
+      "command": "npx",
+      "args": ["-y", "mcp-virustotal"],
       "env": {
         "VIRUSTOTAL_API_KEY": "your-virustotal-api-key"
       }
@@ -181,14 +172,14 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
 
 Things people get wrong here:
 
-- The `sentinelone-mcp` `args` path must be **absolute**, not relative. Resolve with `pwd` while inside the repo.
 - `S1_CONSOLE_API_TOKEN` and `PURPLEMCP_CONSOLE_TOKEN` are the **same** token. One service user with read scope is enough for hunting and triage; IR Team scope or higher is needed for response actions like isolate.
 - Region URLs vary. Check the [Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) article for `S1_HEC_INGEST_URL` and `SDL_XDR_URL`.
-- Replace VirusTotal with your organisation's approved threat intel MCP if different. Install with `npm install -g mcp-virustotal` if you're using VirusTotal.
+- Replace VirusTotal with your organisation's approved threat intel MCP if different.
+- `npx -y` answers "yes" to the install prompt the first time and caches the package. After that, launches are instant.
 
 **Restart Claude Desktop after saving the file.**
 
-### Step 4: Install the plugin
+### Step 3: Install the plugin
 
 The plugin bundles all six skills in a single file, so there's no per-skill install to manage.
 
@@ -199,17 +190,17 @@ The plugin bundles all six skills in a single file, so there's no per-skill inst
 
 If plugin upload fails, the same `dist/` folder has individual `.skill` files you can install one at a time by double-clicking them or by uploading via Browse plugins.
 
-### Step 5: Create the Cowork project
+### Step 4: Create the Cowork project
 
 Cowork projects are durable workspaces with their own folder, plugins, and CLAUDE.md. You'll do all your real work inside one.
 
 1. In Claude Desktop, open **Cowork** and click **New Project**.
 2. Name it `PrincipalSOCAnalyst`.
-3. Click **Select Folder** and pick the `claude-skills` folder you cloned (the one containing `CLAUDE.md`).
-4. Under **Add files**, add `CLAUDE.md` so Claude reads the SOC Analyst persona on every session start.
+3. Click **Select Folder** and pick any folder on your machine. This becomes the project workspace.
+4. Drop a copy of [`CLAUDE.md`](https://raw.githubusercontent.com/pmoses-s1/claude-skills/main/CLAUDE.md) into the project folder. The `sentinelone-mcp` server reads it from there at session start and exposes it as the `sentinelone://soc-context` resource. If you'd rather keep CLAUDE.md elsewhere, set `S1_CLAUDE_MD_PATH` in the `sentinelone-mcp` env block in Step 2.
 5. Confirm `sentinelone-skills` appears under **Personal plugins**, and that `sentinelone-mcp`, `purple-mcp`, and your threat intel MCP appear under **MCP Servers**.
 
-### Step 6: Verify the install
+### Step 5: Verify the install
 
 Open the **PrincipalSOCAnalyst** project and start a new session. Claude will automatically run data source enumeration and triage open alerts. Then ask:
 
@@ -384,11 +375,11 @@ If a skill should have triggered and didn't, ask Claude `which skills are loaded
 
 Check, in order:
 
-1. **Path is absolute.** `args` for `sentinelone-mcp` must be the full path to `index.js`, not `./sentinelone-mcp/index.js`.
-2. **Node.js is on PATH** for Claude Desktop. Restart Claude Desktop after a fresh Node install. On macOS, `which node` should return a path; on Windows, `where node`.
-3. **Dependencies installed.** `cd sentinelone-mcp && npm install` once after cloning.
-4. **For `purple-mcp`: `uvx --version` works in a fresh terminal.** If not, reinstall `uv` and open a new terminal.
-5. **Restart Claude Desktop** after any config change.
+1. **Node.js is on PATH** for Claude Desktop. `npx` ships with Node, so this also covers `mcp-virustotal` and `sentinelone-mcp`. Restart Claude Desktop after a fresh Node install. On macOS, `which node` should return a path; on Windows, `where node`.
+2. **`uvx --version` works in a fresh terminal.** Required for `purple-mcp`. If not, reinstall `uv` and open a new terminal.
+3. **First-launch fetch took too long and timed out.** `npx -y @pmoses-s1/sentinelone-mcp` and `uvx purple-mcp` each download on first use. Run them once manually in a terminal to warm the cache, then restart Claude Desktop.
+4. **Restart Claude Desktop** after any config change.
+5. **Force-refresh the MCP packages** if you suspect a stale cache: `npx clear-npx-cache` and `uvx cache clean purple-mcp`.
 
 ### 401 / 403 errors
 

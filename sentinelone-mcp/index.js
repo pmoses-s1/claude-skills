@@ -32,18 +32,23 @@ const __dir = dirname(fileURLToPath(import.meta.url));
 // ─── SOC context (CLAUDE.md) ──────────────────────────────────────────────────
 
 function loadSocContext() {
-  // Search for CLAUDE.md relative to this server (and up the tree)
+  // Resolution order (highest priority wins):
+  //   1. S1_CLAUDE_MD_PATH env var (explicit override, e.g. set by claude_desktop_config.json)
+  //   2. <cwd>/CLAUDE.md (Cowork project folder when launched from a project)
+  //   3. relative to this server's install dir (works when running from a git clone)
   const candidates = [
-    join(__dir, '..', 'CLAUDE.md'),            // claude-skills/CLAUDE.md
-    join(__dir, '..', '..', 'CLAUDE.md'),       // project root
+    process.env.S1_CLAUDE_MD_PATH,
+    process.cwd() ? join(process.cwd(), 'CLAUDE.md') : null,
+    join(__dir, '..', 'CLAUDE.md'),            // claude-skills/CLAUDE.md (git clone)
+    join(__dir, '..', '..', 'CLAUDE.md'),       // project root (git clone)
     join(__dir, 'CLAUDE.md'),                   // same dir
-  ];
+  ].filter(Boolean);
   for (const p of candidates) {
     if (existsSync(p)) {
       try { return readFileSync(p, 'utf-8'); } catch { /* skip */ }
     }
   }
-  return '# SentinelOne SOC Analyst Context\n\n_CLAUDE.md not found. Place it in the claude-skills/ folder._';
+  return '# SentinelOne SOC Analyst Context\n\n_CLAUDE.md not found. Place it in your Cowork project folder, or set S1_CLAUDE_MD_PATH to an absolute path._';
 }
 
 const SOC_CONTEXT = loadSocContext();

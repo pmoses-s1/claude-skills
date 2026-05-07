@@ -1,17 +1,17 @@
 # Installation and Upgrade Guide
 
-This page covers everything needed to go from zero to a working PrincipalSOCAnalyst session: prerequisites, MCP server setup, plugin install, credential configuration, and project creation. Upgrade instructions are at the bottom.
+Four steps from zero to a working PrincipalSOCAnalyst session: configure MCP servers, install the plugin, create the Cowork project, verify.
+
+The MCP servers all run via package managers (`npx` and `uvx`). There is no git clone, no `npm install`, no absolute path to manage. New machine = paste the config, paste the tokens, restart Claude Desktop.
 
 - [Prerequisites](#prerequisites)
-- [Step 1: Install sentinelone-mcp](#step-1-install-sentinelone-mcp)
-- [Step 2: Install purple-mcp](#step-2-install-purple-mcp)
-- [Step 3: Configure MCP servers](#step-3-configure-mcp-servers)
-- [Step 4: Install the plugin](#step-4-install-the-plugin)
-- [Step 5: Create the Cowork project](#step-5-create-the-cowork-project)
-- [Step 6: Verify the install](#step-6-verify-the-install)
+- [Step 1: Configure MCP servers](#step-1-configure-mcp-servers)
+- [Step 2: Install the plugin](#step-2-install-the-plugin)
+- [Step 3: Create the Cowork project](#step-3-create-the-cowork-project)
+- [Step 4: Verify the install](#step-4-verify-the-install)
 - [Upgrading](#upgrading)
+- [Configuration reference](#configuration-reference)
 - [Building from source](#building-from-source)
-- [Configuration](#configuration)
 
 ---
 
@@ -20,67 +20,26 @@ This page covers everything needed to go from zero to a working PrincipalSOCAnal
 | Requirement | Check | Install |
 |---|---|---|
 | Node.js 18+ | `node --version` | [nodejs.org](https://nodejs.org) |
-| `uv` (for purple-mcp) | `uvx --version` | `curl -LsSf https://astral.sh/uv/install.sh \| sh`, then open a new terminal to confirm `uvx --version` works |
+| `uv` (for purple-mcp) | `uvx --version` | `curl -LsSf https://astral.sh/uv/install.sh \| sh`, then open a new terminal |
 | SentinelOne API token | Settings → Users → Service Users | [Community guide](https://community.sentinelone.com/s/article/000005291) |
 | SDL API keys | Singularity Data Lake → API Keys | [Community guide](https://community.sentinelone.com/s/article/000006763) |
-| Regional endpoint URLs (`S1_CONSOLE_URL`, `SDL_XDR_URL`, `S1_HEC_INGEST_URL`) | — | [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
-| VirusTotal API key (or equivalent threat intel MCP) | [virustotal.com/gui/my-apikey](https://www.virustotal.com/gui/my-apikey) | Free tier is sufficient |
+| Regional endpoint URLs | `S1_CONSOLE_URL`, `SDL_XDR_URL`, `S1_HEC_INGEST_URL` | [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
+| VirusTotal API key | [virustotal.com/gui/my-apikey](https://www.virustotal.com/gui/my-apikey) | Free tier is sufficient |
 
 ---
 
-## Step 1: Install sentinelone-mcp
+## Step 1: Configure MCP servers
 
-`sentinelone-mcp` is a Node.js MCP server. It gives Claude direct access to PowerQuery, the SDL API, the Management Console REST API, UAM, and Hyperautomation, bypassing the Cowork sandbox proxy.
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, or `%APPDATA%\Claude\claude_desktop_config.json` on Windows. Paste in the three MCP servers below and replace every placeholder with your real values.
 
-**Clone or download the repo** (if you haven't already):
-
-```bash
-git clone https://github.com/pmoses-s1/claude-skills.git
-cd claude-skills
-```
-
-Install the MCP server dependencies:
-
-```bash
-cd sentinelone-mcp
-npm install
-cd ..
-```
-
-Note the absolute path to `sentinelone-mcp/index.js` — you will need it in Step 3.
-
----
-
-## Step 2: Install purple-mcp
-
-[purple-mcp](https://github.com/Sentinel-One/purple-mcp) provides alert triage, Purple AI hunting, Deep Visibility, UAM, and asset and vulnerability context. It runs via `uvx` directly from GitHub — no local clone or install needed. `uvx` fetches and caches it automatically on first use.
-
-Confirm `uvx` is in your PATH:
-
-```bash
-uvx --version
-```
-
-If this fails, install `uv` first (see [Prerequisites](#prerequisites)), then open a new terminal and retry.
-
-That's the only setup needed for purple-mcp. The config block in the next step wires it into Claude Desktop.
-
----
-
-## Step 3: Configure MCP servers
-
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, or `%APPDATA%\Claude\claude_desktop_config.json` on Windows. Add the three MCP servers shown below.
-
-Replace every placeholder (`yourname`, `usea1-yourorg`, `eyJ...`, key values) with your real values.
+All three servers run from public package registries: `sentinelone-mcp` and `mcp-virustotal` via `npx`, `purple-mcp` via `uvx`. First launch fetches and caches each one automatically. No prior install step.
 
 ```json
 {
   "mcpServers": {
     "sentinelone-mcp": {
-      "command": "node",
-      "args": [
-        "/path/to/claude-skills/sentinelone-mcp/index.js"
-      ],
+      "command": "npx",
+      "args": ["-y", "@pmoses-s1/sentinelone-mcp"],
       "env": {
         "S1_CONSOLE_URL": "https://usea1-yourorg.sentinelone.net",
         "S1_CONSOLE_API_TOKEN": "eyJ...your-api-token...",
@@ -107,7 +66,8 @@ Replace every placeholder (`yourname`, `usea1-yourorg`, `eyJ...`, key values) wi
       }
     },
     "virustotal": {
-      "command": "mcp-virustotal",
+      "command": "npx",
+      "args": ["-y", "mcp-virustotal"],
       "env": {
         "VIRUSTOTAL_API_KEY": "your-virustotal-api-key"
       }
@@ -120,21 +80,20 @@ Replace every placeholder (`yourname`, `usea1-yourorg`, `eyJ...`, key values) wi
 }
 ```
 
-**Key config notes:**
+**Notes:**
 
-- `sentinelone-mcp`: set `command` to `node` and the first `args` entry to the absolute path of `sentinelone-mcp/index.js` in this repo.
-- `purple-mcp`: uses `uvx` directly — confirm it is in your PATH with `uvx --version` before restarting Claude Desktop.
-- `virustotal`: the VirusTotal MCP is shown as a concrete example. Replace it with your organisation's approved threat intel MCP if different. Install the npm package with `npm install -g mcp-virustotal` if using VirusTotal.
-- Both `S1_CONSOLE_API_TOKEN` and `PURPLEMCP_CONSOLE_TOKEN` are the same Management Console API token; you can generate one under Settings → Users → Service Users.
-- Region URLs vary. Look up your region's `S1_HEC_INGEST_URL` and `SDL_XDR_URL` in the [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) article.
+- Both `S1_CONSOLE_API_TOKEN` and `PURPLEMCP_CONSOLE_TOKEN` are the same Management Console API token. Generate one under Settings → Users → Service Users.
+- Region URLs vary. Look up your region in the [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) article.
+- The VirusTotal MCP shown is one example. Replace it with your organisation's approved threat intel MCP if different.
+- `npx -y` answers "yes" to the install prompt on first run, then caches. `uvx` does the same for the Python side.
 
-**Restart Claude Desktop** after saving the config file.
+**Restart Claude Desktop** after saving.
 
 Full credential reference: [credentials.md](./credentials.md)
 
 ---
 
-## Step 4: Install the plugin
+## Step 2: Install the plugin
 
 The plugin bundles all six skills in a single file. Download `sentinelone-skills-vX.Y.Z.plugin` from [`sentinelone-skills-plugin/dist/`](../sentinelone-skills-plugin/dist/).
 
@@ -145,133 +104,87 @@ In the Claude desktop app:
 3. Click **Browse plugins**
 4. Upload the `.plugin` file
 
-All six skills install in one step. No individual skill configuration is needed after this.
+All six skills install in one step. No individual skill configuration needed.
 
-**If plugin upload fails**, install individual `.skill` files from the same `dist/` folder. Double-click any `.skill` file in Finder (macOS) or Explorer (Windows) to trigger the install prompt, or upload each one via Browse plugins.
-
-The six skill files are: `sentinelone-mgmt-console-api.skill`, `sentinelone-powerquery.skill`, `sentinelone-sdl-api.skill`, `sentinelone-sdl-dashboard.skill`, `sentinelone-sdl-log-parser.skill`, `sentinelone-hyperautomation.skill`.
+If the plugin upload fails, install individual `.skill` files from the same `dist/` folder. The six are: `sentinelone-mgmt-console-api.skill`, `sentinelone-powerquery.skill`, `sentinelone-sdl-api.skill`, `sentinelone-sdl-dashboard.skill`, `sentinelone-sdl-log-parser.skill`, `sentinelone-hyperautomation.skill`.
 
 ---
 
-## Step 5: Create the Cowork project
+## Step 3: Create the Cowork project
 
 > Create this project in Cowork, not Claude.ai chat. Open the Claude desktop app and navigate to Cowork from the sidebar.
 
-1. In the Claude desktop app, open **Cowork** and click **New Project**
+1. Open **Cowork** and click **New Project**
 2. Name it `PrincipalSOCAnalyst`
-3. Click **Select Folder** and choose this `claude-skills` folder (the one containing `CLAUDE.md`)
-4. Under **Add files**, add `CLAUDE.md` so Claude reads the SOC Analyst persona on every session start
+3. Click **Select Folder** and choose any folder on your machine (this becomes the project workspace)
+4. Drop a copy of [`CLAUDE.md`](../CLAUDE.md) from this repo into the project folder. The `sentinelone-mcp` server reads it from the project folder at session start and exposes it as the `sentinelone://soc-context` resource.
+5. Confirm `sentinelone-skills` appears under **Personal plugins**, and that `sentinelone-mcp`, `purple-mcp`, and your threat intel MCP appear under **MCP Servers**
 
-> **credentials.json:** If you are using `sentinelone-mcp` (recommended), all credentials are in `claude_desktop_config.json` and you do not need to add `credentials.json` to the project. If you are running skills directly without `sentinelone-mcp`, add `credentials.json` here as well. See [credentials.md](./credentials.md) for setup.
+If you'd rather keep CLAUDE.md outside the project folder, set `S1_CLAUDE_MD_PATH` in the `sentinelone-mcp` env block in Step 1 to its absolute path.
 
-5. Confirm that `sentinelone-skills` appears under Personal plugins, and that `sentinelone-mcp`, `purple-mcp`, and your threat intel MCP appear under MCP Servers
+> **credentials.json:** With the npx config above, all credentials live in `claude_desktop_config.json` and you do not need a `credentials.json` in your project folder. The file is still supported as a fallback for direct skill usage. See [credentials.md](./credentials.md).
 
 ---
 
-## Step 6: Verify the install
+## Step 4: Verify the install
 
 Open the **PrincipalSOCAnalyst** project and start a new session. Claude will automatically:
 
 - Enumerate all live `dataSource.name` values in your SDL
 - Pull open alerts in parallel
 
-Run a smoke test to confirm all skills and MCP tools are wired up correctly:
+Run a smoke test to confirm everything is wired up:
 
 ```
 smoke test s1 skills
 ```
 
-Claude will verify connectivity to sentinelone-mcp, purple-mcp, and the threat intel MCP, confirm each skill is loaded, and report any missing credentials or unreachable endpoints.
+Claude verifies connectivity to `sentinelone-mcp`, `purple-mcp`, and the threat intel MCP, confirms each skill is loaded, and reports any missing credentials or unreachable endpoints.
 
-If any step fails, check:
+If anything is red, check:
 
-- `sentinelone-mcp` is listed and green under MCP Servers in the Cowork session panel
-- The API token has the correct scope (Viewer or higher for read operations; IR Team or higher for response actions)
-- The `SDL_XDR_URL` and API keys match your region
+- All three MCPs are listed and green under MCP Servers in the Cowork session panel
+- The API token has the right scope (Viewer or higher for read; IR Team or higher for response actions)
+- `SDL_XDR_URL` and the SDL keys match your region
 
-To confirm which plugin version is active, ask Claude: `which version of sentinelone-skills is installed?`
+To confirm the active plugin version: `which version of sentinelone-skills is installed?`
 
 ---
 
 ## Upgrading
 
-When a newer `sentinelone-skills-vX.Y.Z.plugin` is published in [`sentinelone-skills-plugin/dist/`](../sentinelone-skills-plugin/dist/):
-
-1. Download the new `.plugin` file
-2. In the Claude desktop app, open the **Cowork** tab
-3. Click **Customize** → **Browse plugins**
-4. Upload the new `.plugin` file
-5. When prompted that `sentinelone-skills` is already installed, click **Replace**
-
-All six skills upgrade in one step. Credentials and project-folder configuration are untouched.
-
-**Upgrading sentinelone-mcp:**
+**MCP servers** (`sentinelone-mcp`, `purple-mcp`, `virustotal`): nothing to do. `npx -y` and `uvx` re-resolve to the latest published version on each Claude Desktop launch. To force a refresh:
 
 ```bash
-cd claude-skills
-git pull
-cd sentinelone-mcp && npm install
+# npx-based
+npx clear-npx-cache
+
+# uvx-based
+uvx cache clean purple-mcp
 ```
 
-Restart Claude Desktop after pulling changes.
+**Plugin**: download the new `.plugin` from [`sentinelone-skills-plugin/dist/`](../sentinelone-skills-plugin/dist/), open Cowork → Customize → Browse plugins, upload, click **Replace** when prompted.
 
-**Upgrading purple-mcp:**
-
-`uvx` fetches the latest version from GitHub on each startup, so no manual update step is needed. To force a refresh: `uvx cache clean purple-mcp`.
+**CLAUDE.md**: if you customised it, your project-folder copy stays as-is. To pick up upstream improvements, diff against the latest [`CLAUDE.md`](../CLAUDE.md) in this repo.
 
 ---
 
-## Building from source
+## Configuration reference
 
-After making local changes to skill files, rebuild the plugin:
+**Recommended:** credentials live in `claude_desktop_config.json` as env vars on each MCP server (Step 1). No file in the project folder.
 
-```bash
-# Incremental build
-cd sentinelone-skills-plugin && bash scripts/build.sh
-
-# Clean build (removes old dist files first)
-cd sentinelone-skills-plugin && bash scripts/build.sh --clean
-```
-
-Then reinstall the resulting `.plugin` file from `sentinelone-skills-plugin/dist/` via Browse plugins → Replace.
-
----
-
-## Configuration
-
-**If you are using `sentinelone-mcp` (recommended):** credentials are passed as environment variables in `claude_desktop_config.json` as shown in [Step 3](#step-3-configure-mcp-servers) above. You do not need a `credentials.json` file in your project folder.
-
-**If you are using the skills directly without `sentinelone-mcp`** (or for backwards compatibility): the skills also read credentials from a `credentials.json` file placed in your Cowork project folder. The plugin's SessionStart hook auto-discovers it and makes it available to every skill in the session.
-
-**Setup is two commands.** Copy [`credentials.example.json`](../sentinelone-skills-plugin/credentials.example.json) from this repo into your Cowork project folder, renaming it to `credentials.json`, then edit it.
-
-**macOS / Linux:**
+**Backwards-compatible fallback** (for direct skill usage without `sentinelone-mcp`): place a `credentials.json` in your Cowork project folder. The plugin's SessionStart hook auto-discovers it.
 
 ```bash
-# 1. Pick your Cowork project folder.
-PROJECT_DIR=~/Documents/Claude/Projects/MyProject
-
-# 2. Copy the example, renaming to credentials.json.
-cp sentinelone-skills-plugin/credentials.example.json "$PROJECT_DIR/credentials.json"
-
-# 3. Edit it: replace the placeholder values with your real ones.
-${EDITOR:-nano} "$PROJECT_DIR/credentials.json"
+# macOS / Linux
+cp sentinelone-skills-plugin/credentials.example.json ~/Documents/Claude/Projects/PrincipalSOCAnalyst/credentials.json
+${EDITOR:-nano} ~/Documents/Claude/Projects/PrincipalSOCAnalyst/credentials.json
 ```
 
-**Windows (PowerShell):**
-
-```powershell
-# 1. Pick your Cowork project folder.
-$projectDir = "$env:USERPROFILE\Documents\Claude\Projects\MyProject"
-
-# 2. Copy the example, renaming to credentials.json.
-Copy-Item .\sentinelone-skills-plugin\credentials.example.json "$projectDir\credentials.json"
-
-# 3. Edit it: replace the placeholder values with your real ones.
-notepad "$projectDir\credentials.json"
-```
-
-If you only downloaded the `.plugin` file (not the full repo), extract `credentials.example.json` from the plugin zip with any unzip tool, or grab it directly from the repo at [`sentinelone-skills-plugin/credentials.example.json`](../sentinelone-skills-plugin/credentials.example.json).
+Resolution order (highest priority wins):
+1. Environment variables in `claude_desktop_config.json` via `sentinelone-mcp` (recommended)
+2. `<project folder>/credentials.json` (backwards-compatible fallback)
+3. `~/.config/sentinelone/credentials.json` (terminal fallback)
 
 | Credential key | Required for | How to get it |
 |---|---|---|
@@ -281,10 +194,34 @@ If you only downloaded the `.plugin` file (not the full repo), extract `credenti
 | `SDL_XDR_URL` | `sentinelone-sdl-api`, `sentinelone-sdl-dashboard`, `sentinelone-sdl-log-parser` | Your SDL tenant URL, e.g. `https://xdr.us1.sentinelone.net`. See [SentinelOne Endpoint URLs by Region](https://community.sentinelone.com/s/article/000004961) |
 | `SDL_LOG_WRITE_KEY` | `uploadLogs` only | Singularity Data Lake → menu next to username → API Keys → Log Access Keys → New Key (Log Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
 | `SDL_CONFIG_WRITE_KEY` | Deploying parsers/dashboards via `putFile` | Singularity Data Lake → menu next to username → API Keys → Configuration Access Keys → New Key (Configuration Write Access). See [SDL API Keys](https://community.sentinelone.com/s/article/000006763) |
-
-Resolution order (highest priority wins):
-1. Environment variables in `claude_desktop_config.json` via `sentinelone-mcp` (recommended)
-2. `<project folder>/credentials.json` (backwards-compatible fallback for direct skill usage)
-3. `~/.config/sentinelone/credentials.json` (terminal fallback)
+| `S1_CLAUDE_MD_PATH` (optional) | Override CLAUDE.md location | Absolute path to the CLAUDE.md you want exposed as the SOC analyst context. If unset, the MCP looks in the Cowork project folder. |
 
 Full credential reference including all SDL keys: [credentials.md](./credentials.md)
+
+---
+
+## Building from source
+
+Only needed when developing the MCP server or rebuilding the plugin. End users do not need this.
+
+```bash
+git clone https://github.com/pmoses-s1/claude-skills.git
+cd claude-skills
+
+# Run the MCP server from the local clone (replaces the npx command in Step 1)
+node sentinelone-mcp/index.js
+
+# Rebuild the plugin
+cd sentinelone-skills-plugin && bash scripts/build.sh         # incremental
+cd sentinelone-skills-plugin && bash scripts/build.sh --clean # clean
+```
+
+To point Claude Desktop at the local clone instead of the published npm package, replace the `sentinelone-mcp` block in Step 1 with:
+
+```json
+"sentinelone-mcp": {
+  "command": "node",
+  "args": ["/absolute/path/to/claude-skills/sentinelone-mcp/index.js"],
+  "env": { "...": "..." }
+}
+```

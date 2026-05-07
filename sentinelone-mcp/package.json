@@ -1,5 +1,5 @@
 {
-  "name": "sentinelone-mcp-server",
+  "name": "@pmoses-s1/sentinelone-mcp",
   "version": "1.0.0",
   "description": "MCP server orchestrating SentinelOne skills, APIs, and SOC analyst context",
   "type": "module",
@@ -7,11 +7,38 @@
   "bin": {
     "sentinelone-mcp": "./index.js"
   },
+  "files": [
+    "index.js",
+    "lib/",
+    "tools/",
+    "README.md"
+  ],
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pmoses-s1/claude-skills.git",
+    "directory": "sentinelone-mcp"
+  },
+  "homepage": "https://github.com/pmoses-s1/claude-skills/tree/main/sentinelone-mcp#readme",
+  "bugs": "https://github.com/pmoses-s1/claude-skills/issues",
+  "keywords": [
+    "mcp",
+    "sentinelone",
+    "model-context-protocol",
+    "soc",
+    "powerquery",
+    "sdl",
+    "singularity-data-lake",
+    "claude"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -104,8 +104,8 @@ The MCP servers receive credentials via environment variables set in `~/Library/
 {
   "mcpServers": {
     "sentinelone-mcp": {
-      "command": "node",
-      "args": ["/absolute/path/to/claude-skills/sentinelone-mcp/index.js"],
+      "command": "npx",
+      "args": ["-y", "@pmoses-s1/sentinelone-mcp"],
       "env": {
         "S1_CONSOLE_URL":       "https://usea1-yourorg.sentinelone.net",
         "S1_CONSOLE_API_TOKEN": "eyJ...your-api-token...",
@@ -118,7 +118,7 @@ The MCP servers receive credentials via environment variables set in `~/Library/
       }
     },
     "purple-mcp": {
-      "command": "/Users/yourname/.local/bin/uvx",
+      "command": "uvx",
       "args": [
         "--from", "git+https://github.com/Sentinel-One/purple-mcp.git",
         "purple-mcp", "--mode", "stdio"
@@ -128,23 +128,23 @@ The MCP servers receive credentials via environment variables set in `~/Library/
         "PURPLEMCP_CONSOLE_TOKEN":    "eyJ...your-api-token..."
       }
     },
-    "your-threat-intel-mcp": {
-      "command": "...",
+    "virustotal": {
+      "command": "npx",
+      "args": ["-y", "mcp-virustotal"],
       "env": {
-        "API_KEY": "..."
+        "VIRUSTOTAL_API_KEY": "your-virustotal-api-key"
       }
     }
   }
 }
 ```
 
-> **Threat intel MCP:** Replace `your-threat-intel-mcp` with your organisation's approved threat intelligence MCP. The VirusTotal MCP (`npm install -g mcp-virustotal`) is a common example, but any MCP that provides file hash, IP, domain, and URL lookup tools works. The CLAUDE.md operating instructions require multi-source confirmation before a TRUE POSITIVE or CRITICAL verdict: they do not mandate a specific provider.
+> **Threat intel MCP:** Replace `virustotal` with your organisation's approved threat intelligence MCP if different. Any MCP that provides file hash, IP, domain, and URL lookup tools works. The CLAUDE.md operating instructions require multi-source confirmation before a TRUE POSITIVE or CRITICAL verdict: they do not mandate a specific provider.
 
 **Prerequisites:**
-- Node.js 18+ for sentinelone-mcp (`node --version`)
-- `uv` for purple-mcp: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- Find `uvx` path with `which uvx` and use the absolute path in the config
-- VirusTotal: `npm install -g mcp-virustotal` plus a free API key from [virustotal.com](https://virustotal.com)
+- Node.js 18+ for `sentinelone-mcp` and `mcp-virustotal` via `npx` (`node --version`)
+- `uv` for `purple-mcp`: `curl -LsSf https://astral.sh/uv/install.sh | sh`, then open a new terminal and run `uvx --version`
+- A VirusTotal API key (free tier is fine) from [virustotal.com](https://virustotal.com)
 
 Restart Claude Desktop after editing the config. All servers appear under connected MCP tools.
 

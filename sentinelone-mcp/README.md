@@ -61,6 +61,10 @@ Credentials are passed as environment variables in `claude_desktop_config.json` 
 ## Run the server
 
 ```bash
+# From the published npm package (no clone, no install)
+npx -y @pmoses-s1/sentinelone-mcp
+
+# Or from a local clone (development)
 node /path/to/claude-skills/sentinelone-mcp/index.js
 ```
 
@@ -78,14 +82,14 @@ Most users should use Option A: it requires no admin changes and keeps credentia
 
 ### Option A: Add to Claude Desktop
 
-In `~/Library/Application Support/Claude/claude_desktop_config.json`, add the `sentinelone-mcp` entry to your `mcpServers` block. Credentials go in the `env` section:
+In `~/Library/Application Support/Claude/claude_desktop_config.json`, add the `sentinelone-mcp` entry to your `mcpServers` block. The server runs via `npx` directly from npm, so there is no clone, no install, and no absolute path to manage. Credentials go in the `env` section:
 
 ```json
 {
   "mcpServers": {
     "sentinelone-mcp": {
-      "command": "node",
-      "args": ["/Users/yourname/Documents/Claude/Projects/claude-skills/sentinelone-mcp/index.js"],
+      "command": "npx",
+      "args": ["-y", "@pmoses-s1/sentinelone-mcp"],
       "env": {
         "S1_CONSOLE_URL":        "https://usea1-yourorg.sentinelone.net",
         "S1_CONSOLE_API_TOKEN":  "eyJ...your-api-token...",
@@ -101,24 +105,38 @@ In `~/Library/Application Support/Claude/claude_desktop_config.json`, add the `s
 }
 ```
 
-Restart Claude Desktop after saving. `S1_CONSOLE_URL` and `S1_CONSOLE_API_TOKEN` are the minimum required for most tools. Include the SDL keys only if you need log ingest or parser/dashboard deploy.
+`npx -y` answers "yes" to the install prompt on first launch, fetches the package, and caches it. Subsequent launches start instantly from the cache. Restart Claude Desktop after saving.
+
+`S1_CONSOLE_URL` and `S1_CONSOLE_API_TOKEN` are the minimum required for most tools. Include the SDL keys only if you need log ingest or parser/dashboard deploy. Set `S1_CLAUDE_MD_PATH` if you keep CLAUDE.md outside your Cowork project folder.
 
 ### Option A: Add to Claude Code
 
-In `.mcp.json` at your project root, or `~/.mcp.json` globally. Add the same `env` block as above, or rely on environment variables already set in your shell:
+In `.mcp.json` at your project root, or `~/.mcp.json` globally. Same npx invocation, same env block:
 
 ```json
 {
   "mcpServers": {
     "sentinelone-mcp": {
-      "command": "node",
-      "args": ["/Users/yourname/Documents/Claude/Projects/claude-skills/sentinelone-mcp/index.js"],
+      "command": "npx",
+      "args": ["-y", "@pmoses-s1/sentinelone-mcp"],
       "env": {
         "S1_CONSOLE_URL":       "https://usea1-yourorg.sentinelone.net",
         "S1_CONSOLE_API_TOKEN": "eyJ...your-api-token..."
       }
     }
   }
+}
+```
+
+### Option A: Run from a local clone (development only)
+
+If you are developing the MCP server itself, replace the `npx` invocation with a path to your clone:
+
+```json
+"sentinelone-mcp": {
+  "command": "node",
+  "args": ["/absolute/path/to/claude-skills/sentinelone-mcp/index.js"],
+  "env": { "...": "..." }
 }
 ```
 
@@ -172,4 +190,10 @@ sentinelone-mcp/
 
 ## Updating CLAUDE.md
 
-The `sentinelone://soc-context` resource and `soc_analyst` prompt load from `../CLAUDE.md` (the `claude-skills/CLAUDE.md` file) at server startup. Edit that file and restart the server to pick up changes.
+The `sentinelone://soc-context` resource and `soc_analyst` prompt load CLAUDE.md at server startup. Resolution order (highest priority wins):
+
+1. `S1_CLAUDE_MD_PATH` env var (explicit absolute path)
+2. `<cwd>/CLAUDE.md` (your Cowork project folder when launched from a project)
+3. Same-dir / parent / grandparent of the server's `index.js` (when running from a git clone)
+
+For npx installs, drop a copy of CLAUDE.md into your Cowork project folder, or set `S1_CLAUDE_MD_PATH` in the `env` block of `claude_desktop_config.json`. Restart Claude Desktop to pick up changes.
