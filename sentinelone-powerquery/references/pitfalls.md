@@ -476,6 +476,37 @@ A `lookup` before a `group` is evaluated per-event. Once per-group is always che
 | lookup os_version from machineinfo by endpoint.name
 ```
 
+## LRQ / engine functions
+
+### `count_distinct(x)` returns HTTP 500 "Unknown function"
+
+`count_distinct` does not exist on the LRQ/DV engine. Two replacements depending on what you need:
+
+**Approximate (fast):** use `estimate_distinct(x)`. Returns a probabilistic HLL count. Fine for dashboards and thresholds where ±5% error is acceptable.
+
+```
+| group approx_ports = estimate_distinct(dst_endpoint.port) by src_endpoint.ip
+| filter approx_ports > 100
+```
+
+**Exact (two-stage grouping):** when you need a precise count of distinct values per key, do it in two `group` passes:
+
+```
+// Stage 1 — one row per (src, port) pair
+dataSource.name='Palo Alto Networks Firewall' dst_endpoint.port=*
+| group count=count() by src_endpoint.ip, dst_endpoint.port
+
+// Stage 2 — count how many distinct ports each src had
+| group distinct_ports=count() by src_endpoint.ip
+| filter distinct_ports > 100
+| sort -distinct_ports
+| limit 1000
+```
+
+Stage 1 deduplicates by grouping on the value you want to count; stage 2 counts the resulting rows per key. This gives an exact answer and runs cleanly on the LRQ engine.
+
+---
+
 ## Deploying PQ detections
 
 ### Using Hyperautomation instead of cloud-detection/rules

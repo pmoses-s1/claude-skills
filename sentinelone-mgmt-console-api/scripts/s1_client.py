@@ -19,7 +19,7 @@ Loads credentials (in priority order, highest wins):
   working without migration.
 
 Canonical keys in credentials.json:
-  S1_CONSOLE_URL                       tenant console URL (e.g. https://usea1-purple.sentinelone.net)
+  S1_CONSOLE_URL                       tenant console URL (e.g. https://usea1-acme.sentinelone.net)
   S1_CONSOLE_API_TOKEN                 management-console API token (Service Users)
   S1_CONSOLE_API_TOKEN_SINGLE_SCOPE    optional single-scope token for endpoints that
                                        reject multi-scope tokens (e.g. /threat-intelligence/iocs)

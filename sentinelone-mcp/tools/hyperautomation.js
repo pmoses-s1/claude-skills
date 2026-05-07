@@ -50,7 +50,7 @@ export const tools = [
         },
         siteIds: {
           type: 'string',
-          description: 'Comma-separated site IDs to scope results to (e.g. "2056852093198736293"). Omit for all accessible scopes.',
+          description: 'Comma-separated site IDs to scope results to (e.g. "<site-id-1>,<site-id-2>"). Omit for all accessible scopes.',
         },
         sortBy: {
           type: 'string',

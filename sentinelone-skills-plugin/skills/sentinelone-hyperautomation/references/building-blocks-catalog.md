@@ -1059,7 +1059,7 @@ moment the note contains a quote, ampersand, or angle bracket. Wrap, always.
 
 ## E3. Hard-coding site IDs in IOC create
 
-The corpus has IOC payloads with literal `accountIds: ["426418030212073761"]`, fine for
+The corpus has IOC payloads with literal `accountIds: ["<account-id>"]`, fine for
 single-tenant flows, broken on transfer. Prefer:
 - Pull from a Variable (set up-front from a Manual Trigger / Webhook param), or
 - Pull from `singularity-response-trigger.data.scopeId` if the alert carries it.

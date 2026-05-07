@@ -112,7 +112,7 @@ async function hecPost(path, payloads, scope, retries = 3) {
  *
  * Shape matches the confirmed-working Python build_file_indicator() in
  * sentinelone-mgmt-console-api/scripts/uam_alert_interface.py (tested
- * on usea1-purple 2026-04-22). Key points:
+ * on usea1-acme 2026-04-22). Key points:
  *   - metadata.version "1.6.0-dev" (not "1.6.0")
  *   - metadata.extensions array (not "extension" singular)
  *   - metadata.product omits vendor_name (just name)

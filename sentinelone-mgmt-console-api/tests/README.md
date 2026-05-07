@@ -26,8 +26,8 @@ every GET + curated safe POSTs.
 | UAM Alert Interface (single) | POST /v1/indicators + /v1/alerts (1 indicator, 1 alert) → poll UAM → verify link → close | `tests/test_uam_alert_interface_single.py` | Semi (closes alert; ingested events are not hard-deletable) |
 | UAM Alert Interface (batch, multi-observable) | batched POST of 3 indicators (file+process+network, OCSF 1001/1007/4001) each with 3+ observables, 1 alert referencing all 3 on a single device -> poll UAM -> assert every metadata.uid + observable surfaces in alert.rawIndicators -> close | `tests/test_uam_alert_interface_batch.py` | Semi (closes alert; ingested events are not hard-deletable). PARTIAL: multi-indicator stitching is flaky on-tenant (2 of 3 indicators typically land inside a 2-minute grace window). See "Known limitations" below. |
 | Unified Exclusions v2.1 | CREATE (EDR path, site scope) → LIST → DELETE → VERIFY | `tests/test_unified_exclusion_lifecycle.py` | Yes (scoped to one site, fictional path) |
-| Hyperautomation workflow import | IMPORT (minimal manual-trigger workflow) → LIST (recent 20) → ARCHIVE attempt → VERIFY | `tests/test_hyperautomation_import_lifecycle.py` | Mostly (archive returns 500 on purple demo tenant — likely token permissions; workflow left in draft). See gotchas below. |
-| Detection rule ENABLE/DISABLE | CREATE (disabled) → ENABLE → VERIFY_ON (accepts activating) → DISABLE → VERIFY_OFF → DELETE → VERIFY (scheduled + events both exercised) | `tests/test_detection_rule_activate_lifecycle.py` | Yes (pmoses demo site; 24h window prevents real firing) |
+| Hyperautomation workflow import | IMPORT (minimal manual-trigger workflow) → LIST (recent 20) → ARCHIVE attempt → VERIFY | `tests/test_hyperautomation_import_lifecycle.py` | Mostly (archive returns 500 on demo tenant — likely token permissions; workflow left in draft). See gotchas below. |
+| Detection rule ENABLE/DISABLE | CREATE (disabled) → ENABLE → VERIFY_ON (accepts activating) → DISABLE → VERIFY_OFF → DELETE → VERIFY (scheduled + events both exercised) | `tests/test_detection_rule_activate_lifecycle.py` | Yes (demo site; 24h window prevents real firing) |
 | XDR Graph Query | FORMAT DISCOVERY → SAVE → LIST → UPDATE → DELETE → VERIFY | `tests/test_xdr_graph_query_lifecycle.py` | Yes (skips gracefully if no saved queries exist on tenant to use as format template) |
 | STAR rules (events-type detection) | CREATE (Draft) → LIST → UPDATE → DELETE → VERIFY | `tests/test_star_rule_lifecycle.py` | Yes (Draft status, never activates; fictional process name in query) |
 
@@ -394,7 +394,7 @@ delta is the payload shape.
 
 ## 11. PowerQuery scheduled detection lifecycle — inline (2026-05-03)
 
-Proves the full lifecycle for `queryType=scheduled` rules (PowerQuery-based detections) on the pmoses demo site (`siteId=2056852093198736293`). No separate test script exists yet — the lifecycle was confirmed via an inline Python session. See the schema gotchas below before writing a script.
+Proves the full lifecycle for `queryType=scheduled` rules (PowerQuery-based detections) on the demo site (`siteId=<site-id>`). No separate test script exists yet — the lifecycle was confirmed via an inline Python session. See the schema gotchas below before writing a script.
 
 ```
 CREATE  POST  /web/api/v2.1/cloud-detection/rules
@@ -443,7 +443,7 @@ VERIFY  GET   /web/api/v2.1/cloud-detection/rules?ids=...&siteIds=...&isLegacy=f
 - Scheduled default-report tasks — CREATE / LIST / UPDATE / DELETE / VERIFY
 - Alert → IOC pinning pivot — rawIndicator read + pinned IOC CRUD
 - UAM Alert Interface `/v1/indicators` + `/v1/alerts` -- push OCSF indicators + alert into UAM (single + batched 3-indicator / multi-observable across OCSF 1001/1007/4001), verify stitching, close via bulk-ops
-- PowerQuery Scheduled Detections (`queryType=scheduled`) — CREATE / LIST / UPDATE / ENABLE / DISABLE / DELETE / VERIFY on pmoses demo site (2026-05-03)
+- PowerQuery Scheduled Detections (`queryType=scheduled`) — CREATE / LIST / UPDATE / ENABLE / DISABLE / DELETE / VERIFY on demo site (2026-05-03)
 
 **Confirmed reachable via read-only smoke sweep** (see
 `references/tenant_capabilities.md` for the current tenant's full rollup):
@@ -525,7 +525,7 @@ ARCHIVE POST  /web/api/v2.1/hyper-automate/api/v1/workflows/archive
 - Public import response key is `id` not `workflowId`; `version_id` not `versionId`.
 - `/api/public/workflows` and `/api/v1/workflows` return the same nested format: `{id, workflow: {...}, actions: []}`. The `workflow.id` == top-level `id`.
 - Tenant had 1050+ workflows. `nextCursor` returns literal string `"null"` (truthy in Python) — loop by skip/limit, not cursor. Sort by `updated_at desc` and scan first 20 to find a newly imported workflow without paginating 1050 rows.
-- Archive (`/api/v1/workflows/archive`) is NOT in the swagger. Tested body formats: `{"ids": [...]}`, `{"ids": [...], "siteIds": [...]}`, `{"ids": [...], "accountIds": [...]}`, `{"workflowIds": [...]}` — all return HTTP 500 on the purple demo tenant via API token. UI DevTools capture suggests the UI sends `{"ids": [...]}`. The consistent 500 regardless of body shape points to a token-level restriction (service user vs. personal console user) rather than a body format problem. The test tries `ids` first then `workflowIds` and treats archive failure as non-fatal.
+- Archive (`/api/v1/workflows/archive`) is NOT in the swagger. Tested body formats: `{"ids": [...]}`, `{"ids": [...], "siteIds": [...]}`, `{"ids": [...], "accountIds": [...]}`, `{"workflowIds": [...]}` — all return HTTP 500 on the demo tenant via API token. UI DevTools capture suggests the UI sends `{"ids": [...]}`. The consistent 500 regardless of body shape points to a token-level restriction (service user vs. personal console user) rather than a body format problem. The test tries `ids` first then `workflowIds` and treats archive failure as non-fatal.
 
 ## 14. Detection rule ENABLE/DISABLE lifecycle (2026-05-03)
 
@@ -542,7 +542,7 @@ DELETE   DELETE /web/api/v2.1/cloud-detection/rules
 **Gotchas confirmed vs. live API:**
 - After ENABLE, `status` transitions through `"activating"` before settling on `"active"`. Both are valid post-enable states — accept both in assertions.
 - Tested with both `queryType=scheduled` (requires `isLegacy=false` on GET) and `queryType=events`. Both use the same enable/disable endpoints.
-- Tested on pmoses demo (site 2056852093198736293). Scheduled rule used `runIntervalMinutes=1440` and `threshold.value=9999` so it cannot fire within the test lifetime even when briefly enabled.
+- Tested on demo (site <site-id>). Scheduled rule used `runIntervalMinutes=1440` and `threshold.value=9999` so it cannot fire within the test lifetime even when briefly enabled.
 
 ---
 

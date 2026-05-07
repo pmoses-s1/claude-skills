@@ -978,25 +978,3 @@ When deploying STAR / Custom Detection rules via `POST /web/api/v2.1/cloud-detec
 | Rule-creation payload: PQ goes inside `data.scheduledParams.query`, NOT `data.s1ql` | `s1ql` is for `queryType: "events"`. PowerQuery rules use the `scheduledParams` block: `{query, lookbackWindowMinutes, runIntervalMinutes, threshold: {value, operator}}` |
 | Site name lookup returns nothing | Console site names can include spaces (e.g. `acme demo`, not `acme-demo`). Use `name__contains=<substring>` to fuzzy-match, then exact-match by id. |
 | Rule listing returns 0 after successful creation | The `GET /cloud-detection/rules?siteIds=...` filter shape varies by tenant. Trust the POST's returned `data.id` — that's authoritative. |
-
-## VirusTotal Cross-Check Patterns Worth Building In
-
-Confirmed on the FortiGate engagement:
-
-- **GeoIP-evasion detection.** When a FortiGate `srccountry` disagrees with the VT-resolved country for the same IP, that's a stale-GeoIP / VPN-exit signal. Always run `get_ip_report` on flagged IPs and compare `data.attributes.country` against the firewall's GeoIP attribution. Confirmed example: `80.66.66.165` reported by FortiGate as Finland; VT returns Russia.
-- **C2 false-positive avoidance.** Always check VT `resolutions` for outbound destinations before classifying a connection as C2. Confirmed example: `34.193.168.81` was flagged by FortiGate's `udp/6667` app fingerprint on TLS, but VT resolutions show `xdr.us1.sentinelone.net` / `ingest.us1.sentinelone.net` — that's the legitimate S1 ingest endpoint.
-- **Bulletproof-host clustering.** When VT `as_owner` is in `{RouterHosting LLC (AS14956), Tamatiya EOOD (AS50360), Skynet Network (AS214295), Soldatov Alexey Valerevich (AS209702), Hostkey-USA, M247 Europe, IPXO, BL Networks}`, treat the whole subnet as scanner infrastructure regardless of per-IP VT ratio. Block at the ASN/CIDR level.
-- **DGA-domain history as a signal.** A "clean" IP (0/94 VT mal) whose `resolutions` history includes `.work`, `.cn`, `.top`, `.ml`, or freshly-registered `.ru` domains is part of a campaign infrastructure cluster. Treat as suspicious even with a clean current detection ratio.
-
-## Live IOC Blocklist Maintained by This Project
-
-These IOCs were confirmed malicious on 2026-04-25 and pushed to the S1 IOC catalog with a 90-day TTL. Refresh the list whenever new VT-confirmed sources appear. Currently active:
-
-- `79.124.58.218` (BG, Tamatiya EOOD, 13/94 VT mal — port scanner)
-- `79.124.58.98` (BG, Tamatiya EOOD)
-- `45.142.193.73` (RO, Skynet Network, 9/94 VT mal — active malware delivery)
-- `80.66.66.165` (RU geo-evading as FI, 2/94 VT mal)
-- `80.66.66.157` (RU, same /24 as 165)
-- `172.86.89.166` / `172.86.89.67` (US, RouterHosting AS14956)
-- `144.172.91.191` (US, RouterHosting, resolves to Russian DGA)
-- ASN-level blocks: `AS14956`, `AS50360 (79.124.58.0/23)`, `AS214295 (45.142.193.0/24)`, `AS209702 (80.66.66.0/24)`

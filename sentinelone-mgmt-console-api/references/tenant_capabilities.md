@@ -1,7 +1,7 @@
 # Tenant capabilities — auto-generated
 
 - Generated at: 2026-04-28T04:07:21+00:00
-- Tenant: `https://usea1-purple.sentinelone.net`
+- Tenant: `https://usea1-acme.sentinelone.net`
 - Called: 299  |  Skipped (no ID on this tenant): 68
 - Elapsed: 62.34s
 
@@ -326,14 +326,14 @@
 
 | Method | Path | Tag | Status | Reason |
 |---|---|---|---:|---|
-| GET | `/web/api/v2.1/application-management/risks/export/csv` | Application Management | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/surface/cloud/filters/count` | Inventory Cloud Surface Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/container/filters/count` | Inventory Container Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/device/filters/count` | Inventory Device Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/surface/endpoint/filters/count` | Inventory Endpoint Surface Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/surface/networkDiscovery/filters/count` | Inventory Network Discovery Surface Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/server/filters/count` | Inventory Server Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
-| GET | `/web/api/v2.1/xdr/assets/workstation/filters/count` | Inventory Workstation | None | ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/application-management/risks/export/csv` | Application Management | None | ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/surface/cloud/filters/count` | Inventory Cloud Surface Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/container/filters/count` | Inventory Container Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/device/filters/count` | Inventory Device Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/surface/endpoint/filters/count` | Inventory Endpoint Surface Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/surface/networkDiscovery/filters/count` | Inventory Network Discovery Surface Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/server/filters/count` | Inventory Server Filters | None | ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
+| GET | `/web/api/v2.1/xdr/assets/workstation/filters/count` | Inventory Workstation | None | ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0) |
 | GET | `/web/api/v2.1/agents/{agent_id}/uploads/{activity_id}` | Agents | 400 | HTTP 400: Incorrect activity |
 | GET | `/web/api/v2.1/agent-artifacts/token` | Agents Repository (Beta) | 400 | HTTP 400: {"error":"missing scope information: require scope_level and scope_id"} |
 | GET | `/web/api/v2.1/application-management/inventory/applications` | Application Management | 400 | HTTP 400: ids: Missing data for required field. |

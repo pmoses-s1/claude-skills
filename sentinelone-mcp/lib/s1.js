@@ -248,7 +248,7 @@ export async function lrqRun(query, { startTime, endTime, hours = 24, maxRows = 
 }
 
 // ─── Purple AI ────────────────────────────────────────────────────────────────
-// Reverse-engineered from live network traffic on usea1-purple.sentinelone.net.
+// Reverse-engineered from live network traffic on usea1-acme.sentinelone.net.
 //
 // IMPORTANT: purpleLaunchQuery is a GraphQL QUERY (not mutation).
 // Variable wrapper is `request` (type PurpleLaunchQueryRequest), NOT `input`.

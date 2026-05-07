@@ -130,7 +130,7 @@ The MCP servers receive credentials via environment variables set in `~/Library/
     },
     "virustotal": {
       "command": "npx",
-      "args": ["-y", "mcp-virustotal"],
+      "args": ["-y", "@burtthecoder/mcp-virustotal"],
       "env": {
         "VIRUSTOTAL_API_KEY": "your-virustotal-api-key"
       }
@@ -142,7 +142,7 @@ The MCP servers receive credentials via environment variables set in `~/Library/
 > **Threat intel MCP:** Replace `virustotal` with your organisation's approved threat intelligence MCP if different. Any MCP that provides file hash, IP, domain, and URL lookup tools works. The CLAUDE.md operating instructions require multi-source confirmation before a TRUE POSITIVE or CRITICAL verdict: they do not mandate a specific provider.
 
 **Prerequisites:**
-- Node.js 18+ for `sentinelone-mcp` and `mcp-virustotal` via `npx` (`node --version`)
+- Node.js 18+ for `sentinelone-mcp` and `@burtthecoder/mcp-virustotal` via `npx` (`node --version`)
 - `uv` for `purple-mcp`: `curl -LsSf https://astral.sh/uv/install.sh | sh`, then open a new terminal and run `uvx --version`
 - A VirusTotal API key (free tier is fine) from [virustotal.com](https://virustotal.com)
 

@@ -1092,7 +1092,7 @@ Auth: same `Authorization: ApiToken <token>` header as all other S1 REST calls.
 
 **Deletion is a soft-archive, not HTTP DELETE.** The UI calls `POST /workflows/archive` with an array of IDs in the request body.
 
-**Archive body format — unresolved (2026-05):** The archive endpoint is NOT in the swagger. UI DevTools capture suggests the body is `{"ids": ["<v1_uuid>"]}`. Tested variants via API token on the purple demo tenant: `{"ids": [...]}`, `{"ids": [...], "siteIds": [...]}`, `{"workflowIds": [...]}` — all return HTTP 500. The MCP tool `ha_archive_workflow` also returns 500 on this tenant. This is likely a tenant-level permission restriction on the service user token, not a body format problem. `Hyper Automate.write` scope is confirmed required; even with it, archive may be blocked for service users.
+**Archive body format — unresolved (2026-05):** The archive endpoint is NOT in the swagger. UI DevTools capture suggests the body is `{"ids": ["<v1_uuid>"]}`. Tested variants via API token on the demo tenant: `{"ids": [...]}`, `{"ids": [...], "siteIds": [...]}`, `{"workflowIds": [...]}` — all return HTTP 500. The MCP tool `ha_archive_workflow` also returns 500 on this tenant. This is likely a tenant-level permission restriction on the service user token, not a body format problem. `Hyper Automate.write` scope is confirmed required; even with it, archive may be blocked for service users.
 
 Export/import were not captured in the v1 network trace. They are confirmed working at the `/public` base path; the `/v1` equivalents have not been verified.
 

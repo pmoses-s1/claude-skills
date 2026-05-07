@@ -34,7 +34,7 @@ The MCP servers all run via package managers (`npx` and `uvx`). There is no git 
 
 Edit `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, or `%APPDATA%\Claude\claude_desktop_config.json` on Windows. Paste in the three MCP servers below and replace every placeholder with your real values.
 
-All three servers run from public package registries: `sentinelone-mcp` and `mcp-virustotal` via `npx`, `purple-mcp` via `uvx`. First launch fetches and caches each one automatically. No prior install step.
+All three servers run from public package registries: `sentinelone-mcp` and `@burtthecoder/mcp-virustotal` via `npx`, `purple-mcp` via `uvx`. First launch fetches and caches each one automatically. No prior install step.
 
 ```json
 {
@@ -69,7 +69,7 @@ All three servers run from public package registries: `sentinelone-mcp` and `mcp
     },
     "virustotal": {
       "command": "npx",
-      "args": ["-y", "mcp-virustotal"],
+      "args": ["-y", "@burtthecoder/mcp-virustotal"],
       "env": {
         "VIRUSTOTAL_API_KEY": "your-virustotal-api-key"
       }

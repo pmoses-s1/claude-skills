@@ -48,7 +48,7 @@ Batching
 POST /v1/indicators accepts N indicators per call (concatenated JSON,
 gzip-compressed); batching indicators is the idiomatic path.
 
-POST /v1/alerts is DIFFERENT. Empirically (usea1-purple 2026-04-22) the
+POST /v1/alerts is DIFFERENT. Empirically (usea1-acme 2026-04-22) the
 gateway accepts multi-alert bodies and returns HTTP 202, but the
 stitcher silently drops all but one of the alerts. Call /v1/alerts with
 ONE alert per invocation; loop if you have many. `post_alerts` emits a
@@ -343,7 +343,7 @@ class UAMAlertInterfaceClient:
         Multi-alert bodies: the wire format accepts concatenated JSON for
         N alerts in one POST, and the gateway returns HTTP 202, but the
         stitcher has been observed to silently drop all but one of the
-        alerts (usea1-purple 2026-04-22). Loop callers over this method
+        alerts (usea1-acme 2026-04-22). Loop callers over this method
         one alert at a time, or use `post_alert_with_indicators`, which
         enforces the safe pattern. A RuntimeWarning is emitted when
         `alerts` has more than one entry so callers notice the hazard.
@@ -382,7 +382,7 @@ class UAMAlertInterfaceClient:
           3. POST `alert` BY ITSELF to /v1/alerts.
 
         Two empirical failure modes this helper prevents (confirmed on
-        `usea1-purple` 2026-04-22):
+        `usea1-acme` 2026-04-22):
 
           * Back-to-back POSTs with no sleep: the stitcher can resolve
             `related_events[].uid` before the indicator lands on the
@@ -528,7 +528,7 @@ def build_file_indicator(
         file_obj["path"] = file_path
         observables.append(_observable("file.path", OBS_FILE_NAME, file_path))
     # OCSF 1.6.0 file.hashes is Array of Fingerprint objects, NOT a dict.
-    # Empirically (diag2 on usea1-purple 2026-04-22): posting hashes as a
+    # Empirically (diag2 on usea1-acme 2026-04-22): posting hashes as a
     # dict ({"sha256": "..."}) causes the UAM indicator stitcher to silently
     # drop the indicator (POST still returns 202). The correct Fingerprint
     # shape is {"algorithm_id": <int>, "algorithm": "<name>", "value": "<hex>"}.

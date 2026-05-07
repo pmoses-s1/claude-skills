@@ -153,7 +153,7 @@ def _run_sdl_query(client: Any, log_filter: str, *,
 
     This endpoint is synchronous (no poll/cancel) and on bench is
     20-50% faster than the equivalent LRQ LOG query. It is the
-    preferred path for schema discovery. Benchmarks (usea1-purple):
+    preferred path for schema discovery. Benchmarks (usea1-acme):
 
     Windows Event Logs 24h: 3.0s vs 5.8s LRQ (-49%)
     SentinelOne 1h:          3.2s vs 4.6s LRQ (-32%)
@@ -372,7 +372,7 @@ def discover_schema(client: Any, source: str, *, hours: float = 24,
     backend : str, default "auto"
         Which discovery backend to use: "auto" (SDL sync preferred,
         LRQ LOG fallback), "sdl" (sync only), or "lrq" (async only).
-        SDL sync is ~30% faster on usea1-purple; LRQ is slightly more
+        SDL sync is ~30% faster on usea1-acme; LRQ is slightly more
         tolerant of scoping quirks.
 
     Returns

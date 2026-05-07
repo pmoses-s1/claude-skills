@@ -2,7 +2,7 @@
 
 This document records what has been validated against a live SentinelOne tenant, including which endpoints were tested, what passed, and confirmed gotchas discovered during testing.
 
-Tests were run against the **purple demo tenant** (`usea1-purple.sentinelone.net`) using the pmoses demo site (site ID `2056852093198736293`, account `426418030212073761`).
+Tests were run against a live SentinelOne demo tenant. Specific tenant URL, site ID, and account ID are intentionally omitted; replace placeholders in `tests/*.py` with values from your own tenant before running.
 
 Full test scripts live in `sentinelone-mgmt-console-api/tests/`. All lifecycle tests are reversible: they clean up after themselves.
 
@@ -23,9 +23,9 @@ Full test scripts live in `sentinelone-mgmt-console-api/tests/`. All lifecycle t
 | UAM Alert Interface (single) | POST 1 OCSF indicator + 1 alert → poll UAM → verify link → close | `tests/test_uam_alert_interface_single.py` | Semi (alert closed; ingested events not hard-deletable) | PASSED |
 | UAM Alert Interface (batch) | POST 3 indicators (file/process/network) + 1 alert → poll UAM → verify all observable links → close | `tests/test_uam_alert_interface_batch.py` | Semi | PARTIAL: multi-indicator stitching flaky on-tenant |
 | Unified Exclusions v2.1 | CREATE (EDR path, site scope) → LIST → DELETE → VERIFY | `tests/test_unified_exclusion_lifecycle.py` | Yes | PASSED |
-| Hyperautomation workflow import | IMPORT (minimal manual-trigger workflow) → LIST → ARCHIVE attempt → VERIFY | `tests/test_hyperautomation_import_lifecycle.py` | Mostly (archive returns 500 on purple demo tenant) | PASSED (archive non-fatal) |
-| Detection rule ENABLE/DISABLE | CREATE (disabled) → ENABLE → VERIFY_ON → DISABLE → VERIFY_OFF → DELETE → VERIFY (scheduled + events) | `tests/test_detection_rule_activate_lifecycle.py` | Yes (pmoses demo site; 24h window prevents real firing) | PASSED |
-| XDR Graph Query | FORMAT DISCOVERY → SAVE → LIST → UPDATE → DELETE → VERIFY | `tests/test_xdr_graph_query_lifecycle.py` | Yes (skips gracefully if no saved queries exist for format template) | PASSED (skipped on purple demo: no saved queries) |
+| Hyperautomation workflow import | IMPORT (minimal manual-trigger workflow) → LIST → ARCHIVE attempt → VERIFY | `tests/test_hyperautomation_import_lifecycle.py` | Mostly (archive returns 500 on demo tenant) | PASSED (archive non-fatal) |
+| Detection rule ENABLE/DISABLE | CREATE (disabled) → ENABLE → VERIFY_ON → DISABLE → VERIFY_OFF → DELETE → VERIFY (scheduled + events) | `tests/test_detection_rule_activate_lifecycle.py` | Yes (demo site; 24h window prevents real firing) | PASSED |
+| XDR Graph Query | FORMAT DISCOVERY → SAVE → LIST → UPDATE → DELETE → VERIFY | `tests/test_xdr_graph_query_lifecycle.py` | Yes (skips gracefully if no saved queries exist for format template) | PASSED (skipped on demo: no saved queries) |
 | STAR rules (events-type detection) | CREATE (Draft) → LIST → UPDATE → DELETE → VERIFY | `tests/test_star_rule_lifecycle.py` | Yes (Draft status, never activates) | PASSED |
 | PowerQuery Scheduled Detection lifecycle | CREATE → GET → ENABLE → verify activating → DISABLE → GET → DELETE → verify gone | via MCP tools directly | Yes | PASSED |
 
@@ -33,7 +33,7 @@ Full test scripts live in `sentinelone-mgmt-console-api/tests/`. All lifecycle t
 
 ## MCP tools validated (sentinelone-mcp)
 
-All 19 sentinelone-mcp tools were exercised against the live purple demo tenant:
+All 19 sentinelone-mcp tools were exercised against the live demo tenant:
 
 | Tool | Tested operation | Result |
 |---|---|---|
@@ -61,7 +61,7 @@ All 19 sentinelone-mcp tools were exercised against the live purple demo tenant:
 | `ha_get_workflow` | Fetch single workflow | PASSED |
 | `ha_import_workflow` | Import minimal manual-trigger workflow | PASSED |
 | `ha_export_workflow` | Export all workflows as ZIP | PASSED |
-| `ha_archive_workflow` | Archive workflow | FAILED (HTTP 500 on purple demo: token permission) |
+| `ha_archive_workflow` | Archive workflow | FAILED (HTTP 500 on demo: token permission) |
 
 ## MCP tools validated (purple-mcp)
 

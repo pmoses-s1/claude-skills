@@ -113,7 +113,7 @@ zip_skill() {
            -type d -name reports -o \
            -type d -name charts \) -prune -exec rm -rf {} + 2>/dev/null || true
     find "$tmp_skill/$skill_name" \
-        \( -name '*.pyc' -o -name '.DS_Store' -o -name '*.tmp' -o -name '*.log' \) \
+        \( -name '*.pyc' -o -name '.DS_Store' -o -name '*.tmp' -o -name '*.log' -o -name '*.bak' -o -name '*.purgebak' -o -name '*.purgebak-pruned*' -o -name '*.orig' \) \
         -delete 2>/dev/null || true
     (cd "$tmp_skill" && zip -qr "$out_file" "$skill_name/")
     rm -rf "$tmp_skill"
@@ -165,7 +165,7 @@ find "$TMP_PLUGIN" \
        -type d -name reports -o \
        -type d -name charts \) -prune -exec rm -rf {} + 2>/dev/null || true
 find "$TMP_PLUGIN" \
-    \( -name '*.pyc' -o -name '.DS_Store' -o -name '*.tmp' -o -name '*.log' \) \
+    \( -name '*.pyc' -o -name '.DS_Store' -o -name '*.tmp' -o -name '*.log' -o -name '*.bak' -o -name '*.purgebak' -o -name '*.purgebak-pruned*' -o -name '*.orig' \) \
     -delete 2>/dev/null || true
 
 # Copy credentials example if present
@@ -174,6 +174,9 @@ find "$TMP_PLUGIN" \
 (cd "$TMP_PLUGIN" && zip -qr "$PLUGIN_FILE" . \
     --exclude ".git/*" \
     --exclude "*.orig" \
+    --exclude "*.bak" \
+    --exclude "*.purgebak" \
+    --exclude "*.purgebak-pruned*" \
     --exclude ".DS_Store" \
     --exclude "*/__pycache__/*" \
     --exclude "*.pyc" \

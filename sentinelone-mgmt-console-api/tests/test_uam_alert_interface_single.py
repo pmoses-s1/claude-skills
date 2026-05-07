@@ -28,7 +28,7 @@ Usage
     python tests/test_uam_alert_interface_single.py
     python tests/test_uam_alert_interface_single.py --keep
     python tests/test_uam_alert_interface_single.py \\
-        --account-id 426418030212073761 --site-id 373753636674600970
+        --account-id <account-id> --site-id <site-id-alt>
 
 Exit code 0 on full round-trip success, non-zero on any step failure.
 """

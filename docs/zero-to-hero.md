@@ -121,7 +121,7 @@ node --version    # 18 or higher
 uvx --version
 ```
 
-What you got: a Node runtime to run `sentinelone-mcp` and `mcp-virustotal` via `npx`, and `uvx` to run `purple-mcp`. No git clone, no `npm install`, no absolute paths. Each MCP fetches and caches itself on first launch.
+What you got: a Node runtime to run `sentinelone-mcp` and `@burtthecoder/mcp-virustotal` via `npx`, and `uvx` to run `purple-mcp`. No git clone, no `npm install`, no absolute paths. Each MCP fetches and caches itself on first launch.
 
 ### Step 2: Wire up the MCP servers in Claude Desktop
 
@@ -157,7 +157,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
     },
     "virustotal": {
       "command": "npx",
-      "args": ["-y", "mcp-virustotal"],
+      "args": ["-y", "@burtthecoder/mcp-virustotal"],
       "env": {
         "VIRUSTOTAL_API_KEY": "your-virustotal-api-key"
       }
@@ -375,7 +375,7 @@ If a skill should have triggered and didn't, ask Claude `which skills are loaded
 
 Check, in order:
 
-1. **Node.js is on PATH** for Claude Desktop. `npx` ships with Node, so this also covers `mcp-virustotal` and `sentinelone-mcp`. Restart Claude Desktop after a fresh Node install. On macOS, `which node` should return a path; on Windows, `where node`.
+1. **Node.js is on PATH** for Claude Desktop. `npx` ships with Node, so this also covers `@burtthecoder/mcp-virustotal` and `sentinelone-mcp`. Restart Claude Desktop after a fresh Node install. On macOS, `which node` should return a path; on Windows, `where node`.
 2. **`uvx --version` works in a fresh terminal.** Required for `purple-mcp`. If not, reinstall `uv` and open a new terminal.
 3. **First-launch fetch took too long and timed out.** `npx -y @pmoses-s1/sentinelone-mcp` and `uvx purple-mcp` each download on first use. Run them once manually in a terminal to warm the cache, then restart Claude Desktop.
 4. **Restart Claude Desktop** after any config change.

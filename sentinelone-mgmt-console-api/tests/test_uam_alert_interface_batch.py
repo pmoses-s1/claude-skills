@@ -170,7 +170,7 @@ def _assert_linkage(
     alert.rawIndicators (via metadata.uid).
 
     Per-observable name check is INFORMATIONAL in batch mode. Empirically
-    (diag4 on usea1-purple 2026-04-22) the `alertWithRawIndicators`
+    (diag4 on usea1-acme 2026-04-22) the `alertWithRawIndicators`
     GraphQL resolver returns the rawIndicators list with the flat-key
     structure (`observables[N].name`/`.value`/`.type_id`) but the VALUES
     are shuffled across non-final entries: only the LAST rawIndicator in

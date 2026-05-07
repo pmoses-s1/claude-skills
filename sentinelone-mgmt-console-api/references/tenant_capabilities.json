@@ -1,7 +1,7 @@
 {
   "summary": {
     "generated_at": "2026-04-28T04:07:21+00:00",
-    "base_url": "https://usea1-purple.sentinelone.net",
+    "base_url": "https://usea1-acme.sentinelone.net",
     "total_planned": 367,
     "total_called": 299,
     "total_skipped": 68,
@@ -450,7 +450,7 @@
     {
       "method": "GET",
       "path_template": "/web/api/v2.1/accounts/{account_id}",
-      "path_called": "/web/api/v2.1/accounts/426418030212073761",
+      "path_called": "/web/api/v2.1/accounts/<account-id>",
       "tag": "Accounts",
       "operationId": "_web_api_accounts_{account_id}_get",
       "summary": "Get Account by ID",
@@ -485,7 +485,7 @@
     {
       "method": "GET",
       "path_template": "/web/api/v2.1/accounts/{account_id}/uninstall-password/metadata",
-      "path_called": "/web/api/v2.1/accounts/426418030212073761/uninstall-password/metadata",
+      "path_called": "/web/api/v2.1/accounts/<account-id>/uninstall-password/metadata",
       "tag": "Accounts",
       "operationId": "_web_api_accounts_{account_id}_uninstall-password_metadata_get",
       "summary": "Get Uninstall Password Metadata",
@@ -498,7 +498,7 @@
     {
       "method": "GET",
       "path_template": "/web/api/v2.1/accounts/{account_id}/uninstall-password/view",
-      "path_called": "/web/api/v2.1/accounts/426418030212073761/uninstall-password/view",
+      "path_called": "/web/api/v2.1/accounts/<account-id>/uninstall-password/view",
       "tag": "Accounts",
       "operationId": "_web_api_accounts_{account_id}_uninstall-password_view_get",
       "summary": "Get Uninstall Password",
@@ -863,7 +863,7 @@
       "summary": "Risks Data Export",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10002.1,
       "shape": null
     },
@@ -2585,7 +2585,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10003.3,
       "shape": null
     },
@@ -2652,7 +2652,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10002.9,
       "shape": null
     },
@@ -2938,7 +2938,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10003.2,
       "shape": null
     },
@@ -3005,7 +3005,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10003.8,
       "shape": null
     },
@@ -3437,7 +3437,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10003.6,
       "shape": null
     },
@@ -3555,7 +3555,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10002.4,
       "shape": null
     },
@@ -3714,7 +3714,7 @@
       "summary": "Filter counts",
       "ok": false,
       "status": null,
-      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-purple.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
+      "error": "ReadTimeout: HTTPSConnectionPool(host='usea1-acme.sentinelone.net', port=443): Read timed out. (read timeout=10.0)",
       "elapsed_ms": 10003.1,
       "shape": null
     },
@@ -4381,7 +4381,7 @@
     {
       "method": "GET",
       "path_template": "/web/api/v2.1/accounts/{account_id}/policy",
-      "path_called": "/web/api/v2.1/accounts/426418030212073761/policy",
+      "path_called": "/web/api/v2.1/accounts/<account-id>/policy",
       "tag": "Policies",
       "operationId": "_web_api_accounts_{account_id}_policy_get",
       "summary": "Account Policy",
