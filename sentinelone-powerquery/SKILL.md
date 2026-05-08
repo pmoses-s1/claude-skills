@@ -83,6 +83,7 @@ These function names do not exist in PowerQuery. Using any of them produces `Unk
 | `percentile(x, N)` | `p50(x)` / `p95(x)` / `p99(x)` |
 | `first(x)` / `last(x)` | `min_by(x, timestamp)` / `max_by(x, timestamp)` |
 | `sort count desc` / `sort field asc` | `sort -count` / `sort +field` — PowerQuery uses `-`/`+` prefix, NOT SQL-style `desc`/`asc`. Using `desc` or `asc` causes HTTP 500 "Unable to parse the entire query". Purple AI frequently generates this wrong — always correct before running. |
+| `` `field.name` `` (backtick-quoted identifiers) | `field.name` — dotted field names are written bare, no backticks. Using backtick quoting returns HTTP 500 "Don't understand [`]". |
 
 The only valid date/time functions are: `strftime`, `simpledateformat`, `strptime`, `simpledateparse`, `timebucket`, `querystart`, `queryend`, `queryspan`.
 
@@ -97,19 +98,20 @@ These are where queries go wrong. Internalize them before writing.
    - **All-column text search:** `* contains 'evil.com'` or `* matches 'regex'` in the **initial filter** (before the first `|`) searches ALL indexed fields — use when you need to find text anywhere in the event. Dramatically faster than `message contains`. Only works before the first `|`; not valid in `| filter …` after a pipe, and not valid in Alerts.
    - **Empty filter (all events):** start the query with `|`, e.g. `| group ct=count() by event.type`.
 2. **Double-escape regex almost everywhere.** `src.process.cmdline matches "\\d+"`, `tgt.file.path matches '^C:\\\\Windows\\\\Temp\\\\[a-z]{8}\\.tmp$'`. The only place you don't double-escape is the `$"…"` shorthand (searches `message`).
-3. **After `columns` or `group`, previous fields are gone.** These commands create an entirely new record set. If you'll need a field later, carry it through: `group ct=count(), host=any(endpoint.name) by src.process.storyline.id` — don't expect `endpoint.name` to still be addressable after that `group` unless you aggregate it.
-4. **Subqueries can't go after `group`, `sort`, or `limit`.** And the subquery must itself produce the column named in the `in (...)` expression (via `columns` or `group`). `user in (action='login' | group 1 by user)` is valid; `user in (action='login')` is not.
-5. **`compare` and `transpose` must be the LAST command.** Put `sort` before `compare` if you want to order the non-shifted side.
-6. **`join` must start with a pipe.** `| join (…), (…) on x` — without the `|`, "join" is interpreted as a search term. Inner/left joins allow up to 10 subqueries; `sql inner` and `sql left` allow only 2.
-7. **`null` behaves like false in boolean context.** `filter x = null` works after the field is defined by a prior command; before then, use `!(x = *)` for is-null and `x = *` for is-not-null.
-8. **`contains` is case-insensitive by default; `in` is case-sensitive by default.** The `:matchcase` / `:anycase` suffixes reverse this.
-9. **Performance: filter early, group narrow.** Push filters above the first pipe when possible. In `group`, prefer low-cardinality fields; for long ranges, consider `| top K …` instead (probabilistic but orders of magnitude faster).
-10. **Alerts and Dashboards have tighter limits.** A PowerQuery Alert is capped at 1,000 rows intermediate / 1 MB RAM. Don't put `nolimit` in a dashboard panel.
-11. **Shortcut fields (`#cmdline`, `#name`, `#hash`, …) don't work as initial filters on every tenant.** They're documented but return 500 on many deployments. Prefer explicit field names (`src.process.cmdline contains 'x'`) — they're as terse and always work. Save shortcuts for exploratory Event Search where you're not scripting against the API.
-12. **Aggregates to prefer: `min_by` / `max_by` over `first` / `last`.** `first(x)` and `last(x)` are sometimes listed as aggregates but fail on many tenants. Use `min_by(x, timestamp)` and `max_by(x, timestamp)` — they're explicit about ordering and always work.
-13. **Percentiles: use `p50`/`p95`/`p99`, not `percentile(x, N)`.** The latter isn't a real function and returns 500.
-14. **Null-filter at the wrong stage: `filter x = null` before `x` is computed returns 500.** Use `filter !(x = *)` for is-null until after a `let`/`join`/`lookup` has produced `x`.
-15. **Coalesce-style fallback uses bare-field truthy test, NOT `(field = *) ? a : b`.** PQ has no `coalesce()` / `ifnull()` / `nvl()`. To pick the first non-null of several fields inside a `let`, chain bare-field ternaries — they evaluate the field's truthiness directly:
+3. **Regex lazy quantifiers (`?`) are not supported.** The SDL regex engine does not support lazy (non-greedy) quantifiers: `.*?`, `.+?`, `[^x]*?` etc. all return HTTP 500 "Dangling meta character '?'". Use a negated character class instead: `[^"]*` in place of `.*?"`, `[^ ]*` in place of `.*? `, etc.
+4. **After `columns` or `group`, previous fields are gone.** These commands create an entirely new record set. If you'll need a field later, carry it through: `group ct=count(), host=any(endpoint.name) by src.process.storyline.id` — don't expect `endpoint.name` to still be addressable after that `group` unless you aggregate it.
+5. **Subqueries can't go after `group`, `sort`, or `limit`.** And the subquery must itself produce the column named in the `in (...)` expression (via `columns` or `group`). `user in (action='login' | group 1 by user)` is valid; `user in (action='login')` is not.
+6. **`compare` and `transpose` must be the LAST command.** Put `sort` before `compare` if you want to order the non-shifted side.
+7. **`join` must start with a pipe.** `| join (…), (…) on x` — without the `|`, "join" is interpreted as a search term. Inner/left joins allow up to 10 subqueries; `sql inner` and `sql left` allow only 2.
+8. **`null` behaves like false in boolean context.** `filter x = null` works after the field is defined by a prior command; before then, use `!(x = *)` for is-null and `x = *` for is-not-null.
+9. **`contains` is case-insensitive by default; `in` is case-sensitive by default.** The `:matchcase` / `:anycase` suffixes reverse this.
+10. **Performance: filter early, group narrow.** Push filters above the first pipe when possible. In `group`, prefer low-cardinality fields; for long ranges, consider `| top K …` instead (probabilistic but orders of magnitude faster).
+11. **Alerts and Dashboards have tighter limits.** A PowerQuery Alert is capped at 1,000 rows intermediate / 1 MB RAM. Don't put `nolimit` in a dashboard panel.
+12. **Shortcut fields (`#cmdline`, `#name`, `#hash`, …) don't work as initial filters on every tenant.** They're documented but return 500 on many deployments. Prefer explicit field names (`src.process.cmdline contains 'x'`) — they're as terse and always work. Save shortcuts for exploratory Event Search where you're not scripting against the API.
+13. **Aggregates to prefer: `min_by` / `max_by` over `first` / `last`.** `first(x)` and `last(x)` are sometimes listed as aggregates but fail on many tenants. Use `min_by(x, timestamp)` and `max_by(x, timestamp)` — they're explicit about ordering and always work.
+14. **Percentiles: use `p50`/`p95`/`p99`, not `percentile(x, N)`.** The latter isn't a real function and returns 500.
+15. **Null-filter at the wrong stage: `filter x = null` before `x` is computed returns 500.** Use `filter !(x =*)` for is-null until after a `let`/`join`/`lookup` has produced `x`.
+16. **Coalesce-style fallback uses bare-field truthy test, NOT `(field = *) ? a : b`.** PQ has no `coalesce()` / `ifnull()` / `nvl()`. To pick the first non-null of several fields inside a `let`, chain bare-field ternaries — they evaluate the field's truthiness directly:
 
     ```
     | let user_id = actor.user.email_addr
@@ -118,8 +120,8 @@ These are where queries go wrong. Internalize them before writing.
     ```
 
     The `(field = *) ? a : b` form (i.e. wrapping the field-presence test in parens before the ternary) **returns HTTP 500 inside `let`** on this engine — `field = *` is a filter operator, not a boolean expression usable in computed columns. Bare-field truthy is the only working coalesce idiom in PQ.
-16. **`if(...)` is not a function in aggregates.** `sum(if(cond, 1, 0))` returns 500. Use `count(<predicate>)` instead — `count(severity_id == 5)` evaluates the predicate per row and sums the truthy ones. Same for any "count where X" semantic.
-17. **Always filter `field=*` before projecting or inspecting any field.** `| limit N | columns field` returns the first N events regardless of whether the field is populated — most rows will be null. Add `field=*` to the initial filter to scope to events that actually carry the field:
+17. **`if(...)` is not a function in aggregates.** `sum(if(cond, 1, 0))` returns 500. Use `count(<predicate>)` instead — `count(severity_id == 5)` evaluates the predicate per row and sums the truthy ones. Same for any "count where X" semantic.
+18. **Always filter `field=*` before projecting or inspecting any field.** `| limit N | columns field` returns the first N events regardless of whether the field is populated — most rows will be null. Add `field=*` to the initial filter to scope to events that actually carry the field:
 
     ```
     // Wrong — returns nulls; message may not be present on most events
@@ -131,7 +133,7 @@ These are where queries go wrong. Internalize them before writing.
 
     This applies to every field, not just `message`. Any time you want to sample, inspect, or aggregate a field, include `field=*` in the initial filter.
 
-18. **Statistical baselining is two queries plus a client-side merge, not one inline join.** Subqueries inside a single `| join` share the parent query's time range. To compare a 24h live window against a 7d/30d baseline, run them as separate LRQs (or as separate `savelookup`+`lookup` rounds) and merge — there is no single-pass form. Pattern in `examples/behavioral-baselines.md`.
+19. **Statistical baselining is two queries plus a client-side merge, not one inline join.** Subqueries inside a single `| join` share the parent query's time range. To compare a 24h live window against a 7d/30d baseline, run them as separate LRQs (or as separate `savelookup`+`lookup` rounds) and merge — there is no single-pass form. Pattern in `examples/behavioral-baselines.md`.
 
 ## When to delegate baselining + anomaly detection to the mgmt-console-api skill
 
