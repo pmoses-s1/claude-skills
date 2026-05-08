@@ -54,9 +54,21 @@ SDL parsers are **augmented JSON**: unquoted keys are allowed, string values can
 
 Formats are tried in declaration order against the **whole line**. A format that doesn't match simply doesn't apply; a format that matches merges its captures into the event. When `halt: true`, matching stops after the first match.
 
+> **The parser only sees `message`.** Ingest-time attributes added by collectors, relays, or `addEvents` calls (`app_id`, `cluster`, `region`, custom enrichments, etc.) are NOT visible to format strings, format-level `discard:` filters, or `rewrites` regex inputs. They ARE visible to `mappings` predicates and `mappings` op `from:` paths, since mappings run after parsing. If you need to gate a format on a vendor or app sentinel, encode it in the message body or use a `format: "..."` that anchors on a string the message contains. Don't try to read those attributes from inside the format engine.
+
+> **There is NO `from:` directive on `format` entries.** Only the keys listed in the example object above (`id`, `attributes`, `format`, `discard`, `halt`, `repeat`, plus `rewrites`) are honored. A spurious `from: "<somefield>"` next to `format:` is silently ignored, and the format is run against the raw line — which, combined with a greedy regex like `[\s\S]+`, can clobber every captured field with the entire log message on every event. The `from:` key only exists inside `mappings` ops (`{rename: {from, to}}`, `{copy: {from, to}}`, etc.). If you want a format-like rewrite to operate against a specific captured field, you have two real options: (1) a `rewrites` entry on the same format with `input: "<fieldname>"`, or (2) a follow-up `mappings` op that reads from that field.
+
 ### Fragment formats
 
 A format that starts with `.*` matches *anywhere* in the line, not just the start. This is the "line fragment" idiom used to share captures across related event variants. Combined with `halt: true` it's how you build "first match wins" logic.
+
+### Anchoring fragment captures (regex behavior)
+
+When a fragment format pulls a token out of the middle of a line, the prefix's regex must commit the engine to the right position. Two related rules:
+
+1. **The literal anchor must live INSIDE the prefix's regex, not as separate format-string text.** A pattern like `$_pre{regex=[\s\S]*}$/actuator/health$_suf{regex=[\s\S]*}$` (greedy `[\s\S]*` followed by literal `/actuator/health` between the two field markers) does NOT match. The format engine commits each captured field's regex independently and does not backtrack the previous field once a literal-text gap has been crossed. The working form puts the literal inside the regex of the prefix itself: `$_pre{regex=[\s\S]*\/actuator\/health}$$_suf{regex=[\s\S]*}$`. Phase-10-style IOC formats do this with anchors like `[\s\S]*X-Forwarded-For=[\[]?` baked into the prefix regex.
+
+2. **`[\s\S]*ANCHOR` is greedy and lands on the LAST occurrence of `ANCHOR`.** That is correct when the desired token always follows the rightmost anchor on the line, which is why Phase-5-style Dropwizard formats (`[\s\S]*\[dw-[0-9]+ - `) work — the `[dw-N - ` anchor is unique to the request-line bracket. It fails when the anchor is too generic: `[\s\S]*\[` followed by a capture of `UT-[0-9]+` will fail on any line where a later `[` exists (e.g. `[#033[36mClassName#033[0;39m]` ANSI brackets), because greedy match commits to the last `[` and `UT-` does not follow there. Fix in one of two ways: (a) make the anchor multi-character and discriminating (`[\s\S]*\[UT-` so only the bracket that actually opens a UT- token is matched), accepting that the discriminating literal is consumed by the anchor and your capture holds only the trailing portion (`$user_task_id_num{regex=[0-9]+}$`); or (b) use a lazy quantifier (`[\s\S]*?`) when the FIRST occurrence of the anchor is the right one. Lazy + a discriminating literal is usually simplest.
 
 ## Field-matcher syntax
 

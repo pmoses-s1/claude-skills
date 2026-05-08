@@ -17,7 +17,7 @@ mappings: {
                                              // "unsupported event mapper version -1".
   mappings: [
     {
-      predicate: "metadata.event_code == 'RT_FLOW_SESSION_CREATE'",  // first match wins
+      predicate: "metadata.event_code == 'RT_FLOW_SESSION_CREATE'",  // first match wins; see "Notes that bite people" below
       transformations: [
         // Each transformation is { <op_name>: { ...body... } }.
         // op_name is the OUTER key — NOT an `op:` field.
@@ -35,12 +35,14 @@ mappings: {
 
 Notes that bite people:
 
+- **First-match-wins.** Mapping entries are tried in declaration order; only the first entry whose `predicate` matches an event runs its `transformations`. A `predicate: "true"` catch-all therefore MUST go last in the list, otherwise it shadows every entry below it and they silently never fire (renames don't apply, per-class constants stay overridden by the catch-all). When you want a default-then-overrides pattern, structure the entries as: most specific predicates first, generic catch-all last. If two predicates are equally specific and both should fire on the same event, fold their transformations into a single entry. Validated against tenant April 2026.
 - `version: 1` at the top of the block is mandatory.
 - Each transformation's op is the **outer key**. Public docs sometimes show `{op: "rename", from: ..., to: ...}` — that is wrong. Use `{rename: {...}}`.
 - `from` on `rename` is a **single string**, not a list. If you need "first of N matches", use `copy` first (which does accept a list) then `rename`/`drop`.
 - `cast` takes `type: "..."`, not `to: "..."`. So `{cast: {field: "x", type: "int"}}`.
 - `cast` does NOT honor an `output:` key — it overwrites the source field. To cast into a different field, `copy` first, then `cast` the copy.
 - Predicate uses `==` (double-equals), not `=`.
+- `rename` silently no-ops when the source field is absent, which is the idiom that lets a single catch-all entry hold renames for several different vendor-native key sets (e.g. `verb` → `http_request.http_method` for app A, `method` → `http_request.http_method` for app B). Each rename only fires on events that actually carry that source key.
 
 ## Block shape (v0, marketplace)
 
