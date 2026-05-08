@@ -14,7 +14,13 @@
 #
 set -euo pipefail
 
-# ── Pinned versions ──────────────────────────────────────────────────────────
+# ── Image version ────────────────────────────────────────────────────────────
+# The version of THIS image. Independent of the underlying MCP versions
+# below — bump this when the image content (Dockerfile, dispatcher, bundled
+# CLAUDE.md) changes, even if all three MCP pins stay the same.
+IMAGE_VERSION="${IMAGE_VERSION:-1.1.0}"
+
+# ── Pinned MCP versions ──────────────────────────────────────────────────────
 S1_MCP_VERSION="${S1_MCP_VERSION:-1.0.0}"
 VT_MCP_PACKAGE="${VT_MCP_PACKAGE:-@burtthecoder/mcp-virustotal}"
 VT_MCP_VERSION="${VT_MCP_VERSION:-1.0.21}"
@@ -23,7 +29,7 @@ PURPLE_MCP_REF="${PURPLE_MCP_REF:-1582c0945101d0da2a158e66d8c329f66f251f27}"
 # ── Image identity ───────────────────────────────────────────────────────────
 REGISTRY="${REGISTRY:-ghcr.io/pmoses-s1}"
 IMAGE_NAME="${IMAGE_NAME:-s1-mcps}"
-TAG="${TAG:-${S1_MCP_VERSION}}"
+TAG="${TAG:-${IMAGE_VERSION}}"
 
 # ── Build options ────────────────────────────────────────────────────────────
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
@@ -36,9 +42,10 @@ cd "$REPO_ROOT"
 BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 VCS_REF="$(git rev-parse --short HEAD)"
 
-echo "Image:      ${REGISTRY}/${IMAGE_NAME}:${TAG}"
-echo "Platforms:  ${PLATFORMS}"
-echo "Pins:"
+echo "Image:         ${REGISTRY}/${IMAGE_NAME}:${TAG}"
+echo "Image version: ${IMAGE_VERSION}"
+echo "Platforms:     ${PLATFORMS}"
+echo "MCP pins:"
 echo "  sentinelone-mcp:   ${S1_MCP_VERSION}"
 echo "  ${VT_MCP_PACKAGE}: ${VT_MCP_VERSION}"
 echo "  purple-mcp ref:    ${PURPLE_MCP_REF}"

@@ -9,7 +9,7 @@ The recommended path is still [npx/uvx](./installation.md). Pick this one when:
 - You prefer one tool (`docker pull`) for upgrades
 
 Image: `ghcr.io/pmoses-s1/s1-mcps`
-Tags: `latest` (main), `1` / `1.0` / `1.0.0` (pinned semver), `sha-<short>` (any commit)
+Tags: `latest` (main), `1` / `1.1` / `1.1.0` (pinned semver, current), `sha-<short>` (any commit)
 
 - [Prerequisites](#prerequisites)
 - [Step 1: Pull the image](#step-1-pull-the-image)
@@ -41,15 +41,15 @@ Apple Silicon and Intel are both supported; the image is multi-arch (`linux/amd6
 ## Step 1: Pull the image
 
 ```bash
-docker pull ghcr.io/pmoses-s1/s1-mcps:1.0.0
+docker pull ghcr.io/pmoses-s1/s1-mcps:1.1.0
 ```
 
-Pin to a specific tag (`:1.0.0` or `:1`). Pulling `:latest` works but you'll silently inherit upgrades whenever you re-pull, which makes incident triage harder. About 250 MB compressed, ~600 MB unpacked.
+Pin to a specific tag (`:1.1.0` or `:1`). Pulling `:latest` works but you'll silently inherit upgrades whenever you re-pull, which makes incident triage harder. About 250 MB compressed, ~600 MB unpacked.
 
 Verify the dispatcher works:
 
 ```bash
-docker run --rm ghcr.io/pmoses-s1/s1-mcps:1.0.0 help
+docker run --rm ghcr.io/pmoses-s1/s1-mcps:1.1.0 help
 ```
 
 ---
@@ -73,7 +73,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS,
         "-e", "SDL_LOG_READ_KEY",
         "-e", "SDL_CONFIG_WRITE_KEY",
         "-e", "SDL_CONFIG_READ_KEY",
-        "ghcr.io/pmoses-s1/s1-mcps:1.0.0",
+        "ghcr.io/pmoses-s1/s1-mcps:1.1.0",
         "sentinelone-mcp"
       ],
       "env": {
@@ -93,7 +93,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS,
         "run", "-i", "--rm", "--pull=missing",
         "-e", "PURPLEMCP_CONSOLE_TOKEN",
         "-e", "PURPLEMCP_CONSOLE_BASE_URL",
-        "ghcr.io/pmoses-s1/s1-mcps:1.0.0",
+        "ghcr.io/pmoses-s1/s1-mcps:1.1.0",
         "purple-mcp"
       ],
       "env": {
@@ -106,7 +106,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS,
       "args": [
         "run", "-i", "--rm", "--pull=missing",
         "-e", "VIRUSTOTAL_API_KEY",
-        "ghcr.io/pmoses-s1/s1-mcps:1.0.0",
+        "ghcr.io/pmoses-s1/s1-mcps:1.1.0",
         "virustotal-mcp"
       ],
       "env": {
@@ -158,8 +158,8 @@ Claude verifies connectivity to all three Docker-backed MCPs, confirms each skil
 To check the image you have running:
 
 ```bash
-docker run --rm ghcr.io/pmoses-s1/s1-mcps:1.0.0 help
-docker image inspect ghcr.io/pmoses-s1/s1-mcps:1.0.0 \
+docker run --rm ghcr.io/pmoses-s1/s1-mcps:1.1.0 help
+docker image inspect ghcr.io/pmoses-s1/s1-mcps:1.1.0 \
   --format '{{index .Config.Labels "org.opencontainers.image.version"}}'
 ```
 
@@ -182,7 +182,7 @@ To use your own copy, mount your Cowork project folder read-only and point the e
     "-e", "S1_HEC_INGEST_URL", "-e", "SDL_XDR_URL",
     "-e", "SDL_LOG_WRITE_KEY", "-e", "SDL_LOG_READ_KEY",
     "-e", "SDL_CONFIG_WRITE_KEY", "-e", "SDL_CONFIG_READ_KEY",
-    "ghcr.io/pmoses-s1/s1-mcps:1.0.0",
+    "ghcr.io/pmoses-s1/s1-mcps:1.1.0",
     "sentinelone-mcp"
   ],
   "env": { "...": "..." }
@@ -195,7 +195,7 @@ Only the `sentinelone-mcp` entry reads CLAUDE.md; you don't need the volume moun
 
 ## Upgrading
 
-Bump the tag in your `claude_desktop_config.json` from `:1.0.0` to the new version, save, and restart Claude Desktop. The new image is pulled on first launch (`--pull=missing` ensures this).
+Bump the tag in your `claude_desktop_config.json` from `:1.1.0` to the new version, save, and restart Claude Desktop. The new image is pulled on first launch (`--pull=missing` ensures this).
 
 To force a fresh pull mid-tag (e.g. `:latest` moved):
 

@@ -26,11 +26,14 @@ All three MCPs are pinned at build time. The pins live in two places that must s
 
 When bumping a pin, edit both. They are checked once via `grep` in CI; a mismatch fails the build.
 
-| MCP | Source | Current pin |
+| What | Source | Current pin |
 |---|---|---|
+| Image version (`IMAGE_VERSION`) | this repo | `1.1.0` |
 | `@pmoses-s1/sentinelone-mcp` | npm | `1.0.0` |
 | `@burtthecoder/mcp-virustotal` | npm | `1.0.21` |
 | `purple-mcp` | git | `1582c094` (Sentinel-One/purple-mcp main) |
+
+`IMAGE_VERSION` is the tag the image is published under (`ghcr.io/pmoses-s1/s1-mcps:1.1.0`). It is independent of the underlying MCP versions: bump it when the Dockerfile, dispatcher, or bundled CLAUDE.md changes, even if all three MCP pins stay the same.
 
 ## Build locally
 
@@ -39,9 +42,9 @@ When bumping a pin, edit both. They are checked once via `grep` in CI; a mismatc
 docker/build.sh
 
 # Smoke test
-docker run -i --rm s1-mcps:1.0.0 help
+docker run -i --rm s1-mcps:1.1.0 help
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0.1"}}}' \
-  | docker run -i --rm s1-mcps:1.0.0 sentinelone-mcp
+  | docker run -i --rm s1-mcps:1.1.0 sentinelone-mcp
 ```
 
 The dispatcher accepts `sentinelone-mcp`, `purple-mcp`, `virustotal-mcp`, or `help`.
