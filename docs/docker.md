@@ -17,6 +17,7 @@ Tags: `latest` (main), `1` / `1.1` / `1.1.0` (pinned semver, current), `sha-<sho
 - [Step 3: Install the plugin](#step-3-install-the-plugin)
 - [Step 4: Create the Cowork project](#step-4-create-the-cowork-project)
 - [Step 5: Verify the install](#step-5-verify-the-install)
+- [Troubleshooting](#troubleshooting)
 - [CLAUDE.md customization](#claudemd-customization)
 - [Upgrading](#upgrading)
 - [Trade-offs vs the npx path](#trade-offs-vs-the-npx-path)
@@ -162,6 +163,89 @@ docker run --rm ghcr.io/pmoses-s1/s1-mcps:1.1.0 help
 docker image inspect ghcr.io/pmoses-s1/s1-mcps:1.1.0 \
   --format '{{index .Config.Labels "org.opencontainers.image.version"}}'
 ```
+
+---
+
+## Troubleshooting
+
+If a server shows red in Cowork → MCP Servers, work through these in order.
+
+### 1. Confirm Docker Desktop is actually running
+
+```bash
+docker info | head -3
+```
+
+Expected: `Server Version: ...`. If you see `Cannot connect to the Docker daemon`, start Docker Desktop, wait until the whale icon stops animating, and restart Claude Desktop.
+
+### 2. Tail the per-MCP log files
+
+Claude Desktop writes one log file per MCP server. Watch them while you start a new chat:
+
+```bash
+tail -F ~/Library/Logs/Claude/mcp-server-sentinelone-mcp.log
+tail -F ~/Library/Logs/Claude/mcp-server-purple-mcp.log
+tail -F ~/Library/Logs/Claude/mcp-server-virustotal.log
+```
+
+Common signatures:
+
+| Log line | Meaning |
+|---|---|
+| `Cannot connect to the Docker daemon` | Docker Desktop is not running, see step 1 |
+| `Unable to find image ... pulling from ghcr.io` | First-launch pull, normal, takes 30–90 s |
+| `denied: permission_denied` from ghcr.io | Image is private or your network blocks ghcr.io. Run `docker login ghcr.io` if you have a token, or check VPN/proxy. |
+| `VIRUSTOTAL_API_KEY environment variable is required` | The env value did not propagate. Re-check the `env` block in `claude_desktop_config.json` and that the `-e VAR` arg matches the key name. |
+| `pydantic_core.ValidationError ... PURPLEMCP_*` | Same root cause for purple-mcp. |
+| `S1 Mgmt API: NOT configured` | sentinelone-mcp boots but no console token reached it; check `S1_CONSOLE_URL` + `S1_CONSOLE_API_TOKEN` in the config. |
+
+### 3. Run the MCP container by hand
+
+This bypasses Claude Desktop entirely and confirms the image and credentials work end-to-end. Pass the env vars directly so the test is hermetic:
+
+```bash
+# Replace placeholders with your real values; this is a one-off test, NOT something to commit
+docker run -i --rm --pull=missing \
+  -e S1_CONSOLE_URL='https://usea1-yourorg.sentinelone.net' \
+  -e S1_CONSOLE_API_TOKEN='eyJ...' \
+  -e SDL_XDR_URL='https://xdr.us1.sentinelone.net' \
+  -e SDL_LOG_READ_KEY='...' \
+  -e SDL_CONFIG_READ_KEY='...' \
+  ghcr.io/pmoses-s1/s1-mcps:1.1.0 sentinelone-mcp <<< '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0.1"}}}'
+```
+
+Expected: a single JSON line back on stdout with `serverInfo.name = "sentinelone-mcp-server"`. Stderr should show `Tools: 26 registered` and one of the `configured`/`NOT configured` summaries per API surface.
+
+For a less verbose env-source pattern, put the values in a `.env` file and pass it with `--env-file`:
+
+```bash
+docker run -i --rm --pull=missing --env-file ~/.config/sentinelone/s1-mcp.env \
+  ghcr.io/pmoses-s1/s1-mcps:1.1.0 sentinelone-mcp <<< '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0.1"}}}'
+```
+
+The `.env` file is plain `KEY=value` per line. Keep its mode 0600 and out of any repo.
+
+### 4. Force a fresh pull
+
+If you suspect a corrupted local image:
+
+```bash
+docker rmi ghcr.io/pmoses-s1/s1-mcps:1.1.0
+docker pull ghcr.io/pmoses-s1/s1-mcps:1.1.0
+```
+
+### 5. Roll back to the npx path
+
+If the Docker path is misbehaving and you want to get working again immediately, restore the npx config from the backup that was written before the swap:
+
+```bash
+ls -1t ~/Library/Application\ Support/Claude/claude_desktop_config.json.pre-docker-bak-* | head -1
+# Then, copying the most recent backup back over the live config:
+LATEST=$(ls -1t ~/Library/Application\ Support/Claude/claude_desktop_config.json.pre-docker-bak-* | head -1)
+cp "$LATEST" ~/Library/Application\ Support/Claude/claude_desktop_config.json
+```
+
+Restart Claude Desktop. The npx-based config from before the swap takes over, no other changes needed.
 
 ---
 
