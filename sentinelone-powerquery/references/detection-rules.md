@@ -157,39 +157,64 @@ Renames are fine: the engine resolves by name, so `host = any(endpoint.name)` is
 
 ## Deploying a rule via the API
 
-Use `POST /web/api/v2.1/cloud-detection/rules`. The `queryLang` field controls which query dialect is accepted:
+**For any PowerQuery-bodied detection rule, always deploy as `queryType: "scheduled"` with `queryLang: "2.0"`.** This is the supported PowerQuery detection path on the `cloud-detection/rules` endpoint. The other combinations do not work:
 
-| `queryLang` | Dialect | Pipe syntax (`\|`) |
+| `queryType` | `queryLang` | Result |
 |---|---|---|
-| `"2.1"` | PowerQuery | Supported |
-| `"2.0"` | S1QL log-search | Rejected — HTTP 400 "Don't understand [|]" |
+| `scheduled` | `"2.0"` | **Correct path for PowerQuery rules.** Accepts pipe syntax. |
+| `events` | `"2.0"` | HTTP 400 `Don't understand [|]`. `queryLang: 2.0` is only accepted alongside `queryType: scheduled`. |
+| `events` | `"2.1"` | HTTP 400 `queryLang: "2.1" is not a valid choice`. The 2.1 dialect is not in the enum. |
+| `events` | `"1.0"` (default) | S1QL log-search syntax only — no pipe syntax. Use this only when the rule body really is S1QL, not PowerQuery. |
 
-Always use `queryLang: "2.1"` for PowerQuery detection rules. The query string goes in the `s1ql` field regardless of which dialect is in use.
+The query string goes inside `data.scheduledParams.query`, not in `data.s1ql`. The `s1ql` field is for `queryType: "events"` rules.
+
+### Canonical body for a PowerQuery scheduled detection rule
 
 ```json
 {
   "data": {
     "name": "Rule name",
-    "description": "What it detects.",
-    "queryType": "events",
-    "queryLang": "2.1",
-    "s1ql": "<your PowerQuery here>",
+    "description": "What it detects (include MITRE technique IDs).",
+    "queryType": "scheduled",
+    "queryLang": "2.0",
     "severity": "High",
-    "status": "Activating",
+    "status": "Disabled",
     "expirationMode": "Permanent",
-    "treatAsThreat": "Malicious",
-    "networkQuarantine": false,
-    "disableAgentMitigation": true
+    "scheduledParams": {
+      "query": "<your PowerQuery here>",
+      "runIntervalMinutes": 60,
+      "lookbackWindowMinutes": 60,
+      "threshold": {"value": 0, "operator": "Greater"}
+    }
   },
-  "filter": {
-    "siteIds": ["<site_id>"]
-  }
+  "filter": {"accountIds": ["<accountId>"]}
 }
 ```
 
-`disableAgentMitigation: true` is required when the source data is from cloud or network logs (no EDR agent to respond against). Omitting it causes activation to fail silently on some tenants.
+Notes on the shape:
+
+- **Scope:** `filter` accepts `accountIds` or `siteIds`. Pick the layer the rule should fire at. Account-level rules cover all sites under the account.
+- **Threshold:** the trigger threshold is the alert-firing threshold (`scheduledParams.threshold`), not the internal `| filter` inside the PowerQuery. `{value: 0, operator: "Greater"}` means "alert if the PQ returns any rows at all" — combined with an internal `| filter hits >= N`, you get N as the effective threshold.
+- **Run interval and lookback:** match these (e.g. 60 / 60) for non-overlapping evaluation. Setting `lookbackWindowMinutes` higher than `runIntervalMinutes` causes overlap and duplicate alerts.
+- **`status`:** new rules land as `Draft` on creation regardless of the requested status. Enable separately with `PUT /web/api/v2.1/cloud-detection/rules/enable` (body `{"filter": {"ids": [...], "accountIds": [...]}}`).
+- **No `disableAgentMitigation` field:** that property is not part of the scheduled-rule schema. Including it returns HTTP 400 `Unknown field`. Cloud-source PQ rules do not need it.
+- **No `treatAsThreat: "Malicious"`:** scheduled rules accept `treatAsThreat: "UNDEFINED"` (or omit) and `networkQuarantine: false`. Mitigation actions are not supported on scheduled rules.
+
+### If creation fails with `feature not enabled` or equivalent
+
+If `POST /web/api/v2.1/cloud-detection/rules` returns an error indicating Scheduled Detections / PowerQuery Alerts are not licensed or not turned on for the tenant, do not retry, do not silently downgrade to S1QL. **Stop and tell the user to enable the Scheduled Detections feature on the tenant before deploying.** Common surface for this in the console: *Settings → Account → Detection / SDL Add-Ons → Scheduled Detections* (exact path varies by platform version). The user needs to enable it (or have their CS/SE enable it) and then the same POST will succeed.
 
 Do not use Hyperautomation workflows to schedule PQ detections. `cloud-detection/rules` is the correct mechanism. HA is for SOAR-style response playbooks.
+
+### Updating and enabling a rule
+
+```
+PUT /web/api/v2.1/cloud-detection/rules/{id}        # full-replacement update; all 5 data fields required, plus filter
+PUT /web/api/v2.1/cloud-detection/rules/enable      # body: {"filter": {"ids": [...], "accountIds": [...]}}
+PUT /web/api/v2.1/cloud-detection/rules/disable     # same shape
+```
+
+`GET /cloud-detection/rules?ids=...&accountIds=...&isLegacy=false` requires `isLegacy=false` for scheduled rules — without it the list call returns zero results even when the rules exist and the POST response gave you their IDs.
 
 ---
 

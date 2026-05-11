@@ -513,28 +513,31 @@ Stage 1 deduplicates by grouping on the value you want to count; stage 2 counts 
 
 Hyperautomation (HA) workflows are for SOAR-style response playbooks: conditional branching, external webhooks, multi-step actions triggered by an event. They are not the right mechanism for scheduled PowerQuery detections.
 
-The correct API is `POST /web/api/v2.1/cloud-detection/rules` with `queryLang: "2.1"`. HA adds unnecessary complexity, requires workarounds for LRQ poll headers, and puts detection logic in a workflow engine rather than the detection engine where it belongs.
+The correct API is `POST /web/api/v2.1/cloud-detection/rules` with `queryType: "scheduled"` + `queryLang: "2.0"`, and the PowerQuery goes in `data.scheduledParams.query`. HA adds unnecessary complexity, requires workarounds for LRQ poll headers, and puts detection logic in a workflow engine rather than the detection engine where it belongs.
 
-### `queryLang: "2.0"` rejects PowerQuery pipe syntax
+### Always use `queryType: "scheduled"` for PowerQuery rule bodies
 
-```
-POST /web/api/v2.1/cloud-detection/rules
-{ "queryLang": "2.0", "s1ql": "dataSource.name='X' | filter ..." }
-→ HTTP 400: Wrong query Don't understand [|]
-```
+The combination that works for any PowerQuery (pipe-syntax) rule body is `queryType: "scheduled"` + `queryLang: "2.0"`. The other combinations fail:
 
-`"2.0"` is the S1QL log-search dialect and does not accept `|` pipe stages. Use `queryLang: "2.1"` for any query that contains pipes.
+| `queryType` | `queryLang` | Result |
+|---|---|---|
+| `scheduled` | `"2.0"` | **Correct path for PowerQuery rules.** Body goes in `data.scheduledParams.query`. |
+| `events` | `"2.0"` | HTTP 400 `Don't understand [|]`. PowerQuery pipes rejected. |
+| `events` | `"2.1"` | HTTP 400 `queryLang: "2.1" is not a valid choice`. |
+| `events` | `"1.0"` (default) | S1QL log-search only, no pipes. |
 
-### `queryLang: "2.1"` is NOT the LRQ `queryType`
+**If `POST /cloud-detection/rules` fails with a feature-not-enabled / unlicensed response on a tenant where the body is otherwise correct, do not retry and do not silently downgrade to S1QL. Tell the user to enable the Scheduled Detections feature on their tenant and try again.** The console path is typically *Settings → Account → Detection / SDL Add-Ons → Scheduled Detections*, varies by platform version.
+
+### `queryLang` on cloud-detection/rules is NOT the LRQ `queryType`
 
 These are two different fields on two different APIs:
 
 | API | Field | PowerQuery value |
 |---|---|---|
-| `POST /web/api/v2.1/cloud-detection/rules` | `queryLang` | `"2.1"` |
+| `POST /web/api/v2.1/cloud-detection/rules` | `queryLang` | `"2.0"` (with `queryType: "scheduled"`) |
 | `POST /sdl/v2/api/queries` (LRQ) | `queryType` | `"PQ"` |
 
-Do not confuse them. On the LRQ API, `queryType: "2.1"` is invalid. On cloud-detection/rules, `queryType` is always `"events"` regardless of query dialect.
+Do not confuse them. On the LRQ API, `queryType: "2.1"` is invalid. On cloud-detection/rules, the rule is scheduled (`queryType: "scheduled"`), the dialect is PowerQuery (`queryLang: "2.0"`), and the query body lives in `data.scheduledParams.query`, not `data.s1ql`.
 
 ---
 

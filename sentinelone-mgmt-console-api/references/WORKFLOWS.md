@@ -214,45 +214,55 @@ Useful when demoing to a prospect: "here are the 164 Mgmt API endpoints your tok
 
 ## 10. Deploy PowerQuery-based cloud detection rules
 
-PowerQuery detections are deployed via `POST /web/api/v2.1/cloud-detection/rules`. The key field that enables PowerQuery pipe syntax is `queryLang: "2.1"`. Using `"2.0"` causes the API to reject pipe characters with HTTP 400 "Don't understand [|]".
+PowerQuery detections are deployed via `POST /web/api/v2.1/cloud-detection/rules` as **scheduled** rules, not events rules. Use `queryType: "scheduled"` + `queryLang: "2.0"`; the PowerQuery body goes in `data.scheduledParams.query`. The events path (`queryType: "events"`) does not accept pipe-syntax PowerQuery on any tenant.
 
 ```python
 rule_body = {
     "data": {
-        "name": "Rule name — keep under 100 chars",
-        "description": "What it detects and why.",
-        "queryType": "events",      # always "events" for both S1QL and PQ rules
-        "queryLang": "2.1",         # "2.1" = PowerQuery; "2.0" = S1QL (no pipes)
-        "s1ql": (                   # field is named s1ql regardless of queryLang
-            "dataSource.name='MySource' event.type=*\n"
-            "| filter severity_id >= 4\n"
-            "| group count=count(), last_seen=newest(timestamp) by src_endpoint.ip\n"
-            "| sort -count\n"
-            "| limit 100"
-        ),
+        "name": "Rule name, keep under 100 chars",
+        "description": "What it detects and why. Include MITRE technique IDs.",
+        "queryType": "scheduled",   # always "scheduled" for PowerQuery rule bodies
+        "queryLang": "2.0",         # required for scheduled PQ rules
         "severity": "High",         # Critical | High | Medium | Low
-        "status": "Activating",     # use "Activating" on create; it becomes "Active"
+        "status": "Disabled",       # new rules land as Draft; enable separately via PUT
         "expirationMode": "Permanent",
-        "treatAsThreat": "Malicious",       # Malicious | Suspicious | null
-        "networkQuarantine": False,
-        "disableAgentMitigation": True,     # required for SDL/cloud-data-source rules
+        "scheduledParams": {
+            "query": (
+                "dataSource.name='MySource' event.type=*\n"
+                "| filter severity_id >= 4\n"
+                "| group count=count(), last_seen=newest(timestamp) by src_endpoint.ip\n"
+                "| sort -count\n"
+                "| limit 100"
+            ),
+            "runIntervalMinutes": 60,
+            "lookbackWindowMinutes": 60,
+            "threshold": {"value": 0, "operator": "Greater"},
+        },
     },
     "filter": {
-        "siteIds": ["<site_id>"],   # scope to one or more sites; omit for account-wide
+        "accountIds": ["<account_id>"],   # or siteIds; account scope covers all sites
     },
 }
 
 resp = c.post("/web/api/v2.1/cloud-detection/rules", json_body=rule_body)
 rule_id = resp["data"]["id"]
+
+# Enable. New rules are created in Draft regardless of the status field on POST.
+c.put(
+    "/web/api/v2.1/cloud-detection/rules/enable",
+    json_body={"filter": {"ids": [rule_id], "accountIds": ["<account_id>"]}},
+)
 ```
 
 Key points:
 
-- `queryLang: "2.1"` is what enables the PowerQuery pipe-stage syntax. `"2.0"` is the older S1QL log-search dialect — do not use it for PQ rules.
-- The query string always goes in the `s1ql` field regardless of `queryLang`. The field name is historical.
-- `disableAgentMitigation: true` is required when the detection is over cloud or firewall data (no EDR agent to act on).
-- To list existing rules: `GET /web/api/v2.1/cloud-detection/rules` with optional `siteIds`, `query` (name search), `status`, or `severity` params.
-- To delete rules: `DELETE /web/api/v2.1/cloud-detection/rules` with body `{"data": {"ids": ["<id1>", "<id2>"]}}`.
+- `queryType: "scheduled"` + `queryLang: "2.0"` is the supported PowerQuery detection path. `queryType: "events"` rejects pipe syntax; `queryLang: "2.1"` is not in the enum.
+- The query string lives in `data.scheduledParams.query`. The `data.s1ql` field is for `queryType: "events"` (S1QL log-search) rules.
+- Do NOT include `disableAgentMitigation`, `treatAsThreat: "Malicious"`, or `activeResponse` on scheduled rules. `disableAgentMitigation` returns HTTP 400 `Unknown field`. Mitigation actions are not supported on scheduled rules; the verdict surfaces via severity.
+- New rules land in `Draft` status regardless of the requested `status` on POST. Call `PUT /cloud-detection/rules/enable` after creation; the rule transitions to `Activating` then `Active` within the hour.
+- **If the POST returns a feature-not-enabled / unlicensed response, stop and tell the user to enable Scheduled Detections on the tenant.** Do not silently downgrade to S1QL or retry as `queryType: "events"`.
+- To list scheduled rules: `GET /web/api/v2.1/cloud-detection/rules?accountIds=...&isLegacy=false`. The `isLegacy=false` is required or the list call returns zero results for scheduled rules.
+- To delete rules: `DELETE /web/api/v2.1/cloud-detection/rules` with body `{"filter": {"ids": [...], "accountIds": [...]}}`.
 - When sources lack fully mapped OCSF fields, use `| parse "pattern=$var$ " from message` to extract fields from raw syslog/CEF message strings before grouping.
 
 ---
@@ -264,4 +274,4 @@ Key points:
 - **Using the legacy `/dv/init-query` + `/dv/query-status` + `/dv/events` flow**: deprecated and sunset 2027-02-15. Use LRQ with `queryType="LOG"` instead (see Section 4).
 - **Trusting `totalItems`** on restricted-scope accounts: it reflects what the token can see, not the tenant total.
 - **Re-reading `spec/swagger_2_1.json`** (14 MB) into context. Use the per-tag reference file or `search_endpoints.py`.
-- **Using Hyperautomation workflows as a substitute for PQ detection rules**: HA is for SOAR-style response automation (conditional branching, external actions, multi-step playbooks). Scheduled PowerQuery detections belong in `cloud-detection/rules` with `queryLang: "2.1"`. HA adds unnecessary complexity and is not the right layer for "run this query on a schedule and alert if rows > 0".
+- **Using Hyperautomation workflows as a substitute for PQ detection rules**: HA is for SOAR-style response automation (conditional branching, external actions, multi-step playbooks). Scheduled PowerQuery detections belong in `cloud-detection/rules` with `queryType: "scheduled"` + `queryLang: "2.0"`. HA adds unnecessary complexity and is not the right layer for "run this query on a schedule and alert if rows > 0".

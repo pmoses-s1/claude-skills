@@ -94,6 +94,19 @@ with `queryType=events`, the same endpoint as all other Custom Detection Rules.
 
 `queryType` enum (from swagger): `events`, `scheduled`, `correlation`, `uebafirstseen`.
 
+**⚠️ Pick the right `queryType` for your rule body BEFORE composing the POST. Mismatches return HTTP 400.**
+
+| Rule body language | Correct `queryType` | Correct `queryLang` | Field carrying the query |
+|---|---|---|---|
+| **PowerQuery (pipe syntax `\|`)** | **`scheduled`** | **`"2.0"`** | `data.scheduledParams.query` |
+| S1QL log-search / event search | `events` | `"1.0"` (default, omit) | `data.s1ql` |
+| EUEBA first-seen | `uebafirstseen` | n/a | per swagger schema |
+| Correlation | `correlation` | n/a | per swagger schema |
+
+**Any time the rule body has the pipe character `\|` (i.e. PowerQuery), the only working path is `queryType: "scheduled"` + `queryLang: "2.0"`.** `queryType: "events"` rejects pipe syntax (HTTP 400 `Don't understand [|]`), and `queryLang: "2.1"` is not in the enum (HTTP 400 `queryLang: "2.1" is not a valid choice`). Confirmed against the live API, 2026-05.
+
+See the **PowerQuery Scheduled Detections** subsection below for the full scheduled-rule body, gotchas, and the feature-flag fallback path if the tenant has not enabled Scheduled Detections.
+
 `expirationMode` valid values: `"Permanent"` or `"Temporary"`. `"Never"` is not valid and returns 400.
 
 **Events (STAR) rule — confirmed CREATE body (live API, 2026-05):**
@@ -150,11 +163,13 @@ The body field for filter criteria is `filterFields`, not `filters`:
 
 ### PowerQuery Scheduled Detections — POST/PUT/GET/DELETE /cloud-detection/rules
 
-`queryType: "scheduled"` rules are PowerQuery-based detections. They use a different schema from `events` and `correlation` rules and have several non-obvious requirements confirmed against the live API (2026-05-03).
+`queryType: "scheduled"` rules are PowerQuery-based detections. **This is the only path that accepts pipe-syntax PowerQuery in a detection rule body.** Events rules reject pipe syntax even with `queryLang: "2.0"`. They use a different schema from `events` and `correlation` rules and have several non-obvious requirements confirmed against the live API (2026-05).
+
+**If the POST fails with a feature-not-enabled / not-licensed / unauthorized response on a tenant where the schema is otherwise correct, stop and tell the user to enable the Scheduled Detections feature on the tenant before retrying.** Do not silently downgrade the rule body to S1QL or re-attempt with `queryType: "events"`. The console path is typically *Settings → Account → Detection / SDL Add-Ons → Scheduled Detections* but varies by platform version, so phrase the ask in terms of capability ("please enable Scheduled Detections on this account") rather than the exact click path.
 
 **CREATE — POST /web/api/v2.1/cloud-detection/rules**
 
-All five `data` fields are required. `queryLang: "2.0"` is mandatory; omitting it returns HTTP 400 "query lang must be 2.0":
+All five `data` fields are required. `queryLang: "2.0"` is mandatory; omitting it returns HTTP 400 "query lang must be 2.0". `filter` accepts `accountIds` or `siteIds` (account-level rules cover all sites under that account):
 
 ```json
 {
@@ -166,15 +181,22 @@ All five `data` fields are required. `queryLang: "2.0"` is mandatory; omitting i
     "expirationMode": "Permanent",
     "status": "Disabled",
     "scheduledParams": {
-      "query": "dataSource.name = 'EndpointSecurityWin' | group count = count() by AgentName | filter count > 0",
+      "query": "dataSource.name='Proofpoint' event.type='Click' unmapped.classification='malware' | group hits=count(), first_seen=oldest(timestamp), last_seen=newest(timestamp) by clickIP | filter hits >= 1 | sort -hits | limit 100",
       "runIntervalMinutes": 60,
       "lookbackWindowMinutes": 60,
       "threshold": {"value": 0, "operator": "Greater"}
     }
   },
-  "filter": {"siteIds": ["<siteId>"]}
+  "filter": {"accountIds": ["<accountId>"]}
 }
 ```
+
+**Scheduled-rule gotchas confirmed against live API (2026-05):**
+
+- `disableAgentMitigation` is **not** part of the scheduled schema. Including it returns HTTP 400 `Unknown field`. Cloud-source PQ rules do not need it; mitigation actions are not supported on scheduled rules anyway.
+- `treatAsThreat: "Malicious"` is for events rules with EDR telemetry. Scheduled rules accept `treatAsThreat: "UNDEFINED"` (or omit) and `networkQuarantine: false`. The verdict surfaces via the rule's `severity`, not via mitigation.
+- New rules are created in `Draft` status regardless of the requested `status` in the POST. To enable, call `PUT /web/api/v2.1/cloud-detection/rules/enable` with `{"filter": {"ids": [...], "accountIds": [...]}}` after creation. The response transitions to `Activating` and then `Active` within the hour.
+- The PowerQuery in `scheduledParams.query` must NOT use `nolimit`, `compare`, or subqueries. The 1,000-row intermediate cap from `references/detection-rules.md` applies.
 
 **GET requires `isLegacy=false`** — without this query parameter, the list endpoint returns 0 results for scheduled rules even though they exist and are visible in the console UI. Always include it:
 
