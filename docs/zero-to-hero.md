@@ -297,10 +297,10 @@ Skills: `sentinelone-mgmt-console-api`, plus `purple-mcp` for richer GraphQL fie
 
 ```
 Triage alert ID abc123: get full details, check notes and history, enrich
-any IOCs in VirusTotal, and give me a verdict.
+any IOCs through the threat-intel MCP, and give me a verdict.
 ```
 
-What you'll get: the full alert payload, prior analyst notes, MDR verdict, asset criticality lookup, every IOC enriched in VirusTotal, MITRE mapping, and a calibrated verdict. If the verdict is CRITICAL or TRUE POSITIVE, you'll see the threat intel evidence inline.
+What you'll get: the full alert payload, prior analyst notes, MDR verdict, asset criticality lookup, every IOC enriched through the configured threat-intel MCP (VirusTotal in the default bundle), MITRE mapping, and a calibrated verdict. If the verdict is CRITICAL or TRUE POSITIVE, you'll see the threat intel evidence inline.
 
 ### Behavioral baselining and anomaly detection
 

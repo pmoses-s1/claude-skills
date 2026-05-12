@@ -350,7 +350,7 @@ endpoint.name = 'EC2AMAZ-4158GRS'
 ```
 
 **Tune** — replace `endpoint.name = '…'` with a broader filter for tenant-wide; that may need a longer window or tighter port filter.
-**Pivot** — the heavy-hitter destination IPs go straight into VirusTotal (`mcp__virustotal__get_ip_report`).
+**Pivot**, the heavy-hitter destination IPs go straight into the configured threat-intel MCP for an IP reputation lookup (in the default bundle that's `mcp__virustotal__get_ip_report`; substitute the equivalent tool if you've connected a different provider).
 
 ### Beaconing detection (regular intervals)
 

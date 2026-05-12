@@ -73,9 +73,9 @@ The plugin bundles every skill; installing it is sufficient. No individual skill
 
 | Outcome | How |
 |---|---|
-| **Reduce L1 SOC workload by 70%+** | Automated triage, mandatory VirusTotal enrichment, and verdict generation eliminate repetitive alert investigation. L1 analysts focus on exceptions, not routine. |
+| **Reduce L1 SOC workload by 70%+** | Automated triage, mandatory threat-intel enrichment on every IOC, and verdict generation eliminate repetitive alert investigation. L1 analysts focus on exceptions, not routine. |
 | **Elevate every analyst to principal grade** | Junior analysts get the same structured investigation framework, enrichment depth, and analytical reasoning that only senior staff possess today. |
-| **External threat intelligence on every IOC** | Mandatory VirusTotal enrichment on every IP, domain, hash, and URL, with 70+ AV engines, threat actor attribution, and full infrastructure mapping on every finding. |
+| **External threat intelligence on every IOC** | Mandatory enrichment of every IP, domain, hash, and URL through the configured threat-intel MCP. The default bundle ships VirusTotal (70+ AV engines, threat-actor attribution, full infrastructure mapping); swap in any equivalent provider (Recorded Future, Mandiant Advantage, OpenCTI, MISP, etc.) and the workflow is unchanged. |
 | **Mean investigation time under 5 minutes** | Investigation workflows that take 45-60 minutes manually compress to under 5 minutes. Continuous hunting catches threats between analyst shifts. |
 | **Full data estate coverage** | Queries OCSF-normalised logs, non-OCSF vendor logs, and raw syslog. Discovers field schemas dynamically at session start, with no hardcoded assumptions about what sources are present. |
 | **Fast-track detection creation** | Natural language detection authoring across any data source. Recommends new STAR rules and custom detections as threats are identified during investigation. |
@@ -132,7 +132,7 @@ Copy the contents of `CLAUDE.md` into Settings → Custom Instructions (or equiv
 
 **Investigation workflow**
 - Triage and context gathering: alert details, analyst notes, MDR verdicts, asset criticality
-- VirusTotal enrichment: every IP, domain, hash, and URL enriched before any verdict; no finding classified CRITICAL without independent TI confirmation
+- Threat-intel enrichment: every IP, domain, hash, and URL enriched through the configured threat-intel MCP (VirusTotal in the default bundle) before any verdict; no finding classified CRITICAL without independent TI confirmation
 - Infrastructure pivoting: C2 infrastructure, threat actor attribution, SSL certificate reuse, sibling domains, dropped payloads, execution chain reconstruction
 - Cross-source correlation: IOC found in any source is immediately hunted across all other connected sources
 - Anomaly analysis: every query result checked for frequency, timing, geolocation, baseline, volume, new entity, privilege, and chain anomalies
@@ -141,7 +141,7 @@ Copy the contents of `CLAUDE.md` into Settings → Custom Instructions (or equiv
 
 **Report generation**
 
-At the end of any significant investigation, ask Claude to produce a SOC report. It generates a structured `.docx` file containing: executive summary, incident timeline, affected assets, full IOC table with VT verdicts, threat actor profile, MITRE ATT&CK mapping, root cause analysis, VirusTotal intelligence summary, actions taken, and recommendations.
+At the end of any significant investigation, ask Claude to produce a SOC report. It generates a structured `.docx` file containing: executive summary, incident timeline, affected assets, full IOC table with threat-intel verdicts, threat actor profile, MITRE ATT&CK mapping, root cause analysis, threat-intel summary, actions taken, and recommendations.
 
 **Example session starters**
 ```
@@ -311,7 +311,7 @@ These are real questions you can ask. Claude will pick the right skill automatic
 ### SOC investigation and triage
 
 - *"Start a new investigation session: enumerate live data sources and pull today's open alerts"*
-- *"Triage alert ID `abc123`: get the full details, check notes and history, enrich any IOCs in VirusTotal, and give me a verdict"*
+- *"Triage alert ID `abc123`: get the full details, check notes and history, enrich any IOCs through the threat-intel MCP, and give me a verdict"*
 - *"Enrich this file hash `aabbccdd...`: detection ratio, behavioral analysis, C2 infrastructure, and threat actor attribution"*
 - *"Pivot on IP `1.2.3.4`: what malware communicates with it, what domains resolve to it, and is it associated with any APT group?"*
 - *"Cross-correlate this IOC across all connected data sources: check firewall, Okta, Zeek, and CloudTrail for any trace of `1.2.3.4`"*
@@ -321,9 +321,9 @@ These are real questions you can ask. Claude will pick the right skill automatic
 
 ### Reporting
 
-- *"Write a SOC Leader report for this investigation as a Word document: executive summary, incident timeline, IOC table with VT verdicts, MITRE mapping, root cause, and recommendations"*
+- *"Write a SOC Leader report for this investigation as a Word document: executive summary, incident timeline, IOC table with threat-intel verdicts, MITRE mapping, root cause, and recommendations"*
 - *"Generate a weekly threat summary for SOC leadership covering alerts triaged, true positives confirmed, top IOCs, and any active campaigns"*
-- *"Produce an IOC table for all indicators found in the last 24 hours, including VirusTotal verdict, detection ratio, and threat actor attribution"*
+- *"Produce an IOC table for all indicators found in the last 24 hours, including threat-intel MCP verdict, detection ratio, and threat actor attribution"*
 - *"Give me an executive-level summary of the firewall beaconing pattern we found: one paragraph, business risk focus, no jargon"*
 
 ### Hyperautomation workflows

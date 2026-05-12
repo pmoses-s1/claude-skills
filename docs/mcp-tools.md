@@ -169,4 +169,4 @@ Convert ISO 8601 timestamps to Unix milliseconds.
 | Deploy parser or dashboard to SDL | `sdl_put_file` |
 | Ingest custom log events | `sdl_upload_logs` |
 | Import Hyperautomation workflow | `ha_import_workflow` |
-| Enrich IOC (IP, hash, domain, URL) | virustotal-mcp tools |
+| Enrich IOC (IP, hash, domain, URL) | Threat-intel MCP tools (default bundle: virustotal-mcp; substitute your provider's tools if different) |
