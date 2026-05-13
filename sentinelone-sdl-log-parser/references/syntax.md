@@ -64,11 +64,13 @@ A format that starts with `.*` matches *anywhere* in the line, not just the star
 
 ### Anchoring fragment captures (regex behavior)
 
-When a fragment format pulls a token out of the middle of a line, the prefix's regex must commit the engine to the right position. Two related rules:
+When a fragment format pulls a token out of the middle of a line, the prefix's regex must commit the engine to the right position. Three related rules:
 
 1. **The literal anchor must live INSIDE the prefix's regex, not as separate format-string text.** A pattern like `$_pre{regex=[\s\S]*}$/actuator/health$_suf{regex=[\s\S]*}$` (greedy `[\s\S]*` followed by literal `/actuator/health` between the two field markers) does NOT match. The format engine commits each captured field's regex independently and does not backtrack the previous field once a literal-text gap has been crossed. The working form puts the literal inside the regex of the prefix itself: `$_pre{regex=[\s\S]*\/actuator\/health}$$_suf{regex=[\s\S]*}$`. Phase-10-style IOC formats do this with anchors like `[\s\S]*X-Forwarded-For=[\[]?` baked into the prefix regex.
 
-2. **`[\s\S]*ANCHOR` is greedy and lands on the LAST occurrence of `ANCHOR`.** That is correct when the desired token always follows the rightmost anchor on the line, which is why Phase-5-style Dropwizard formats (`[\s\S]*\[dw-[0-9]+ - `) work — the `[dw-N - ` anchor is unique to the request-line bracket. It fails when the anchor is too generic: `[\s\S]*\[` followed by a capture of `UT-[0-9]+` will fail on any line where a later `[` exists (e.g. `[#033[36mClassName#033[0;39m]` ANSI brackets), because greedy match commits to the last `[` and `UT-` does not follow there. Fix in one of two ways: (a) make the anchor multi-character and discriminating (`[\s\S]*\[UT-` so only the bracket that actually opens a UT- token is matched), accepting that the discriminating literal is consumed by the anchor and your capture holds only the trailing portion (`$user_task_id_num{regex=[0-9]+}$`); or (b) use a lazy quantifier (`[\s\S]*?`) when the FIRST occurrence of the anchor is the right one. Lazy + a discriminating literal is usually simplest.
+2. **`[\s\S]*ANCHOR` is greedy and lands on the LAST occurrence of `ANCHOR`.** That is correct when the desired token always follows the rightmost anchor on the line — Phase-5-style Dropwizard formats (`[\s\S]*\[dw-[0-9]+ - `) work because `[dw-N - ` is unique to the request-line bracket. It fails when the anchor is too generic: `[\s\S]*\[` followed by a capture of `UT-[0-9]+` will fail on any line where a later `[` exists (e.g. `[#033[36mClassName#033[0;39m]` ANSI brackets), because greedy match commits to the last `[` and `UT-` does not follow there. Fix: make the anchor multi-character and discriminating (`[\s\S]*\[UT-` so only the bracket that actually opens a UT- token is matched), accepting that the discriminating literal is consumed by the anchor and your capture holds only the trailing portion (`$user_task_id_num{regex=[0-9]+}$`).
+
+3. **DO NOT use `[\s\S]*?` lazy quantifier at the start of a prefix regex.** Same family as the documented `.*?` orphaned-`?` trap, but no error: the format silently matches almost nothing (tenant-validated 2026-05-13, `[\s\S]*?` prefixes hit 365 of ~190K events when greedy + literal anchor hit close to all). The SDL regex engine does not backtrack the lazy quantifier across field boundaries to find a position where the next field's regex matches. Always use greedy `[\s\S]*` plus a discriminating literal anchor (rule 2 above). If you actually need first-match-on-line semantics, encode it with a literal that only appears once per line (e.g. `[\s\S]*\"merchant_transaction_id\":\"` to anchor on a unique JSON key), do not reach for `*?`.
 
 ## Field-matcher syntax
 
@@ -223,6 +225,38 @@ Missing → `info` (3).
 - `repeat: true` — keep re-applying this format at the position after the last match (required for key/value catch-alls).
 - `skipNumericConversion: true` — preserve string values that look numeric (e.g., postal code `00187`). Per-format flag.
 - `intermittentTimestamps: true` — parser-level; for logs that emit a timestamp only when the clock rolls over. Lines without a timestamp inherit the most recent one instead of the ingest time.
+
+## `discardAttributes` — placement matters
+
+`discardAttributes: ["field1", "field2", ...]` accepts a list of field names to drop from the final event. There are TWO valid placements with different scopes:
+
+**Per-format (preferred for format-capture scratch fields).** Place `discardAttributes` as a sibling key to `format:` inside an individual format object:
+
+```js
+formats: [
+  {
+    format: "$_pre{regex=[\\s\\S]*\\[dw-[0-9]+ - }$$http_method{regex=[A-Z]+}$ $_tail{regex=[\\s\\S]*}$",
+    discardAttributes: ["_pre", "_tail"]
+  }
+]
+```
+
+This is the form the built-in `json` parser uses: `formats: [ { format: "$json{parse=json}$", repeat: true, discardAttributes: ["message"] } ]`. Reliably drops any field the format itself captured into a `$name$` marker.
+
+**Parser-root (for fields produced by `{parse=json}` / `{parse=dottedJson}` flat expansion).** Place `discardAttributes` as a top-level key on the parser object:
+
+```js
+{
+  timezone: "UTC",
+  attributes: { ... },
+  discardAttributes: ["flipkart_not_secure", "upstream_addr", "pipe"],
+  formats: [ ... ]
+}
+```
+
+Use this for vendor-noise keys that show up at the event root because a `{parse=json}` directive flattened them out of the source body. Parser-root scope does NOT reliably drop fields created by named-capture markers inside format strings — those leak through on this tenant despite being listed at the root. The fix is to move them into the per-format `discardAttributes` of the format that creates them. Tenant-validated 2026-05-13.
+
+**Neither scope drops `{parse=gron}` outputs at the event root.** Gron-expanded keys (`host`, `facility`, `sndr` directly on the root) require `mappings.drop` or `mappings.drop_tree`. Tenant-validated May 2026.
 
 ## Associations
 
