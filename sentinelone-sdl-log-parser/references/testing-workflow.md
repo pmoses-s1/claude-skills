@@ -12,8 +12,10 @@ There is **no dedicated `testParser` REST endpoint** on the SDL tenant. The in-c
 ## Full loop
 
 ```python
-import sys, time, uuid, json, pathlib
-sys.path.insert(0, "/sessions/dazzling-ecstatic-volta/mnt/.claude/skills/sentinelone-sdl-api/scripts")
+import sys, glob, time, uuid, json, pathlib
+_sdl_scripts = next(iter(glob.glob("/sessions/*/mnt/.claude/skills/sentinelone-sdl-api/scripts")), None)
+if _sdl_scripts:
+    sys.path.insert(0, _sdl_scripts)
 from sdl_client import SDLClient
 
 c = SDLClient()

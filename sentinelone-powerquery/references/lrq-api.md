@@ -204,12 +204,7 @@ The reference implementation (`merge_aggregate` in the runner) handles sum/min/m
 
 ## Canonical Python runner
 
-Working implementations live at:
-
-- `/sessions/great-serene-euler/pq_30d_max_lrq.py` - single-token version with token-bucket rate limiting and three slice-shape modes. Best 30d wall: 66.25s (6x5d pool=3).
-- `/sessions/great-serene-euler/pq_30d_max_lrq_v2.py` - two-JWT round-robin version, pool=6, ~5 rps combined. Best 30d wall: 28.52s (10x3d) / 28.56s (15x2d). For the same workload in the 18-22s range, extend to three JWTs with pool=9.
-
-Key pieces, in order of importance:
+The implementation is built from these key pieces, in order of importance:
 
 1. **RateLimiter** - token bucket with `rps` and `burst`, acquire before every API call. One per client.
 2. **LRQClient** - wraps one `requests.Session()` with `HTTPAdapter(pool_maxsize=N)` and `Authorization: Bearer <jwt>`. Exposes `launch(body)`, `poll(qid, forward_tag, last_seen)`, `cancel(qid, forward_tag)`. Auto-retries 429 with exponential backoff.

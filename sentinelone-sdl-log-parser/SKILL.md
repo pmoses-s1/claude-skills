@@ -348,8 +348,10 @@ If you inherit a marketplace parser, keep it on v0 rather than rewriting. For ne
 Always validate against the live tenant via the `sentinelone-sdl-api` skill. Do not rely solely on the syntactic plausibility of the JSON — the only authoritative test is "did the field actually appear in a query after ingest." This is what the in-console `Test Parser` button approximates client-side; doing it through the API exercises the real ingest pipeline.
 
 ```python
-import sys, time, uuid, json
-sys.path.insert(0, "/sessions/dazzling-ecstatic-volta/mnt/.claude/skills/sentinelone-sdl-api/scripts")
+import sys, glob, time, uuid, json
+_sdl_scripts = next(iter(glob.glob("/sessions/*/mnt/.claude/skills/sentinelone-sdl-api/scripts")), None)
+if _sdl_scripts:
+    sys.path.insert(0, _sdl_scripts)
 from sdl_client import SDLClient
 
 c = SDLClient()

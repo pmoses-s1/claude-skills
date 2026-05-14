@@ -197,7 +197,7 @@ DELETE https://<console>.sentinelone.net/sdl/v2/api/queries/{id}     -> cancel w
 
 Once two tokens are in play the per-user rate cap stops being the bottleneck and the slowest slice's backend runtime (p95 ~9-17s) becomes the floor. Push further by adding a third service-user JWT (pool=9, ~7.5 rps budget, expected 18-22s), swapping `| group` for `| top K` on huge ranges, or narrowing the initial filter. Defaults table and the full benchmark live in `references/lrq-api.md`.
 
-**Canonical runner.** A working Python implementation (rate limiter, two-token round-robin, aggregate merge across slices) is kept at `/sessions/great-serene-euler/pq_30d_max_lrq_v2.py` and documented in `references/lrq-api.md`. Read that file before writing a new runner from scratch.
+**Canonical runner.** The full Python implementation (rate limiter, two-token round-robin, aggregate merge across slices) is documented in `references/lrq-api.md`. Read that file before writing a new runner from scratch.
 
 **Quick one-shot exploration** (no API client wired up): the Purple MCP `mcp__purple-mcp__powerquery` tool is fine for an interactive 24h hunt. It wraps the same engine but with lower limits, tighter timeouts, and no parallelism. Pair it with `mcp__purple-mcp__get_timestamp_range(hours=24)` for ISO-8601 ranges, and `mcp__purple-mcp__purple_ai` when you need a starting-point query draft from natural language. Prefer LRQ for anything programmatic, multi-slice, over long windows, or producing results the user will use downstream.
 
@@ -206,7 +206,6 @@ Once two tokens are in play the per-user rate cap stops being the bottleneck and
 ```python
 # Starting from the already-loaded S1Client used by the sentinelone-mgmt-console-api skill:
 from sentinelone_sdl_lrq import LRQClient, run_lrq_pq, parallel_run_roundrobin, slice_window
-# or import directly from /sessions/great-serene-euler/pq_30d_max_lrq_v2.py
 
 s1 = S1Client()                                # same client the mgmt skill uses
 jwt = s1.api_token                              # raw JWT - no prefix
