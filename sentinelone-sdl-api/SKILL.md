@@ -10,7 +10,7 @@ Wraps the Singularity Data Lake API (10 methods across log ingestion, query, and
 
 The SDL API is distinct from the Management Console API. It speaks JSON over `Bearer` tokens (not `ApiToken`) and is the canonical path for ingesting custom telemetry and editing parsers/dashboards/alerts/lookups directly.
 
-> **Sandbox proxy blocked?** If calls to `*.sentinelone.net` (SDL host or console host) fail with a connection or proxy error inside the Claude sandbox, use the `sentinelone-mcp` server instead. It runs locally via `node` and bypasses the sandbox proxy entirely. Setup: add it to `claude_desktop_config.json` (see `claude-skills/sentinelone-mcp/README.md`). The MCP server exposes `sdl_list_files`, `sdl_get_file`, `sdl_put_file`, `sdl_delete_file`, and `sdl_upload_logs` — running directly from your machine against the SDL API.
+> **Sandbox proxy blocked?** If calls to `*.sentinelone.net` (SDL host or console host) fail with a connection or proxy error inside the Claude sandbox, use the `sentinelone-mcp` server instead. It runs locally via `node` and bypasses the sandbox proxy entirely. Setup: add it to `claude_desktop_config.json` (see `sentinelone-mcp/README.md`). The MCP server exposes `sdl_list_files`, `sdl_get_file`, `sdl_put_file`, `sdl_delete_file`, and `sdl_upload_logs` — running directly from your machine against the SDL API.
 
 ## IMPORTANT: query methods are deprecated — and LRQ is NOT available here
 

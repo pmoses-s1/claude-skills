@@ -12,10 +12,11 @@ There is **no dedicated `testParser` REST endpoint** on the SDL tenant. The in-c
 ## Full loop
 
 ```python
-import sys, glob, time, uuid, json, pathlib
-_sdl_scripts = next(iter(glob.glob("/sessions/*/mnt/.claude/skills/sentinelone-sdl-api/scripts")), None)
-if _sdl_scripts:
-    sys.path.insert(0, _sdl_scripts)
+import sys, os, time, uuid, json, pathlib
+_sdl_scripts = os.environ.get("SDL_API_SCRIPTS") or os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sentinelone-sdl-api", "scripts")
+)
+sys.path.insert(0, _sdl_scripts)
 from sdl_client import SDLClient
 
 c = SDLClient()
@@ -146,9 +147,8 @@ assert attrs.get("metadata.version") or _has_mappings_constant(parser, "metadata
 # 2. Every OCSF field name should be discoverable in ocsf-schema-documentation.md.
 #    Grep the schema doc for each emitted field name.
 import re, pathlib
-schema_doc = pathlib.Path(
-    "/sessions/.../claude-skills/sentinelone-sdl-log-parser/references/ocsf-schema-documentation.md"
-).read_text()
+_skill_root = os.environ.get("SKILL_DIR", os.path.dirname(os.path.abspath(__file__)))
+schema_doc = pathlib.Path(_skill_root, "references", "ocsf-schema-documentation.md").read_text()
 emitted_fields = set()
 def collect(obj):
     if isinstance(obj, dict):

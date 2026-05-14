@@ -9,7 +9,7 @@ description: >
 
 This skill helps you design, author, and deploy Singularity Data Lake (SDL) dashboards — from a single panel to a full multi-tab SOC dashboard. Dashboards live as configuration files in SDL and are authored as JSON (or a relaxed JavaScript-literal superset of it). You deploy them via the `sentinelone-sdl-api` skill's `put_file` method.
 
-> **Sandbox proxy blocked?** If `put_file` or SDL API calls to `*.sentinelone.net` fail with a connection or proxy error inside the Claude sandbox, use the `sentinelone-mcp` server instead. It runs locally via `node` and bypasses the sandbox proxy entirely. Setup: add it to `claude_desktop_config.json` (see `claude-skills/sentinelone-mcp/README.md`). Use the `sdl_put_file` tool to deploy dashboards and `sdl_get_file` / `sdl_list_files` to inspect what's already deployed.
+> **Sandbox proxy blocked?** If `put_file` or SDL API calls to `*.sentinelone.net` fail with a connection or proxy error inside the Claude sandbox, use the `sentinelone-mcp` server instead. It runs locally via `node` and bypasses the sandbox proxy entirely. Setup: add it to `claude_desktop_config.json` (see `sentinelone-mcp/README.md`). Use the `sdl_put_file` tool to deploy dashboards and `sdl_get_file` / `sdl_list_files` to inspect what's already deployed.
 
 ## Workflow
 

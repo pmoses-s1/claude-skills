@@ -8,7 +8,7 @@ description: Use whenever the user wants to author, edit, debug, validate, or ex
 
 This skill turns raw log samples into deployed, validated SDL parser definitions. A parser is an *augmented-JSON* file at `/logParsers/<name>` on the SDL tenant that extracts fields from each ingested line. The parser editor and the `Test Parser` button in the console run the parser client-side in JavaScript; this skill mirrors that workflow programmatically and finishes by ingesting a sample through the deployed parser to confirm the actual ingest path works.
 
-> **Sandbox proxy blocked?** If `putFile` or `uploadLogs` calls to `*.sentinelone.net` fail with a connection or proxy error inside the Claude sandbox, use the `sentinelone-mcp` server instead. It runs locally via `node` and bypasses the sandbox proxy entirely. Setup: add it to `claude_desktop_config.json` (see `claude-skills/sentinelone-mcp/README.md`). Use `sdl_put_file` to deploy the parser and `sdl_upload_logs` to run the ingest validation step — both execute from your machine, not the sandbox.
+> **Sandbox proxy blocked?** If `putFile` or `uploadLogs` calls to `*.sentinelone.net` fail with a connection or proxy error inside the Claude sandbox, use the `sentinelone-mcp` server instead. It runs locally via `node` and bypasses the sandbox proxy entirely. Setup: add it to `claude_desktop_config.json` (see `sentinelone-mcp/README.md`). Use `sdl_put_file` to deploy the parser and `sdl_upload_logs` to run the ingest validation step — both execute from your machine, not the sandbox.
 
 ## Two hard rules (every parser, every time)
 
@@ -348,10 +348,11 @@ If you inherit a marketplace parser, keep it on v0 rather than rewriting. For ne
 Always validate against the live tenant via the `sentinelone-sdl-api` skill. Do not rely solely on the syntactic plausibility of the JSON — the only authoritative test is "did the field actually appear in a query after ingest." This is what the in-console `Test Parser` button approximates client-side; doing it through the API exercises the real ingest pipeline.
 
 ```python
-import sys, glob, time, uuid, json
-_sdl_scripts = next(iter(glob.glob("/sessions/*/mnt/.claude/skills/sentinelone-sdl-api/scripts")), None)
-if _sdl_scripts:
-    sys.path.insert(0, _sdl_scripts)
+import sys, os, time, uuid, json
+_sdl_scripts = os.environ.get("SDL_API_SCRIPTS") or os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sentinelone-sdl-api", "scripts")
+)
+sys.path.insert(0, _sdl_scripts)
 from sdl_client import SDLClient
 
 c = SDLClient()
