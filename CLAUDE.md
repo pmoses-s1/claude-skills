@@ -882,6 +882,7 @@ Replicate this shape for any investigation that culminates in deliverables, rega
 - NEVER use `sort fieldname desc` or `sort fieldname asc` — wrong syntax, causes parse error.
 - NEVER use bare `*` as the initial filter — causes HTTP 500 (`"Don't understand [*]"`). Use a field presence check like `event.time=*` or `dataSource.name=*` instead.
 - NEVER start a query with `|` and no initial predicate — also causes a 500.
+- NEVER use `| head N` — not a valid command, returns HTTP 500 `Unknown command [head]`. Use `| limit N`.
 
 ## SDL Dashboard — Common Rendering Pitfalls
 
@@ -896,6 +897,63 @@ These rendering failures are common across tenants and platform versions. Apply 
 | Dashboard panel times out / spins | Subquery inside the main query doubles the scan-and-aggregate cost | Don't gate the main query on a subquery in dashboards. Hardcode the top-N via inline OR clauses, or accept the full cardinality (small after filtering). |
 | Number panel slow | No `\| limit 1` after `\| group count()` — engine keeps scanning | Always terminate number panels with `\| limit 1` |
 | Wide range + fine bucket = thousands of points | `timebucket("10m")` over 7d = 1,008 points per series | Match bucket to duration: 1d → 10m, 7d → 1h, 30d → 1d minimum |
+
+
+## LRQ API — Technical Reference
+
+### Endpoint and Wire Format
+
+```
+POST   https://<console>.sentinelone.net/sdl/v2/api/queries
+GET    https://<console>.sentinelone.net/sdl/v2/api/queries/{id}?lastStepSeen={n}
+DELETE https://<console>.sentinelone.net/sdl/v2/api/queries/{id}
+```
+
+`xdr.us1.sentinelone.net` is the V1 Scalyr/DataSet endpoint — deprecated, sunset Feb 2027. Do not use it.
+
+**Auth:** `Authorization: Bearer <jwt>`. The same token the Mgmt API uses with `ApiToken` prefix. Using `ApiToken` prefix on `/sdl/v2/api/queries` returns HTTP 500.
+
+**Launch body:**
+```json
+{
+  "queryType": "PQ",
+  "startTime": "<iso-z>",
+  "endTime":   "<iso-z>",
+  "queryPriority": "HIGH",
+  "pq": { "query": "<pq string>", "resultType": "TABLE" },
+  "tenant": true
+}
+```
+Query string goes inside `pq.query`, NOT at the top level. `queryType` must be uppercase `"PQ"`. Omitting it returns HTTP 400.
+
+**`X-Dataset-Query-Forward-Tag` is mandatory.** Capture it from the POST response header and echo it on every GET and DELETE. Without it the routing layer rejects the request. It is session-scoped — one client's tag cannot be used by another.
+
+**Poll done condition:** `stepsCompleted >= stepsTotal` (both integers in the top-level response). There is no `status` string field.
+
+**Results location:** `data.columns` (list of dicts with `.name`) and `data.values` (2D array). `matchCount` is in `data.matchCount`.
+
+### Rate Limiting and Two-Token Round-Robin
+
+Per-service-user cap is ~2.5 rps. A single token over 30 days serially takes ~166s; 6×5d slices at pool=3 reaches ~66s.
+
+**To exceed the cap:** create two service users (different `sub` claims). Each has its own 3 rps budget. Bind each time slice to one client for its full launch-poll-cancel lifecycle (forward tag is session-scoped). Round-robin slices across clients. Combined ~5-6 rps; best observed 30d wall time ~28.5s (10×3d slices, pool=6 each). Three JWTs reaches 18-22s.
+
+### `tenant: true` Multi-Account Scoping Gotcha
+
+`tenant: true` scopes to a **default account**, not every account. If Purple MCP returns rows for the same window and query but LRQ returns `matchCount=0`, suspect multi-account scoping. Re-run with explicit `accountIds` set to the account that carries the data. Discover candidate account IDs via `GET /web/api/v2.1/accounts`.
+
+### `merge_aggregate` — Non-Additive Aggregates
+
+Sliced parallel queries cannot be naively concatenated. Re-aggregation rules:
+
+| Aggregate | Cross-slice operation |
+|---|---|
+| `count()` / `sum()` | Sum per-slice values |
+| `min()` | Min of mins |
+| `max()` | Max of maxes |
+| `estimate_distinct()` | NOT additive — rerun a final single-slice query over the union, or accept approximation |
+
+For anything other than sum/min/max, run a final aggregating pass over the merged row set.
 
 ## SentinelOne Custom Detection Rule (STAR) — Deployment Gotchas
 
